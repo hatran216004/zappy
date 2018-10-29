@@ -11,6 +11,7 @@ import RegisterPage from '@/pages/RegisterPage';
 import { JoinGroupPage } from '@/pages/JoinGroupPage';
 import { useAuth } from '@/stores/user';
 import { BrowserRouter, Outlet, Route, Routes, Navigate } from 'react-router';
+import PostsPage from '@/pages/posts/PostsPage';
 
 const ProtectedRoutes = () => {
   const { isAuthenticated } = useAuth();
@@ -38,6 +39,11 @@ export default function AppRoutes() {
               <Route index element={<FriendPage />} />
               <Route path="group" element={<FriendGroupsPage />} />
               <Route path="requests" element={<FriendRequestsPage />} />
+            </Route>
+            
+            <Route path="posts">
+              <Route index element={<PostsPage />} />
+              <Route path=":postId" element={<PostsPage />} />
             </Route>
           </Route>
         </Route>

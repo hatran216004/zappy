@@ -10,7 +10,8 @@ import {
   Settings,
   Moon,
   Sun,
-  User,
+  User, 
+  Globe,
   LogOut,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -112,6 +113,7 @@ export default function Navbar() {
 
   const isChat = pathname.includes("chat") || pathname === "/";
   const isFriends = pathname.includes("friends");
+  const isPost = pathname.includes("posts");
 
   return (
     <>
@@ -281,7 +283,24 @@ export default function Navbar() {
             </div>
           </ItemWrap>
 
-          {/* Thêm khoảng trắng cho thở */}
+
+          <ItemWrap active={isPost}>
+            <TooltipBtn
+              onClick={() => navigate("/posts")}
+              isActive={isPost}
+              icon={Globe}
+              label="Posts"
+              className="
+                relative z-[1]
+                text-[#B5BAC1]
+                hover:text-white
+                !rounded-2xl
+                w-10 h-10
+                flex items-center justify-center
+                data-[active=true]:text-white
+              "
+            />
+          </ItemWrap>
           <div className="h-2" />
         </div>
 
