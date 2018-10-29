@@ -7,7 +7,7 @@ import { IoMdPersonAdd } from 'react-icons/io';
 const sidebarButtons = [
   { label: 'Danh sách bạn bè', icon: BsPersonLinesFill, url: '/friends' },
   {
-    label: 'Danh sách nhóm và cộng đồng',
+    label: 'Danh sách nhóm',
     icon: HiMiniUserGroup,
     url: '/friends/group'
   },
