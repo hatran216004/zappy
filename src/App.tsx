@@ -1,3 +1,5 @@
+import Layout from "./layouts/layout";
+
 export default function App() {
-  return <div>App</div>;
+  return <Layout />;
 }
