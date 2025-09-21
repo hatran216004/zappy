@@ -1,23 +1,11 @@
 import { useState } from "react";
 import { Search, UserPlus, Pin } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+
 import { TbUsersPlus } from "react-icons/tb";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+
+import { TooltipBtn } from "@/components/TooltipBtn";
+import ClassifyDropdown from "@/components/ContactBar/ClassifyDropdown";
 
 const mockChats = [
   {
@@ -39,13 +27,19 @@ const mockChats = [
   },
   {
     id: 3,
-    name: "Cuong",
+    name: "Nhóm 1",
     lastMsg: "Cuong: abc ...",
     time: "1 phút",
     avatar: "/test.png",
     unread: 64,
     active: true,
   },
+];
+
+const classifyTags = [
+  { color: "bg-red-500", label: "Khóa luận cử nhân" },
+  { color: "bg-blue-500", label: "Thực tập" },
+  { color: "bg-gray-400", label: "Tin nhắn từ người lạ" },
 ];
 
 export default function ContactBar() {
@@ -70,35 +64,14 @@ export default function ContactBar() {
             icon={<TbUsersPlus className="size-5" />}
             label="Tạo nhóm"
           />
-
-          {/* <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-            <MoreHorizontal className="size-5 text-gray-500 dark:text-gray-300" />
-          </button> */}
         </div>
-
-        {/* Tabs */}
-        {/* <div className="flex border-b border-gray-300 dark:border-gray-700 text-sm">
-          {["Tất cả", "Chưa đọc", "Phân loại"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-2  ${
-                tab === t
-                  ? "border-b-2 border-blue-500 text-blue-500"
-                  : "text-gray-500 dark:text-gray-400"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div> */}
 
         <div className="flex border-b border-gray-300 dark:border-gray-700 text-sm">
           {/* Tất cả */}
           <button
-            onClick={() => setTab("Tất cả")}
+            onClick={() => setTab("all")}
             className={`flex-1 py-2 ${
-              tab === "Tất cả"
+              tab === "all"
                 ? "border-b-2 border-blue-500 text-blue-500"
                 : "text-gray-500 dark:text-gray-400"
             }`}
@@ -108,9 +81,9 @@ export default function ContactBar() {
 
           {/* Chưa đọc */}
           <button
-            onClick={() => setTab("Chưa đọc")}
+            onClick={() => setTab("unread")}
             className={`flex-1 py-2 ${
-              tab === "Chưa đọc"
+              tab === "unread"
                 ? "border-b-2 border-blue-500 text-blue-500"
                 : "text-gray-500 dark:text-gray-400"
             }`}
@@ -118,38 +91,8 @@ export default function ContactBar() {
             Chưa đọc
           </button>
 
-          {/* Phân loại có dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={`flex-1 py-2 flex items-center justify-center gap-1 ${
-                  tab === "Phân loại"
-                    ? "border-b-2 border-blue-500 text-blue-500"
-                    : "text-gray-500 dark:text-gray-400"
-                }`}
-              >
-                Phân loại
-                <ChevronDown className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Theo thẻ phân loại</DropdownMenuLabel>
-              <DropdownMenuItem>
-                <span className="w-2 h-2 rounded-sm bg-red-500 mr-2" />
-                Khóa luận cử nhân
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <span className="w-2 h-2 rounded-sm bg-blue-500 mr-2" />
-                Thực tập
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <span className="w-2 h-2 rounded-sm bg-gray-400 mr-2" />
-                Tin nhắn từ người lạ
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Quản lý thẻ phân loại</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Phân loại */}
+          <ClassifyDropdown classifyTags={classifyTags} />
         </div>
 
         {/* Banner */}
@@ -162,7 +105,7 @@ export default function ContactBar() {
         </div> */}
 
         {/* Chat list */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-custom [scrollbar-gutter:stable]">
           {mockChats.map((chat) => (
             <div
               key={chat.id}
@@ -174,7 +117,9 @@ export default function ContactBar() {
             >
               <Avatar className="h-10 w-10">
                 <AvatarImage src={chat.avatar} />
-                <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                <AvatarFallback className="bg-zinc-300">
+                  {chat.name[0]}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center">
@@ -188,13 +133,13 @@ export default function ContactBar() {
                     {chat.lastMsg}
                   </p>
                   <div className="flex items-center gap-1">
-                    {chat.pinned && (
-                      <Pin className="size-3 text-gray-400 dark:text-gray-500" />
-                    )}
                     {chat.unread && (
                       <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5">
                         {chat.unread > 99 ? "99+" : chat.unread}
                       </span>
+                    )}
+                    {chat.pinned && (
+                      <Pin className="size-3 text-gray-400 dark:text-gray-500" />
                     )}
                   </div>
                 </div>
@@ -204,27 +149,5 @@ export default function ContactBar() {
         </div>
       </div>
     </div>
-  );
-}
-
-function TooltipBtn({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="p-2 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            {/* <UserPlus className="size-5 text-gray-500 dark:text-gray-300" /> */}
-            {icon}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" align="start">
-          <p>{label}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
   );
 }
