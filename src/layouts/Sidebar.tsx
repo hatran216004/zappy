@@ -6,15 +6,15 @@ import {
   Users,
   Clock,
   FileText,
-  Image,
-  File,
-  Link,
   AlertTriangle,
   Trash2,
   LogOut,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+
+import { SidebarAccordionSection } from "../components/Sidebar/SidebarAccordionSection";
+import SidebarAction from "@/components/Sidebar/SidebarAction";
+import SidebarDangerItem from "@/components/Sidebar/SidebarDangerItem";
 
 export default function Sidebar() {
   return (
@@ -25,134 +25,125 @@ export default function Sidebar() {
           Thông tin nhóm
         </h2>
       </div>
+      <div className="overflow-y-auto scrollbar-custom [scrollbar-gutter:stable]">
+        {/* Group Info */}
+        <div className="flex flex-col items-center py-6 border-b dark:border-gray-700">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src="/avatar.png" />
+            <AvatarFallback className="bg-zinc-300">U</AvatarFallback>
+          </Avatar>
+          <p className="mt-3 font-medium text-gray-900 dark:text-gray-100 text-center">
+            Nhóm 1
+          </p>
+          <div className="flex gap-6 mt-4">
+            <SidebarAction icon={<BellOff />} label="Tắt thông báo" />
+            <SidebarAction icon={<Pin />} label="Ghim hội thoại" />
+            <SidebarAction icon={<UserPlus />} label="Thêm thành viên" />
+            <SidebarAction icon={<Settings />} label="Quản lý nhóm" />
+          </div>
+        </div>
 
-      <div className="flex flex-col items-center py-6 border-b dark:border-gray-700">
-        <Avatar className="h-16 w-16">
-          <AvatarImage src="/avatar.png" />
-          <AvatarFallback>U</AvatarFallback>
-        </Avatar>
-        <p className="mt-3 font-medium text-gray-900 dark:text-gray-100">
-          Cường đại đế và tàu ngọc trai đen
-        </p>
-        <div className="flex gap-6 mt-4">
-          <SidebarAction icon={<BellOff />} label="Tắt thông báo" />
-          <SidebarAction icon={<Pin />} label="Ghim hội thoại" />
-          <SidebarAction icon={<UserPlus />} label="Thêm thành viên" />
-          <SidebarAction icon={<Settings />} label="Quản lý nhóm" />
+        {/* Sections */}
+        <div className="flex-1  px-2">
+          {/* Thành viên nhóm */}
+          <SidebarAccordionSection
+            type="list"
+            title="Thành viên nhóm"
+            items={[
+              { label: `5 thành viên`, icon: <Users className="size-5" /> },
+            ]}
+          />
+
+          {/* Bảng tin nhóm */}
+          <SidebarAccordionSection
+            type="list"
+            title="Bảng tin nhóm"
+            items={[
+              {
+                label: "Danh sách nhắc hẹn",
+                icon: <Clock className="size-5" />,
+              },
+              {
+                label: "Ghi chú, ghim, bình chọn",
+                icon: <FileText className="size-5" />,
+              },
+            ]}
+          />
+
+          {/* Accordion Sections */}
+          <SidebarAccordionSection
+            type="media"
+            title="Ảnh/Video"
+            items={[
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+              { src: "/default-image.png" },
+            ]}
+          />
+
+          <SidebarAccordionSection
+            type="file"
+            title="File"
+            items={[
+              {
+                name: "NguyenTrongHieu_2001221402.docx",
+                size: "124.24 KB",
+                time: "Hôm nay",
+              },
+              {
+                name: "Mau phieu-nhan-xet.docx",
+                size: "294.65 KB",
+                time: "Hôm nay",
+              },
+            ]}
+          />
+
+          <SidebarAccordionSection
+            type="link"
+            title="Link"
+            items={[
+              {
+                title: "ChatGPT - Quét heuristic virus",
+                url: "chatgpt.com",
+                time: "Hôm nay",
+              },
+              {
+                title: "https://chatgpt.com/share/68ce70a1",
+                url: "chatgpt.com",
+                time: "Hôm nay",
+              },
+            ]}
+          />
+
+          {/* Thiết lập bảo mật */}
+          <div className="py-3 border-b dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Thiết lập bảo mật
+            </h3>
+            <div className="flex flex-col gap-2">
+              <SidebarDangerItem icon={<AlertTriangle />} label="Báo xấu" />
+              <SidebarDangerItem
+                icon={<Trash2 />}
+                label="Xoá lịch sử trò chuyện"
+              />
+              <SidebarDangerItem icon={<LogOut />} label="Rời nhóm" />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Sections */}
-      <div className="flex-1 overflow-y-auto px-2">
-        <SidebarSection title="Thành viên nhóm">
-          <SidebarItem
-            icon={<Users className="size-5" />}
-            label="5 thành viên"
-          />
-        </SidebarSection>
-
-        <SidebarSection title="Bảng tin nhóm">
-          <SidebarItem
-            icon={<Clock className="size-5" />}
-            label="Danh sách nhắc hẹn"
-          />
-          <SidebarItem
-            icon={<FileText className="size-5" />}
-            label="Ghi chú, ghim, bình chọn"
-          />
-        </SidebarSection>
-
-        <SidebarSection title="Ảnh/Video">
-          <SidebarItem icon={<Image className="size-5" />} label="Ảnh/Video" />
-        </SidebarSection>
-
-        <SidebarSection title="File">
-          <SidebarItem icon={<File className="size-5" />} label="File" />
-        </SidebarSection>
-
-        <SidebarSection title="Link">
-          <SidebarItem icon={<Link className="size-5" />} label="Link" />
-        </SidebarSection>
-
-        <SidebarSection title="Thiết lập bảo mật">
-          <SidebarItem
-            icon={<AlertTriangle className="size-5 text-red-500" />}
-            label="Báo xấu"
-            danger
-          />
-          <SidebarItem
-            icon={<Trash2 className="size-5 text-red-500" />}
-            label="Xoá lịch sử trò chuyện"
-            danger
-          />
-          <SidebarItem
-            icon={<LogOut className="size-5 text-red-500" />}
-            label="Rời nhóm"
-            danger
-          />
-        </SidebarSection>
-      </div>
-    </div>
-  );
-}
-
-function SidebarAction({
-  icon,
-  label,
-}: {
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1 text-gray-600 dark:text-gray-300">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-800"
-      >
-        {icon}
-      </Button>
-      <span className="text-xs">{label}</span>
-    </div>
-  );
-}
-
-function SidebarSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="py-3 border-b dark:border-gray-700">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-        {title}
-      </h3>
-      <div className="flex flex-col gap-2">{children}</div>
-    </div>
-  );
-}
-
-function SidebarItem({
-  icon,
-  label,
-  danger,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  danger?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer ${
-        danger
-          ? "text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
-      }`}
-    >
-      {icon}
-      <span className="text-sm">{label}</span>
     </div>
   );
 }
