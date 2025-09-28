@@ -39,33 +39,24 @@ export default function Navbar() {
   };
 
   return (
-    <div className="w-[70px] border-r dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex flex-col items-center py-4 justify-between">
+    <div className="w-[70px] border-r dark:border-gray-800 bg-blue-500 dark:bg-gray-950 flex flex-col items-center py-4 justify-between">
       <div className="flex flex-col items-center gap-6">
         <Avatar className={cn(avatarVariants({ size: "md" }))}>
           <AvatarImage src="https://s120-ava-talk.zadn.vn/e/6/4/0/11/120/f56b25f4693f07db6244c569eeb86226.jpg" />
           <AvatarFallback className="bg-zinc-300">MD</AvatarFallback>
         </Avatar>
-        <TooltipBtn
-          icon={<MessageCircle className="size-6" />}
-          label="Tin nhắn"
-        />
-        <TooltipBtn icon={<Users className="size-6" />} label="Danh bạ" />
+        <TooltipBtn icon={MessageCircle} label="Tin nhắn" />
+        <TooltipBtn icon={Users} label="Danh bạ" />
       </div>
       <div className="flex flex-col items-center gap-6">
         <TooltipBtn
           onClick={toggleTheme}
-          icon={
-            theme === "light" ? (
-              <MoonIcon className="size-6" />
-            ) : (
-              <SunIcon className="size-6" />
-            )
-          }
+          icon={theme === "light" ? MoonIcon : SunIcon}
           label={`${theme === "light" ? "Chế độ tối" : "Chế độ sáng"}`}
         />
-        <TooltipBtn icon={<Cloud className="size-6" />} label="Cloud" />
-        <TooltipBtn icon={<Briefcase className="size-6" />} label="Công việc" />
-        <TooltipBtn icon={<Settings className="size-6" />} label="Cài đặt" />
+        <TooltipBtn icon={Cloud} label="Cloud" />
+        <TooltipBtn icon={Briefcase} label="Công việc" />
+        <TooltipBtn icon={Settings} label="Cài đặt" />
       </div>
     </div>
   );

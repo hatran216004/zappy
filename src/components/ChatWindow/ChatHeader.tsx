@@ -19,11 +19,11 @@ export default function ChatHeader() {
       </div>
 
       <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-        <TooltipBtn icon={<Search className="size-5 cursor-pointer" />} />
-        <TooltipBtn icon={<Phone className="size-5 cursor-pointer" />} />
-        <TooltipBtn icon={<Video className="size-5 cursor-pointer" />} />
-        <TooltipBtn icon={<Users className="size-5 cursor-pointer" />} />
-        <TooltipBtn icon={<Info className="size-5 cursor-pointer" />} />
+        <TooltipBtn icon={Search} />
+        <TooltipBtn icon={Phone} />
+        <TooltipBtn icon={Video} />
+        <TooltipBtn icon={Users} />
+        <TooltipBtn icon={Info} />
       </div>
     </div>
   );
