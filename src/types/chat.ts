@@ -2,7 +2,9 @@ export type Chat = {
   id: number;
   name: string;
   lastMsg: string;
-  time: Date;
+  time: string;
   avatar: string;
-  pinned: true;
+  pinned?: boolean;
+  unread?: number;
+  active?: boolean;
 };

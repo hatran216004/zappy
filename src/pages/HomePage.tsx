@@ -1,21 +1,29 @@
-import ChatWindow from '@/layouts/ChatWindow';
-import ContactBar from '@/layouts/ContactBar';
-import Navbar from '@/layouts/Navbar';
-import Sidebar from '@/layouts/Sidebar';
+import ChatWindow from "@/layouts/ChatWindow";
+import ContactBar from "@/layouts/ContactBar";
+import Navbar from "@/layouts/Navbar";
+import Sidebar from "@/layouts/Sidebar";
+import { useState } from "react";
 
 export default function HomePage() {
+  const [currentTab, setCurrentTab] = useState("ChatList");
+  const [contentContact, setContentContact] = useState<{
+    id?: string;
+    title?: string;
+    icon?: React.ElementType;
+  }>({});
+
   return (
-    <div className="flex h-screen dark:bg-gray-900">
-      <Navbar />
+    <div className="flex h-screen dark:bg-gray-900 ">
+      <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} />
 
-      <ContactBar />
+      <ContactBar
+        currentTab={currentTab}
+        setContentContact={setContentContact}
+      />
 
-      {/* <div className="flex-1 bg-white dark:bg-gray-800"></div> */}
-      <ChatWindow />
+      <ChatWindow currentTab={currentTab} contentContact={contentContact} />
 
-      {/* <div className="w-[300px] border-l dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-        </div> */}
-      <Sidebar />
+      {currentTab === "ContactList" ? null : <Sidebar />}
     </div>
   );
 }

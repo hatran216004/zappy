@@ -13,12 +13,13 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 import { SidebarAccordionSection } from "../components/Sidebar/SidebarAccordionSection";
-import SidebarAction from "@/components/Sidebar/SidebarAction";
+// import SidebarAction from "@/components/Sidebar/SidebarAction";
 import SidebarDangerItem from "@/components/Sidebar/SidebarDangerItem";
+import { TooltipBtn } from "@/components/TooltipBtn";
 
 export default function Sidebar() {
   return (
-    <div className="w-[300px] flex flex-col h-full border-l dark:border-gray-800 bg-white dark:bg-gray-900">
+    <div className="w-[350px] flex flex-col h-full border-l dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="p-4 border-b dark:border-gray-700 text-center">
         <h2 className="font-semibold text-gray-800 dark:text-gray-200">
@@ -36,15 +37,19 @@ export default function Sidebar() {
             Nhóm 1
           </p>
           <div className="flex gap-6 mt-4">
-            <SidebarAction icon={<BellOff />} label="Tắt thông báo" />
+            {/* <SidebarAction icon={<BellOff />} label="Tắt thông báo" />
             <SidebarAction icon={<Pin />} label="Ghim hội thoại" />
             <SidebarAction icon={<UserPlus />} label="Thêm thành viên" />
-            <SidebarAction icon={<Settings />} label="Quản lý nhóm" />
+            <SidebarAction icon={<Settings />} label="Quản lý nhóm" /> */}
+            <TooltipBtn icon={BellOff} label="Tắt thông báo" />
+            <TooltipBtn icon={Pin} label="Ghim hội thoại" />
+            <TooltipBtn icon={UserPlus} label="Thêm thành viên" />
+            <TooltipBtn icon={Settings} label="Quản lý nhóm" />
           </div>
         </div>
 
         {/* Sections */}
-        <div className="flex-1  px-2">
+        <div className="flex-1 ">
           {/* Thành viên nhóm */}
           <SidebarAccordionSection
             type="list"
@@ -129,17 +134,14 @@ export default function Sidebar() {
           />
 
           {/* Thiết lập bảo mật */}
-          <div className="py-3 border-b dark:border-gray-700">
+          <div className="px-2 py-3 border-b dark:border-gray-700">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Thiết lập bảo mật
             </h3>
             <div className="flex flex-col gap-2">
-              <SidebarDangerItem icon={<AlertTriangle />} label="Báo xấu" />
-              <SidebarDangerItem
-                icon={<Trash2 />}
-                label="Xoá lịch sử trò chuyện"
-              />
-              <SidebarDangerItem icon={<LogOut />} label="Rời nhóm" />
+              <SidebarDangerItem icon={AlertTriangle} label="Báo xấu" />
+              <SidebarDangerItem icon={Trash2} label="Xoá lịch sử trò chuyện" />
+              <SidebarDangerItem icon={LogOut} label="Rời nhóm" />
             </div>
           </div>
         </div>
