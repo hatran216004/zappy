@@ -30,7 +30,7 @@ export function SidebarAccordionSection({
       className="w-full border-b border-gray-200 dark:border-gray-700"
     >
       <AccordionItem value={title.toLowerCase()}>
-        <AccordionTrigger className="text-sm font-semibold text-gray-800 dark:text-gray-200 hover:no-underline">
+        <AccordionTrigger className="px-2 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:no-underline">
           {title}
         </AccordionTrigger>
 

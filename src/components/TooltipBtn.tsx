@@ -5,31 +5,48 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 type TooltipBtnProps = {
+  id?: string;
   icon: React.ElementType;
   label?: string;
-
-  onClick?: () => void | undefined;
+  onClick?: () => void;
+  active?: string;
+  className?: string;
 };
 
-export function TooltipBtn({ icon: Icon, label, onClick }: TooltipBtnProps) {
+export function TooltipBtn({
+  id,
+  icon: Icon,
+  label,
+  onClick,
+  active,
+  className,
+}: TooltipBtnProps) {
+  const isActive = !!id && active === id;
+
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             onClick={onClick}
-            variant="secondary"
+            variant="ghost"
             size="icon"
-            className="p-4 bg-transparent hover:bg-gray-800/50 dark:hover:bg-gray-600 cursor-pointer"
+            className={cn(
+              "p-2 rounded-full bg-transparent",
+              isActive
+                ? "bg-gray-600/50 text-white hover:bg-blue-600"
+                : "text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700",
+              className
+            )}
           >
-            {/* <UserPlus className="size-5 text-gray-500 dark:text-gray-300" /> */}
-            <Icon className="size-5 text-white " />
+            <Icon className="size-5" />
           </Button>
         </TooltipTrigger>
         {label && (
-          <TooltipContent side="bottom" align="start">
+          <TooltipContent side="bottom" align="center">
             <p>{label}</p>
           </TooltipContent>
         )}

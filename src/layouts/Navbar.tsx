@@ -13,7 +13,12 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export default function Navbar() {
+type NavbarProps = {
+  currentTab: string;
+  setCurrentTab: React.Dispatch<React.SetStateAction<string>>;
+};
+
+export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("theme");
     if (saved) return saved;
@@ -45,18 +50,45 @@ export default function Navbar() {
           <AvatarImage src="https://s120-ava-talk.zadn.vn/e/6/4/0/11/120/f56b25f4693f07db6244c569eeb86226.jpg" />
           <AvatarFallback className="bg-zinc-300">MD</AvatarFallback>
         </Avatar>
-        <TooltipBtn icon={MessageCircle} label="Tin nhắn" />
-        <TooltipBtn icon={Users} label="Danh bạ" />
+        <TooltipBtn
+          id="ChatList"
+          active={currentTab}
+          onClick={() => setCurrentTab("ChatList")}
+          icon={MessageCircle}
+          label="Tin nhắn"
+          className="text-white hover:text-white hover:bg-zinc-600/50"
+        />
+        <TooltipBtn
+          id="ContactList"
+          active={currentTab}
+          onClick={() => setCurrentTab("ContactList")}
+          icon={Users}
+          label="Danh bạ"
+          className="text-white hover:text-white hover:bg-zinc-600/50"
+        />
       </div>
       <div className="flex flex-col items-center gap-6">
         <TooltipBtn
           onClick={toggleTheme}
           icon={theme === "light" ? MoonIcon : SunIcon}
           label={`${theme === "light" ? "Chế độ tối" : "Chế độ sáng"}`}
+          className="text-white hover:text-white hover:bg-zinc-600/50"
         />
-        <TooltipBtn icon={Cloud} label="Cloud" />
-        <TooltipBtn icon={Briefcase} label="Công việc" />
-        <TooltipBtn icon={Settings} label="Cài đặt" />
+        <TooltipBtn
+          icon={Cloud}
+          label="Cloud"
+          className="text-white hover:text-white hover:bg-zinc-600/50"
+        />
+        <TooltipBtn
+          icon={Briefcase}
+          label="Công việc"
+          className="text-white hover:text-white hover:bg-zinc-600/50"
+        />
+        <TooltipBtn
+          icon={Settings}
+          label="Cài đặt"
+          className="text-white hover:text-white hover:bg-zinc-600/50"
+        />
       </div>
     </div>
   );
