@@ -17,7 +17,7 @@ const messages = [
 
 export default function ChatMessages() {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pb-4 sc">
       {messages.map((m) => (
         <div
           key={m.id}
