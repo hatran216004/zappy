@@ -12,6 +12,7 @@ import { useMutation } from '@tanstack/react-query';
 import authServices from '@/services/authServices';
 import toast from 'react-hot-toast';
 import { PasswordHints } from '@/components/PasswordHints';
+import SelectController from '@/components/SelectController';
 
 type FormData = RegisterSchema;
 
@@ -36,14 +37,16 @@ const RegisterPage = () => {
   });
 
   const onSubmit = async (data: FormData) => {
-    const { email, password, username } = data;
+    const { email, password, username, displayName, gender } = data;
 
     mutate(
-      { email, password, username },
+      { email, password, username, displayName, gender },
       {
         onSuccess: () => {
-          toast.success('Login successfully');
-          navigate('/');
+          toast.success(
+            'Đăng ký thành công. Vui lòng kiểm tra và xác nhận email'
+          );
+          navigate('/login');
         },
         onError: (error) => {
           toast.error(error.message);
@@ -66,79 +69,97 @@ const RegisterPage = () => {
           </p>
         </div>
 
-        <form
-          className="bg-white rounded-3xl shadow-2xl p-8 backdrop-blur-sm space-y-4"
-          onSubmit={handleSubmit(onSubmit)}
-        >
-          <Input
-            register={register}
-            name="username"
-            placeholder="Username"
-            errorMessage={errors.username?.message}
-            type="text"
-            icon={User}
-          />
-
-          <Input
-            name="email"
-            placeholder="Email"
-            errorMessage={errors.email?.message}
-            type="email"
-            register={register}
-            icon={Mail}
-          />
-
-          <Input
-            register={register}
-            name="password"
-            placeholder="Password"
-            errorMessage={errors.password?.message}
-            type="password"
-            icon={Lock}
-          />
-          <PasswordHints control={control} name="password" />
-
-          <Input
-            register={register}
-            name="confirmPassword"
-            placeholder="Confirm password"
-            errorMessage={errors.confirmPassword?.message}
-            type="password"
-            icon={Lock}
-          />
-
-          <div className="flex items-start space-x-3 mb-4">
-            <input
-              type="checkbox"
-              id="agreeTerms"
-              className="mt-1 h-4 w-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-              {...register('agreeTerms')}
+        <div className="bg-white rounded-3xl shadow-2xl p-8 backdrop-blur-sm">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <Input
+              register={register}
+              name="displayName"
+              placeholder="Họ và tên"
+              errorMessage={errors.displayName?.message}
+              type="text"
+              icon={User}
             />
-            <label
-              htmlFor="agreeTerms"
-              className="text-sm text-gray-600 leading-relaxed cursor-pointer select-none"
+
+            <Input
+              register={register}
+              name="username"
+              placeholder="Username"
+              errorMessage={errors.username?.message}
+              type="text"
+              icon={User}
+            />
+
+            <Input
+              name="email"
+              placeholder="Email"
+              errorMessage={errors.email?.message}
+              type="email"
+              register={register}
+              icon={Mail}
+            />
+
+            <Input
+              register={register}
+              name="password"
+              placeholder="Password"
+              errorMessage={errors.password?.message}
+              type="password"
+              icon={Lock}
+            />
+            <PasswordHints control={control} name="password" />
+
+            <Input
+              register={register}
+              name="confirmPassword"
+              placeholder="Confirm password"
+              errorMessage={errors.confirmPassword?.message}
+              type="password"
+              icon={Lock}
+            />
+
+            <SelectController
+              control={control}
+              fieldName="gender"
+              options={[
+                { label: 'Nam', value: 'male' },
+                { label: 'Nữ', value: 'female' }
+              ]}
+              placeholder="Giới tính"
+              errorMessage={errors.gender?.message}
+            />
+
+            <div className="flex items-start space-x-3 mb-4">
+              <input
+                type="checkbox"
+                id="agreeTerms"
+                className="mt-1 h-4 w-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
+                {...register('agreeTerms')}
+              />
+              <label
+                htmlFor="agreeTerms"
+                className="text-sm text-gray-600 leading-relaxed cursor-pointer select-none"
+              >
+                Tôi đồng ý với{' '}
+                <span className="text-blue-500 hover:text-blue-600 font-medium cursor-pointer">
+                  Điều khoản sử dụng
+                </span>{' '}
+                và{' '}
+                <span className="text-blue-500 hover:text-blue-600 font-medium cursor-pointer">
+                  Chính sách bảo mật
+                </span>{' '}
+                của Zalo
+              </label>
+            </div>
+            <Button
+              rounded
+              primary
+              disabled={!watch('agreeTerms') || isPending}
+              isLoading={isPending}
+              type="submit"
             >
-              Tôi đồng ý với{' '}
-              <span className="text-blue-500 hover:text-blue-600 font-medium cursor-pointer">
-                Điều khoản sử dụng
-              </span>{' '}
-              và{' '}
-              <span className="text-blue-500 hover:text-blue-600 font-medium cursor-pointer">
-                Chính sách bảo mật
-              </span>{' '}
-              của Zalo
-            </label>
-          </div>
-
-          <Button
-            rounded
-            primary
-            disabled={!watch('agreeTerms') || isPending}
-            type="submit"
-          >
-            Đăng ký
-          </Button>
-
+              Đăng ký
+            </Button>
+          </form>
           <Divider>Hoặc</Divider>
 
           <div className="space-y-3">
@@ -179,7 +200,7 @@ const RegisterPage = () => {
               </Link>
             </p>
           </div>
-        </form>
+        </div>
 
         {/* Footer */}
         <div className="mt-6 text-center">

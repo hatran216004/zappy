@@ -1,6 +1,7 @@
 import * as yup from 'yup';
 
 export const registerSchema = yup.object({
+  displayName: yup.string().required('Họ tên là bắt buộc'),
   username: yup.string().required('Username là bắt buộc'),
 
   email: yup.string().email('Email không hợp lệ').required('Email là bắt buộc'),
@@ -16,6 +17,11 @@ export const registerSchema = yup.object({
       /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/,
       'Phải có ít nhất 1 ký tự đặc biệt'
     ),
+
+  gender: yup
+    .mixed<'male' | 'female'>()
+    .oneOf(['male', 'female'], 'Vui lòng chọn giới tính')
+    .required('Giới tính là bắt buộc'),
 
   confirmPassword: yup
     .string()

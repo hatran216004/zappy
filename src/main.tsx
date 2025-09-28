@@ -17,7 +17,7 @@ createRoot(document.getElementById('root')!).render(
     <ReactQueryDevtools
       initialIsOpen={false}
       position="bottom"
-      buttonPosition="bottom-left"
+      buttonPosition="bottom-right"
     />
     <App />
   </QueryClientProvider>
