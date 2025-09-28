@@ -7,12 +7,13 @@ import {
 } from "@/components/ui/tooltip";
 
 type TooltipBtnProps = {
-  icon: React.ReactNode;
+  icon: React.ElementType;
   label?: string;
+
   onClick?: () => void | undefined;
 };
 
-export function TooltipBtn({ icon, label, onClick }: TooltipBtnProps) {
+export function TooltipBtn({ icon: Icon, label, onClick }: TooltipBtnProps) {
   return (
     <TooltipProvider>
       <Tooltip>
@@ -21,10 +22,10 @@ export function TooltipBtn({ icon, label, onClick }: TooltipBtnProps) {
             onClick={onClick}
             variant="secondary"
             size="icon"
-            className="p-2 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+            className="p-4 bg-transparent hover:bg-gray-800/50 dark:hover:bg-gray-600 cursor-pointer"
           >
             {/* <UserPlus className="size-5 text-gray-500 dark:text-gray-300" /> */}
-            {icon}
+            <Icon className="size-5 text-white " />
           </Button>
         </TooltipTrigger>
         {label && (

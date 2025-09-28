@@ -10,15 +10,12 @@ function Layout() {
       <Navbar />
 
       {/* ContactBar */}
-      <ContactBar />
+      <ContactBar isContact={true} />
 
       {/* Chat Window */}
-      {/* <div className="flex-1 bg-white dark:bg-gray-800"></div> */}
       <ChatWindow />
 
       {/* Sidebar */}
-      {/* <div className="w-[300px] border-l dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-      </div> */}
       <Sidebar />
     </div>
   );
