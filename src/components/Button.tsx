@@ -1,12 +1,14 @@
 import clsx from 'clsx';
 import { ButtonHTMLAttributes } from 'react';
 import { twMerge } from 'tailwind-merge';
+import Loading from './Loading';
 
 type ButtonProps = {
   primary?: boolean;
   rounded?: boolean;
   outline?: boolean;
   className?: string;
+  isLoading?: boolean;
   children?: React.ReactNode;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
@@ -16,6 +18,7 @@ export default function Button(props: ButtonProps) {
     rounded = false,
     outline = false,
     disabled = false,
+    isLoading = false,
     className = '',
     children,
     onClick = () => {},
@@ -32,7 +35,7 @@ export default function Button(props: ButtonProps) {
       disabled={disabled}
       className={clsx(
         twMerge(
-          'w-full flex items-center justify-center bg-gradient-to-r cursor-pointer disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-4 transition-all duration-200 shadow-lg transform disabled:transform-none disabled:cursor-not-allowed',
+          'w-full flex items-center justify-center gap-2 bg-gradient-to-r cursor-pointer disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-4 transition-all duration-200 shadow-lg transform disabled:transform-none disabled:cursor-not-allowed',
           className
         ),
         {
@@ -44,6 +47,7 @@ export default function Button(props: ButtonProps) {
       )}
       {...passProps}
     >
+      {isLoading && <Loading />}
       {children}
     </button>
   );
