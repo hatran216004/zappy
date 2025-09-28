@@ -1,5 +1,11 @@
-import Layout from "./layouts/Layout";
+import AppRoutes from "./components/AppRoutes";
+import CustomToast from "./components/CustomToast";
 
 export default function App() {
-  return <Layout />;
+  return (
+    <>
+      <AppRoutes />
+      <CustomToast />
+    </>
+  );
 }
