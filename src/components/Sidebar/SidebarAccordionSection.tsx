@@ -30,14 +30,14 @@ export function SidebarAccordionSection({
       className="w-full border-b border-gray-200 dark:border-gray-700"
     >
       <AccordionItem value={title.toLowerCase()}>
-        <AccordionTrigger className="px-2 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:no-underline">
+        <AccordionTrigger className="px-6 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:no-underline">
           {title}
         </AccordionTrigger>
 
-        <AccordionContent className="pt-2">
+        <AccordionContent className="p-5">
           {/* List */}
           {type === "list" && (
-            <div className="flex flex-col gap-2 mb-3">
+            <div className="flex flex-col gap-2">
               {(items as ListItem[]).map((item, i) => (
                 <div
                   key={i}
@@ -115,7 +115,7 @@ export function SidebarAccordionSection({
 
           {/* nút xem tất cả */}
           {type !== "list" && items.length > 0 && (
-            <Button className="w-full py-2 rounded-md bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+            <Button className="w-full py-2 rounded-xs  bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
               Xem tất cả
             </Button>
           )}
