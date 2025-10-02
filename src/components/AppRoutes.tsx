@@ -18,16 +18,14 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-
-        {/* <Route element={<ProtectedRoutes />}>
+        <Route element={<ProtectedRoutes />}>
           <Route path="/" element={<HomePage />} />
         </Route>
 
         <Route element={<RejectedRoutes />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-        </Route> */}
+        </Route>
       </Routes>
     </BrowserRouter>
   );

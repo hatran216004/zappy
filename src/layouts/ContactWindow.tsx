@@ -11,7 +11,13 @@ import {
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Filter, MoreHorizontal, Check } from "lucide-react";
+import {
+  ChevronDown,
+  Filter,
+  MoreHorizontal,
+  Check,
+  ArrowUpDownIcon,
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { avatarVariants } from "@/lib/variants";
 import { cn } from "@/lib/utils";
@@ -38,7 +44,7 @@ export default function ContactWindow() {
   const [sort, setSort] = useState("Tên (A-Z)");
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-sm">
       <div className="px-3 py-2 select-none">Bạn bè ({friends.length})</div>
 
       {/* Search + Controls */}
@@ -58,6 +64,7 @@ export default function ContactWindow() {
               className="flex items-center justify-between w-1/4 h-9 rounded-lg 
                      bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
             >
+              <ArrowUpDownIcon className="size-4 mr-1 shrink-0 opacity-70" />
               <span className="truncate">{sort}</span>
               <ChevronDown className="size-4 ml-1 shrink-0 opacity-70" />
             </Button>
@@ -158,15 +165,24 @@ export default function ContactWindow() {
         {friends.map((friend) => (
           <div
             key={friend.id}
-            className="mt-2 relative flex items-center justify-between px-3 py-2 
-                     hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
+            className=" relative flex items-center justify-between p-3 
+                     hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
           >
             <div className="flex items-center gap-3 relative z-10">
               <Avatar className={cn(avatarVariants({ size: "md" }))}>
                 <AvatarImage src={friend.avatar} />
                 <AvatarFallback className="bg-zinc-300">MD</AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium">{friend.name}</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">{friend.name}</span>
+                <div className="flex items-center gap-2 text-gray-400">
+                  <div className="text-[12px] mt-0.5">5 thành viên</div>
+                  <div>
+                    <span className="w-2 h-2 rounded-full inline-block mr-1 bg-red-500" />
+                    <span className="text-[12px]">Thực tập</span>
+                  </div>
+                </div>
+              </div>
             </div>
             <Button
               variant="ghost"
