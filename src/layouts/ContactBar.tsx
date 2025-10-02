@@ -38,6 +38,114 @@ const mockChats: Chat[] = [
     unread: 64,
     active: true,
   },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
+  // {
+  //   id: 3,
+  //   name: "Nhóm 1",
+  //   lastMsg: "Cuong: abc ...",
+  //   time: "1 phút",
+  //   avatar: "/test.png",
+  //   unread: 64,
+  //   active: true,
+  // },
 ];
 
 const classifyTags = [
@@ -80,7 +188,7 @@ export default function ContactBar({
   }, [isActive, currenContentContact, setContentContact]);
 
   return (
-    <div className="w-[350px] border-r dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+    <div className="w-[350px] border-r dark:border-gray-900 bg-gray-50 dark:bg-gray-800">
       <div className="flex flex-col h-full">
         {/* Search bar */}
         <SearchBar />
@@ -121,7 +229,7 @@ export default function ContactBar({
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto scrollbar-custom [scrollbar-gutter:stable]">
+          <div className="flex-1 overflow-y-auto scrollbar-custom">
             {mockChats.map((chat) => (
               <ChatItem key={chat.id} chat={chat} />
             ))}
@@ -136,7 +244,7 @@ function ChatItem({ chat }: { chat: Chat }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md ",
+        "flex items-center gap-3 p-4 cursor-pointer ",
         chat.active
           ? "bg-blue-600/20"
           : "hover:bg-gray-200 dark:hover:bg-gray-800"
