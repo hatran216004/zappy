@@ -21,7 +21,11 @@ export default function ChatWindow({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto scrollbar-custom px-4 pt-4 bg-gray-100 dark:bg-gray-900">
-          {currentTab === "ContactList" ? <ContactWindow /> : <ChatMessages />}
+          {currentTab === "ContactList" ? (
+            <ContactWindow contentContact={contentContact} />
+          ) : (
+            <ChatMessages />
+          )}
         </div>
 
         {/* Footer */}
