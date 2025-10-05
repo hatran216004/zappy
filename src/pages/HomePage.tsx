@@ -1,7 +1,7 @@
 import ChatWindow from "@/layouts/ChatWindow";
 import ContactBar from "@/layouts/ContactBar";
 import Navbar from "@/layouts/Navbar";
-import Sidebar from "@/layouts/Sidebar";
+// import Sidebar from "@/layouts/Sidebar";
 import { useState } from "react";
 
 export default function HomePage() {
@@ -22,8 +22,6 @@ export default function HomePage() {
       />
 
       <ChatWindow currentTab={currentTab} contentContact={contentContact} />
-
-      {currentTab === "ContactList" ? null : <Sidebar />}
     </div>
   );
 }
