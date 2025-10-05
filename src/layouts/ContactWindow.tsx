@@ -24,14 +24,24 @@ import { cn } from "@/lib/utils";
 
 // Mock friends data
 const friends = [
-  { id: 1, name: "User 1", avatar: "/default_user.jpg" },
-  { id: 2, name: "User 2", avatar: "/default_user.jpg" },
-  { id: 3, name: "User 3", avatar: "/default_user.jpg" },
-  { id: 4, name: "User 4", avatar: "/default_user.jpg" },
-  { id: 5, name: "User 5", avatar: "/default_user.jpg" },
-  { id: 6, name: "User 6", avatar: "/default_user.jpg" },
-  { id: 7, name: "User 7", avatar: "/default_user.jpg" },
-  { id: 8, name: "User 8", avatar: "/default_user.jpg" },
+  {
+    id: 1,
+    name: "User 1",
+    avatar: "/default_user.jpg",
+    tags: ["Thực tập", "Backend"],
+  },
+  {
+    id: 2,
+    name: "User 2",
+    avatar: "/default_user.jpg",
+    tags: ["Khóa luận cử nhân"],
+  },
+  {
+    id: 3,
+    name: "User 3",
+    avatar: "/default_user.jpg",
+    tags: ["Frontend", "ReactJS", "Nhóm 5"],
+  },
 ];
 
 const classifyTags = [
