@@ -37,7 +37,7 @@ const LoginPage = () => {
       { email, password },
       {
         onSuccess: () => {
-          toast.success('Login succesful');
+          toast.success('Đăng nhập thành công');
           navigate('/');
         },
         onError: (error) => {
