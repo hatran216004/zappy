@@ -1,36 +1,36 @@
-import { Button } from "@/components/ui/button";
+import clsx from 'clsx';
+import { Link, useLocation } from 'react-router';
 
 type SelectableButtonProps = {
-  id: string;
-  title: string;
+  label: string;
+  url: string;
   icon: React.ElementType;
-  isActive: string;
-  setIsActive: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export default function SelectableButton({
-  id,
-  title,
+  label,
   icon: Icon,
-  isActive,
-  setIsActive,
+  url
 }: SelectableButtonProps) {
+  const { pathname } = useLocation();
+  const isActive = pathname.endsWith(url);
+
   return (
-    <Button
-      variant="ghost"
-      onClick={() => setIsActive(id)}
-      className={`rounded-none flex items-center justify-start gap-3 px-3 py-6 
-                  text-gray-700 dark:text-gray-200 
-                  hover:bg-gray-200 dark:hover:bg-gray-800
-                  cursor-pointer
-                  ${
-                    isActive === id
-                      ? "bg-blue-500/20 dark:bg-blue-500/30 text-black dark:text-white"
-                      : ""
-                  }`}
+    <Link
+      to={`friends${url}`}
+      className={clsx(
+        'rounded-none flex items-center justify-start gap-3 px-3 py-6 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer',
+        isActive &&
+          'bg-blue-500/20 dark:bg-blue-500/30 text-black dark:text-white'
+      )}
     >
       <Icon className="size-5" /> {/* 👈 icon auto size */}
-      <span className="text-sm font-medium">{title}</span>
-    </Button>
+      <span className="text-sm font-medium">{label}</span>
+    </Link>
   );
 }
+
+/*
+
+
+*/

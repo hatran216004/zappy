@@ -5,27 +5,25 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import clsx from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 type TooltipBtnProps = {
   id?: string;
-  icon: React.ElementType;
   label?: string;
-  active?: string;
+  isActive?: boolean;
   className?: string;
+  icon: React.ElementType;
   onClick?: () => void;
 };
 
 export function TooltipBtn({
-  id,
   icon: Icon,
   label,
-  active,
   className,
+  isActive,
   onClick
 }: TooltipBtnProps) {
-  const isActive = id && active === id;
-
   return (
     <TooltipProvider>
       <Tooltip>
@@ -34,19 +32,21 @@ export function TooltipBtn({
             onClick={onClick}
             variant="ghost"
             size="icon"
-            className={cn(
-              'p-2 rounded-full bg-transparent',
-              isActive
-                ? 'bg-gray-600/50 text-white hover:bg-blue-600'
-                : 'text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700',
-              className
+            className={clsx(
+              twMerge(
+                'p-2 rounded-full bg-transparent',
+                isActive
+                  ? 'bg-gray-600/50 text-white hover:bg-blue-600'
+                  : 'text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700',
+                className
+              )
             )}
           >
             <Icon className="size-5" />
           </Button>
         </TooltipTrigger>
         {label && (
-          <TooltipContent side="bottom" align="center">
+          <TooltipContent side="right" align="center" sideOffset={8}>
             <p>{label}</p>
           </TooltipContent>
         )}
