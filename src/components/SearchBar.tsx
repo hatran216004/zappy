@@ -1,6 +1,7 @@
-import { Search, UserPlus } from "lucide-react";
-import { TooltipBtn } from "./TooltipBtn";
-import { TbUsersPlus } from "react-icons/tb";
+import { Search } from 'lucide-react';
+import { TooltipBtn } from './TooltipBtn';
+import { TbUsersPlus } from 'react-icons/tb';
+import AddFriendModal from './modal/AddFriendModal';
 
 export default function SearchBar() {
   return (
@@ -14,7 +15,7 @@ export default function SearchBar() {
         />
       </div>
 
-      <TooltipBtn icon={UserPlus} label="Thêm bạn" />
+      <AddFriendModal />
       <TooltipBtn icon={TbUsersPlus} label="Tạo nhóm" />
     </div>
   );
