@@ -360,7 +360,10 @@ const ProfileModal = ({ open, onOpenChange }: ProfileModalProps) => {
           <div className="space-y-4 py-4">
             {editField === "name" && (
               <div>
-                <Label htmlFor="display-name" className="dark:text-gray-200">
+                <Label
+                  htmlFor="display-name"
+                  className="dark:text-gray-200 mb-2"
+                >
                   Tên hiển thị
                 </Label>
                 <Input
@@ -379,7 +382,7 @@ const ProfileModal = ({ open, onOpenChange }: ProfileModalProps) => {
 
             {editField === "bio" && (
               <div>
-                <Label htmlFor="bio" className="dark:text-gray-200">
+                <Label htmlFor="bio" className="dark:text-gray-200 mb-2">
                   Giới thiệu
                 </Label>
                 <Textarea
