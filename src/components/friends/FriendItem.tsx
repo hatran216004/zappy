@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
+import { useState } from "react";
 
 interface FriendItemProps {
   friend: {
@@ -13,7 +14,7 @@ interface FriendItemProps {
 
 export default function FriendItem({ friend, onRemove }: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
-
+  console.log(friend);
   return (
     <li className="relative">
       {/* Row */}
@@ -23,12 +24,16 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
       >
         {/* Avatar */}
         <div className="relative shrink-0">
-          <img
-            src={friend.avatar_url || '/default-avatar.png'}
-            alt={friend.display_name}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-          {friend.status === 'online' && (
+          <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
+            <AvatarImage
+              src={friend.avatar_url || "/default-avatar.png"}
+              alt={friend.display_name}
+            />
+            <AvatarFallback>
+              {friend.display_name?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          {friend.status === "online" && (
             <span
               className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card
                          bg-[oklch(0.79_0.14_145)]"
