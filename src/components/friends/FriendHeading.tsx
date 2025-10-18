@@ -1,5 +1,5 @@
 export default function FriendHeading({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
