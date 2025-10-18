@@ -1,14 +1,14 @@
-import useUser from '@/hooks/useUser';
-import FriendLayout from '@/layouts/FriendLayout';
-import MainLayout from '@/layouts/MainLayout';
-import ChatPage from '@/pages/ChatPage';
-import FriendGroupsPage from '@/pages/friends/FriendGroupsPage';
-import FriendPage from '@/pages/friends/FriendPage';
-import FriendRequestsPage from '@/pages/friends/FriendRequestsPage';
-import LoginPage from '@/pages/LoginPage';
-import NotFound from '@/pages/NotFound';
-import RegisterPage from '@/pages/RegisterPage';
-import { BrowserRouter, Outlet, Route, Routes, Navigate } from 'react-router';
+import useUser from "@/hooks/useUser";
+import FriendLayout from "@/layouts/FriendLayout";
+import MainLayout from "@/layouts/MainLayout";
+import ChatPage from "@/pages/ChatPage";
+import FriendGroupsPage from "@/pages/friends/FriendGroupsPage";
+import FriendPage from "@/pages/friends/FriendPage";
+import FriendRequestsPage from "@/pages/friends/FriendRequestsPage";
+import LoginPage from "@/pages/LoginPage";
+import NotFound from "@/pages/NotFound";
+import RegisterPage from "@/pages/RegisterPage";
+import { BrowserRouter, Outlet, Route, Routes, Navigate } from "react-router";
 
 const ProtectedRoutes = () => {
   const { isAuthenticated } = useUser();
