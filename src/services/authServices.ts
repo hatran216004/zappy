@@ -108,4 +108,21 @@ const getCurrentUser = async (): Promise<{ user: User }> => {
   return { user: data.user };
 };
 
-export default { register, loginWithPassword, getCurrentUser };
+const logout = async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    const message =
+      AUTH_ERROR_MESSAGES[error?.code as string] ||
+      error?.message ||
+      'Có lỗi xảy ra. Vui lòng thử lại';
+
+    throw new CustomError(message, {
+      type: 'authentication',
+      details: `HTTP ${error.status ?? 'unknown'}`,
+      retryable: false
+    });
+  }
+  return null;
+};
+
+export default { register, loginWithPassword, getCurrentUser, logout };

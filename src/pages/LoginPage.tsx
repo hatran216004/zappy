@@ -3,7 +3,7 @@ import { type RegisterSchema, registerSchema } from '@/utils/rules';
 import { Lock, Mail } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { FcGoogle } from 'react-icons/fc';
 import { FaFacebook } from 'react-icons/fa';
 import Button from '@/components/Button';
@@ -11,6 +11,7 @@ import Divider from '@/components/Divider';
 import { useMutation } from '@tanstack/react-query';
 import authServices from '@/services/authServices';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/stores/user';
 
 type FormData = Pick<RegisterSchema, 'email' | 'password'>;
 const loginSchema = registerSchema.pick(['email', 'password']);
@@ -19,8 +20,7 @@ const LoginPage = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: authServices.loginWithPassword
   });
-
-  const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const {
     register,
@@ -36,9 +36,9 @@ const LoginPage = () => {
     mutate(
       { email, password },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast.success('Đăng nhập thành công');
-          navigate('/');
+          setUser(data.user);
         },
         onError: (error) => {
           toast.error(error.message);
@@ -64,6 +64,7 @@ const LoginPage = () => {
               placeholder="Email"
               errorMessage={errors.email?.message}
               type="email"
+              defaultValue="minhhatran153@gmail.com"
               register={register}
               icon={Mail}
             />
@@ -72,6 +73,7 @@ const LoginPage = () => {
               register={register}
               name="password"
               placeholder="Password"
+              defaultValue="Test1234@"
               errorMessage={errors.password?.message}
               type="password"
               icon={Lock}
