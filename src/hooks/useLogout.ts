@@ -1,10 +1,12 @@
 import authServices from '@/services/authServices';
+import { useAuth } from '@/stores/user';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router';
 
 function useLogout() {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const {
     mutate: logout,
@@ -17,6 +19,7 @@ function useLogout() {
     },
     onSettled: () => {
       navigate('/login');
+      setUser(null);
     }
   });
 

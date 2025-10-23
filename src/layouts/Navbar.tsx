@@ -23,18 +23,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import useUser from '@/hooks/useUser';
 import { useProfile } from '@/hooks/useProfile';
 import ProfileModal from '@/components/profile/ProfileModal';
 import useLogout from '@/hooks/useLogout';
+import { useAuth } from '@/stores/user';
+import {
+  useFriendRequestsRealtime,
+  usePendingFriendRequests
+} from '@/hooks/useFriends';
 
 export default function Navbar() {
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  const { data: requests } = usePendingFriendRequests(userId as string);
+
+  // Subscribe to realtime updates
+  useFriendRequestsRealtime(userId as string);
+  let hasFriendRequest = true;
+
   const { logout } = useLogout();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { user } = useUser();
-  const userId = user?.id as string;
-  const { data: profile } = useProfile(userId);
+  const { data: profile } = useProfile(userId as string);
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
@@ -60,6 +71,10 @@ export default function Navbar() {
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
+
+  if (!requests || requests.length === 0) {
+    hasFriendRequest = false;
+  }
 
   return (
     <>
@@ -128,6 +143,7 @@ export default function Navbar() {
           <TooltipBtn
             onClick={() => navigate('/friends')}
             icon={Users}
+            hasBadge={hasFriendRequest}
             isActive={pathname.includes('friends')}
             label="Danh bạ"
             className="text-white hover:text-white hover:bg-zinc-600/50"

@@ -5,7 +5,7 @@ import AddFriendModal from './modal/AddFriendModal';
 
 export default function SearchBar() {
   return (
-    <div className="flex items-center gap-2 p-2">
+    <div className="flex items-center gap-2 py-2">
       <div className="flex items-center flex-1 bg-gray-200 dark:bg-gray-800 rounded-md px-2">
         <Search className="h-4 w-4 text-gray-400 shrink-0" />
         <input

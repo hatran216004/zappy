@@ -14,6 +14,7 @@ type TooltipBtnProps = {
   isActive?: boolean;
   className?: string;
   icon: React.ElementType;
+  hasBadge?: boolean;
   onClick?: () => void;
 };
 
@@ -22,6 +23,7 @@ export function TooltipBtn({
   label,
   className,
   isActive,
+  hasBadge = false,
   onClick
 }: TooltipBtnProps) {
   return (
@@ -34,7 +36,7 @@ export function TooltipBtn({
             size="icon"
             className={clsx(
               twMerge(
-                'p-2 rounded-full bg-transparent',
+                'p-2 rounded-full bg-transparent relative',
                 isActive
                   ? 'bg-gray-600/50 text-white hover:bg-blue-600'
                   : 'text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700',
@@ -43,6 +45,9 @@ export function TooltipBtn({
             )}
           >
             <Icon className="size-5" />
+            {hasBadge && (
+              <div className="absolute w-3 h-3 rounded-full top-0 right-0 bg-red-500"></div>
+            )}
           </Button>
         </TooltipTrigger>
         {label && (
