@@ -2,12 +2,12 @@ import {
   usePendingFriendRequests,
   useFriendRequestsRealtime
 } from '../../hooks/useFriends';
-import useUser from '@/hooks/useUser';
 import { Separator } from '../ui/separator';
 import FriendRequestItem from './FriendRequestItem';
+import { useAuth } from '@/stores/user';
 
 export const FriendRequests = () => {
-  const { user } = useUser();
+  const { user } = useAuth();
   const userId = user?.id;
 
   const { data: requests, isLoading } = usePendingFriendRequests(

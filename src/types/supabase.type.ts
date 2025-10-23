@@ -584,9 +584,9 @@ export type Database = {
           conversation_id: string
           created_at: string
           edited_at: string | null
-          fts: unknown | null
+          fts: unknown
           id: string
-          location: unknown | null
+          location: unknown
           recalled_at: string | null
           reply_to_id: string | null
           sender_id: string
@@ -597,9 +597,9 @@ export type Database = {
           conversation_id: string
           created_at?: string
           edited_at?: string | null
-          fts?: unknown | null
+          fts?: unknown
           id?: string
-          location?: unknown | null
+          location?: unknown
           recalled_at?: string | null
           reply_to_id?: string | null
           sender_id: string
@@ -610,9 +610,9 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           edited_at?: string | null
-          fts?: unknown | null
+          fts?: unknown
           id?: string
-          location?: unknown | null
+          location?: unknown
           recalled_at?: string | null
           reply_to_id?: string | null
           sender_id?: string
@@ -742,28 +742,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_friend_request: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      accept_friend_request: { Args: { _user_id: string }; Returns: boolean }
       assign_contact_label: {
         Args: { _contact_label: string; _user_id: string }
         Returns: boolean
       }
-      block_user: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
-      cancel_friend_request: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      block_user: { Args: { _user_id: string }; Returns: boolean }
+      cancel_friend_request: { Args: { _user_id: string }; Returns: boolean }
       create_contact_label: {
         Args: { _color: number; _name: string }
         Returns: boolean
       }
       get_contact_labels: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           color: number
           id: string
@@ -771,7 +762,7 @@ export type Database = {
         }[]
       }
       get_friends: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           display_name: string
@@ -785,13 +776,29 @@ export type Database = {
         Args: { _color: number; _label_id: string; _name: string }
         Returns: boolean
       }
-      reject_friend_request: {
-        Args: { _user_id: string }
-        Returns: boolean
+      reject_friend_request: { Args: { _user_id: string }; Returns: boolean }
+      remove_contact_label: { Args: { _label_id: string }; Returns: boolean }
+      request_users: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          display_name: string
+          from_me: boolean
+          id: string
+          status: string
+          username: string
+        }[]
       }
-      remove_contact_label: {
-        Args: { _label_id: string }
-        Returns: boolean
+      search_users: {
+        Args: { _search: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          from_me: boolean
+          id: string
+          status: string
+          username: string
+        }[]
       }
       send_friend_request: {
         Args: { _message: string; _user_id: string }
@@ -801,6 +808,7 @@ export type Database = {
         Args: { _contact_label: string; _user_id: string }
         Returns: boolean
       }
+      verify_user_password: { Args: { _password: string }; Returns: boolean }
     }
     Enums: {
       app_theme: "light" | "dark" | "system"

@@ -18,7 +18,7 @@ import { SidebarAccordionSection } from '../Sidebar/SidebarAccordionSection';
 
 export default function ConversationListPane() {
   return (
-    <div className="w-[350px] flex flex-col h-full border-l dark:border-gray-800 bg-white dark:bg-gray-900">
+    <div className="flex flex-col h-full border-l dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="p-4 border-b dark:border-gray-700 text-center">
         <h2 className="font-semibold text-gray-800 dark:text-gray-200">
