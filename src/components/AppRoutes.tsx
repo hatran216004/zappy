@@ -1,3 +1,4 @@
+import ChatLayout from '@/layouts/ChatLayout';
 import FriendLayout from '@/layouts/FriendLayout';
 import MainLayout from '@/layouts/MainLayout';
 import ChatPage from '@/pages/ChatPage';
@@ -28,8 +29,7 @@ export default function AppRoutes() {
           <Route element={<MainLayout />}>
             <Route index element={<Navigate to="chat" replace />} />
 
-            <Route path="chat">
-              <Route index element={<ChatPage />} />
+            <Route path="chat" element={<ChatLayout />}>
               <Route path=":conversationId" element={<ChatPage />} />
             </Route>
 

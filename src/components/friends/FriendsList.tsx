@@ -107,22 +107,24 @@ export const FriendsList = () => {
           {/* Labeled groups */}
           {Object.entries(groupedFriends || {})
             .filter(([key]) => key !== 'no_label')
-            .map(([labelId, friendsList]) => (
-              <section key={labelId}>
-                <h3 className="px-2 sm:px-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase mb-2">
-                  Nhãn: {labelId}
-                </h3>
-                <ul className="bg-card rounded-xl border border-border divide-y divide-border">
-                  {(friendsList ?? []).map((friend) => (
-                    <FriendItem
-                      key={friend.id}
-                      friend={friend}
-                      onRemove={() => setSelectedFriend(friend.id)}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
+            .map(([labelId, friendsList]) => {
+              return (
+                <section key={labelId}>
+                  <h3 className="px-2 sm:px-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase mb-2">
+                    Nhãn: {labelId}
+                  </h3>
+                  <ul className="bg-card rounded-xl border border-border divide-y divide-border">
+                    {(friendsList ?? []).map((friend) => (
+                      <FriendItem
+                        key={friend.id}
+                        friend={friend}
+                        onRemove={() => setSelectedFriend(friend.id)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
         </div>
       )}
 

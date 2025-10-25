@@ -3,19 +3,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { twMerge } from 'tailwind-merge';
 
 import { ConversationWithDetails } from '@/services/chatService';
+import { Link } from 'react-router';
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
   userId: string;
   isSelected: boolean;
-  onClick: () => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   userId,
-  isSelected,
-  onClick
+  isSelected
 }) => {
   const otherParticipant = conversation.participants.find(
     (p) => p.user_id !== userId
@@ -84,8 +83,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     unread > 0 ? (unread > 99 ? '99+' : String(unread)) : null;
 
   return (
-    <div
-      onClick={onClick}
+    <Link
+      to={`/chat/${conversation.id}`}
       className={twMerge(
         'flex items-center gap-3 p-4 cursor-pointer',
         isActive ? 'bg-blue-600/20' : 'hover:bg-gray-200 dark:hover:bg-gray-800'
@@ -126,7 +125,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 
