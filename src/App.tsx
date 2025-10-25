@@ -1,7 +1,9 @@
-import AppRoutes from './components/AppRoutes';
-import CustomToast from './components/CustomToast';
+import AppRoutes from "./components/AppRoutes";
+import CustomToast from "./components/CustomToast";
+import { useAutoUserStatus } from "./hooks/useUserStatus";
 
 export default function App() {
+  useAutoUserStatus(true);
   return (
     <>
       <AppRoutes />
