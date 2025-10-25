@@ -1,6 +1,6 @@
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Search, Phone, Video, Users, Info } from 'lucide-react';
-import { TooltipBtn } from '../TooltipBtn';
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Search, Phone, Video, Users, Info } from "lucide-react";
+import { TooltipBtn } from "../TooltipBtn";
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -17,17 +17,17 @@ interface ChatHeaderProps {
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   otherParticipant,
-  typingUsers
+  typingUsers,
 }) => {
-  const displayName = otherParticipant?.profile.display_name || 'Người dùng';
+  const displayName = otherParticipant?.profile.display_name || "Người dùng";
   const avatarUrl =
-    otherParticipant?.profile.avatar_url || '/default-avatar.png';
+    otherParticipant?.profile.avatar_url || "/default-avatar.png";
   const statusText =
     typingUsers.length > 0
-      ? 'Đang nhập...'
-      : otherParticipant?.profile.status === 'online'
-      ? 'Đang hoạt động'
-      : 'Không hoạt động';
+      ? "Đang nhập..."
+      : otherParticipant?.profile.status === "online"
+      ? "Đang hoạt động"
+      : "Không hoạt động";
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800">

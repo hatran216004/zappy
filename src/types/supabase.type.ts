@@ -827,7 +827,7 @@ export type Database = {
         | "system";
       notif_level: "all" | "mentions" | "none";
       role_type: "admin" | "member";
-      user_status: "online" | "offline" | "away" | "busy";
+      user_status: "online" | "offline";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -978,7 +978,7 @@ export const Constants = {
       ],
       notif_level: ["all", "mentions", "none"],
       role_type: ["admin", "member"],
-      user_status: ["online", "offline", "away", "busy"],
+      user_status: ["online", "offline"],
     },
   },
 } as const;

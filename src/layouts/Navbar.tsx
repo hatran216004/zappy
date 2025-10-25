@@ -1,7 +1,5 @@
 import { TooltipBtn } from "@/components/TooltipBtn";
-// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// import { cn } from "@/lib/utils";
-// import { avatarVariants } from "@/lib/variants";
+
 import {
   MessageCircle,
   Users,
@@ -31,7 +29,8 @@ import {
   useFriendRequestsRealtime,
   usePendingFriendRequests,
 } from "@/hooks/useFriends";
-import { UserAvatarWithStatus } from "@/components/user/UserAvatarWithStatus";
+
+import { UserAvatar } from "@/components/UserAvatar";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -42,7 +41,6 @@ export default function Navbar() {
   // Subscribe to realtime updates
   useFriendRequestsRealtime(userId as string);
   let hasFriendRequest = true;
-
   const { logout } = useLogout();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -91,14 +89,13 @@ export default function Navbar() {
                     {profile?.display_name?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
+          
               </button> */}
               <button className="select-none">
-                <UserAvatarWithStatus
-                  userId={profile?.id || ""}
-                  avatarUrl={profile?.avatar_url}
-                  displayName={profile?.display_name}
+                <UserAvatar
+                  userId={profile?.id as string}
                   size="md"
-                  showStatusBadge={true}
+                  showStatus={true}
                 />
               </button>
             </DropdownMenuTrigger>
