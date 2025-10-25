@@ -9,16 +9,18 @@ import {
   useConversation
 } from '../../hooks/useChat';
 import MessageBubble from './MessageBubble';
-import ConversationListPane from '../chat/ConversationListPane';
 import ChatHeader from './ChatHeader';
 import ChatFooter from '../ChatWindow/ChatFooter';
+import { useParams } from 'react-router';
 
 interface ChatWindowProps {
-  conversationId: string;
   userId: string;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, userId }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
+  const params = useParams();
+  const conversationId = params.conversationId as string;
+
   const [messageText, setMessageText] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   // const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -83,9 +85,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, userId }) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageText(e.target.value);
-    // sendTyping(true);
-    // if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    // typingTimeoutRef.current = setTimeout(() => sendTyping(false), 3000);
+    if (!typingUsers.includes(userId)) {
+      sendTyping(true);
+    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => sendTyping(false), 3000);
   };
 
   const handleSendMessage = async () => {
@@ -98,8 +102,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, userId }) => {
         content: messageText.trim(),
         replyToId: replyTo || undefined
       });
-
-      console.log('Message sent successfully');
 
       setMessageText('');
       setReplyTo(null);
@@ -150,99 +152,94 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, userId }) => {
   );
 
   return (
-    <div className="grid grid-cols-12 justify-center">
-      <div className="col-span-8">
-        <div className="flex flex-col h-screen justify-between">
-          <ChatHeader
-            otherParticipant={otherParticipant}
-            typingUsers={typingUsers}
-          />
+    <>
+      <div className="flex flex-col h-screen justify-between">
+        <ChatHeader
+          otherParticipant={otherParticipant}
+          typingUsers={typingUsers}
+        />
 
-          <div className="h-[calc(100%-122px)] overflow-y-auto p-4 space-y-2">
-            {hasNextPage && (
-              <div className="text-center pb-4">
-                <button
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
-                >
-                  {isFetchingNextPage ? 'Đang tải...' : 'Tải tin nhắn cũ hơn'}
-                </button>
-              </div>
-            )}
-
-            {messages.map((message, index) => {
-              const prevMessage = messages[index - 1];
-              const showAvatar =
-                !prevMessage || prevMessage.sender_id !== message.sender_id;
-              const showTimestamp =
-                !prevMessage ||
-                new Date(message.created_at).getTime() -
-                  new Date(prevMessage.created_at).getTime() >
-                  5 * 60 * 1000;
-
-              return (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  isOwn={message.sender_id === userId}
-                  showAvatar={showAvatar}
-                  showTimestamp={showTimestamp}
-                  onReply={() => setReplyTo(message.id)}
-                  currentUserId={userId}
-                />
-              );
-            })}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {replyTo && (
-            <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600">
-                  Đang trả lời:{' '}
-                  {messages.find((m) => m.id === replyTo)?.content_text}
-                </p>
-              </div>
+        <div className="h-[calc(100%-122px)] overflow-y-auto p-4 space-y-2">
+          {hasNextPage && (
+            <div className="text-center pb-4">
               <button
-                onClick={() => setReplyTo(null)}
-                className="text-gray-500 hover:text-gray-700"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                {isFetchingNextPage ? 'Đang tải...' : 'Tải tin nhắn cũ hơn'}
               </button>
             </div>
           )}
 
-          <ChatFooter
-            fileInputRef={fileInputRef}
-            handleInputChange={handleInputChange}
-            inputRef={inputRef}
-            handleFileSelect={handleFileSelect}
-            handleKeyPress={handleKeyPress}
-            handleSendMessage={handleSendMessage}
-            messageText={messageText}
-            sendFileMutation={sendFileMutation}
-            sendTextMutation={sendTextMutation}
-          />
+          {messages.map((message, index) => {
+            const prevMessage = messages[index - 1];
+            const showAvatar =
+              !prevMessage || prevMessage.sender_id !== message.sender_id;
+            const showTimestamp =
+              !prevMessage ||
+              new Date(message.created_at).getTime() -
+                new Date(prevMessage.created_at).getTime() >
+                5 * 60 * 1000;
+
+            return (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isOwn={message.sender_id === userId}
+                showAvatar={showAvatar}
+                showTimestamp={showTimestamp}
+                onReply={() => setReplyTo(message.id)}
+                currentUserId={userId}
+              />
+            );
+          })}
+
+          <div ref={messagesEndRef} />
         </div>
+
+        {replyTo && (
+          <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm text-gray-600">
+                Đang trả lời:{' '}
+                {messages.find((m) => m.id === replyTo)?.content_text}
+              </p>
+            </div>
+            <button
+              onClick={() => setReplyTo(null)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        <ChatFooter
+          fileInputRef={fileInputRef}
+          handleInputChange={handleInputChange}
+          inputRef={inputRef}
+          handleFileSelect={handleFileSelect}
+          handleKeyPress={handleKeyPress}
+          handleSendMessage={handleSendMessage}
+          messageText={messageText}
+          sendFileMutation={sendFileMutation}
+          sendTextMutation={sendTextMutation}
+        />
       </div>
-      <div className="col-span-4">
-        <ConversationListPane />
-      </div>
-    </div>
+    </>
   );
 };
 

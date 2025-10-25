@@ -13,8 +13,9 @@ type TooltipBtnProps = {
   label?: string;
   isActive?: boolean;
   className?: string;
-  icon: React.ElementType;
   hasBadge?: boolean;
+  tooltipSide?: 'bottom' | 'left' | 'right' | 'top';
+  icon: React.ElementType;
   onClick?: () => void;
 };
 
@@ -24,6 +25,7 @@ export function TooltipBtn({
   className,
   isActive,
   hasBadge = false,
+  tooltipSide = 'right',
   onClick
 }: TooltipBtnProps) {
   return (
@@ -51,7 +53,7 @@ export function TooltipBtn({
           </Button>
         </TooltipTrigger>
         {label && (
-          <TooltipContent side="right" align="center" sideOffset={8}>
+          <TooltipContent side={tooltipSide} align="center" sideOffset={8}>
             <p>{label}</p>
           </TooltipContent>
         )}

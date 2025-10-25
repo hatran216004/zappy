@@ -3,20 +3,15 @@ import React from 'react';
 import { useConversations, useConversationsRealtime } from '@/hooks/useChat';
 import ConversationItem from './ConversationItem';
 import { useFriends, useFriendsRealtime } from '@/hooks/useFriends';
-import FriendsListForChat from '../friends/FriendsListForChat';
 
 interface ConversationsListProps {
   userId: string;
   selectedConversationId?: string;
-  onSelectConversation: (conversationId: string) => void;
-  onSelectFriend: (friendId: string) => Promise<void>;
 }
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
-  selectedConversationId,
-  onSelectConversation,
-  onSelectFriend
+  selectedConversationId
 }) => {
   const { data: conversations, isLoading } = useConversations(userId);
   const { data: friends } = useFriends(userId);
@@ -27,13 +22,13 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="m-auto flex items-center justify-center h-full">
         <div className="text-gray-500">Đang tải...</div>
       </div>
     );
   }
 
-  if ((!conversations || conversations.length === 0) && friends?.length === 0) {
+  if (conversations?.length === 0 && friends?.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
         <div className="text-gray-400 mb-4">
@@ -57,14 +52,13 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="overflow-y-auto">
       {conversations?.map((conversation) => (
         <ConversationItem
           key={conversation.id}
           conversation={conversation}
           userId={userId}
           isSelected={conversation.id === selectedConversationId}
-          onClick={() => onSelectConversation(conversation.id)}
         />
       ))}
       {/* <FriendsListForChat userId={userId} onSelectFriend={onSelectFriend} /> */}
