@@ -14,6 +14,7 @@ import { useParams } from 'react-router';
 import ChatFooter from '../ChatWindow/ChatFooter';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
+import { ImagePreview } from './ImagePreview';
 
 interface ChatWindowProps {
   userId: string;
@@ -29,6 +30,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [imageToSend, setImageToSend] = useState<File | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -283,6 +285,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
     console.log('📁 File selected:', { name: file.name, type: file.type, detectedType: type });
 
+    // Nếu là ảnh, show preview trước khi gửi
+    if (type === 'image') {
+      setImageToSend(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Các file khác gửi luôn
     try {
       await sendFileMutation.mutateAsync({
         conversationId,
@@ -311,6 +323,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const handleEmojiSelect = useCallback((emoji: string) => {
     setMessageText((prev) => prev + emoji);
     inputRef.current?.focus();
+  }, []);
+
+  // ✅ Handle image send from preview
+  const handleSendImage = useCallback(async () => {
+    if (!imageToSend) return;
+
+    try {
+      await sendFileMutation.mutateAsync({
+        conversationId,
+        senderId: userId,
+        file: imageToSend,
+        type: 'image'
+      });
+      console.log('✅ Image sent successfully');
+      setImageToSend(null);
+    } catch (error) {
+      console.error('❌ Error sending image:', error);
+    }
+  }, [imageToSend, conversationId, userId, sendFileMutation]);
+
+  const handleCancelImage = useCallback(() => {
+    setImageToSend(null);
   }, []);
 
   // ✅ 7. Search functionality - Using API search
@@ -564,6 +598,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         sendFileMutation={sendFileMutation}
         sendTextMutation={sendTextMutation}
       />
+
+      {/* Image Preview Modal */}
+      {imageToSend && (
+        <ImagePreview
+          file={imageToSend}
+          onSend={handleSendImage}
+          onCancel={handleCancelImage}
+          isSending={sendFileMutation.isPending}
+        />
+      )}
     </div>
   );
 };

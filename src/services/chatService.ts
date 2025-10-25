@@ -86,74 +86,133 @@ export const getOrCreateDirectConversation = async (
   return newConvo.id;
 };
 
-// Lấy danh sách conversations
+// Lấy danh sách conversations (bao gồm cả direct và group)
 export const getConversations = async (
   userId: string
 ): Promise<ConversationWithDetails[]> => {
-  // Cách 1: Query trực tiếp từ conversations
-  const { data, error } = await supabase
-    .from('conversations')
+  // Step 1: Get direct conversations từ direct_pairs
+  const { data: directPairs, error: directError } = await supabase
+    .from('direct_pairs')
     .select(
       `
-    id, title, updated_at, created_at,
-    conversation_participants!inner(
-      user_id,
-      joined_at,
-      last_read_at,
-      left_at,
-      profile:profiles(id, display_name, avatar_url, username, status, last_seen_at)
-    ),
-    last_message:messages!conversations_last_message_id_fkey(
-      id, content_text, type, sender_id, created_at,
-      sender:profiles!messages_sender_id_fkey(id, display_name, avatar_url)
+      conversation_id,
+      user_a,
+      user_b,
+      conversations:conversation_id (
+        id,
+        title,
+        type,
+        updated_at,
+        created_at,
+        last_message_id
+      )
+    `
     )
-  `
+    .or(`user_a.eq.${userId},user_b.eq.${userId}`);
+
+  if (directError) {
+    console.error('Error fetching direct conversations:', directError);
+    throw directError;
+  }
+
+  // Step 2: Get group conversations từ conversation_participants
+  const { data: groupConvos, error: groupError } = await supabase
+    .from('conversation_participants')
+    .select(
+      `
+      conversation_id,
+      conversations:conversation_id (
+        id,
+        title,
+        type,
+        updated_at,
+        created_at,
+        last_message_id
+      )
+    `
     )
-    .eq('conversation_participants.user_id', userId)
-    .is('conversation_participants.left_at', null)
-    .order('updated_at', { ascending: false });
+    .eq('user_id', userId)
+    .is('left_at', null);
 
-  if (error) throw error;
+  if (groupError) {
+    console.error('Error fetching group conversations:', groupError);
+    throw groupError;
+  }
 
-  // Get participants and unread count for each conversation
+  // Step 3: Combine và deduplicate conversations
+  const allConvoIds = new Set<string>();
+  const conversationsMap = new Map<string, any>();
+
+  // Add direct conversations
+  directPairs?.forEach((pair) => {
+    if (pair.conversations) {
+      allConvoIds.add(pair.conversation_id);
+      conversationsMap.set(pair.conversation_id, {
+        ...pair.conversations,
+        direct_pair: { user_a: pair.user_a, user_b: pair.user_b }
+      });
+    }
+  });
+
+  // Add group conversations (nếu chưa có)
+  groupConvos?.forEach((item) => {
+    if (item.conversations && item.conversations.type === 'group') {
+      allConvoIds.add(item.conversation_id);
+      if (!conversationsMap.has(item.conversation_id)) {
+        conversationsMap.set(item.conversation_id, item.conversations);
+      }
+    }
+  });
+
+  // Step 4: Get full details for each conversation
   const conversationsWithDetails = await Promise.all(
-    (data || []).map(async (convo) => {
-      // Get all participants with profiles
-      const { data: participants, error: error1 } = await supabase
+    Array.from(conversationsMap.values()).map(async (convo) => {
+      // Get all participants
+      const { data: participants } = await supabase
         .from('conversation_participants')
-        .select(
-          `
-          *,
-          profile:profiles(*)
-        `
-        )
+        .select('*, profile:profiles(*)')
         .eq('conversation_id', convo.id)
         .is('left_at', null);
 
-      if (error1) throw error1;
-
-      // Find current user's participant record
-      const userParticipant = participants?.find((p) => p.user_id === userId);
+      // Get last message
+      let lastMessage = null;
+      if (convo.last_message_id) {
+        const { data: msgData } = await supabase
+          .from('messages')
+          .select(
+            `
+            id, content_text, type, sender_id, created_at,
+            sender:profiles!messages_sender_id_fkey(id, display_name, avatar_url)
+          `
+          )
+          .eq('id', convo.last_message_id)
+          .single();
+        lastMessage = msgData;
+      }
 
       // Get unread count
-      const { count: unreadCount, error: error2 } = await supabase
+      const userParticipant = participants?.find((p) => p.user_id === userId);
+      const { count: unreadCount } = await supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
         .eq('conversation_id', convo.id)
         .gt('created_at', userParticipant?.last_read_at || '1970-01-01')
         .neq('sender_id', userId);
 
-      if (error2) throw error2;
-
       return {
         ...convo,
         participants: participants || [],
+        last_message: lastMessage,
         unread_count: unreadCount || 0
       };
     })
   );
 
-  return conversationsWithDetails;
+  // Sort by updated_at descending
+  return conversationsWithDetails.sort(
+    (a, b) =>
+      new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
+  );
 };
 
 // Lấy thông tin conversation
@@ -210,6 +269,9 @@ export const getMessages = async (
       created_at,
       reply_to_id,
       recalled_at,
+      edited_at,
+      fts,
+      location,
       sender:profiles!messages_sender_id_fkey(*),
       attachments(*)
     `
@@ -444,6 +506,7 @@ export const searchMessages = async (
     .select('id, content_text, created_at')
     .eq('conversation_id', conversationId)
     .is('recalled_at', null)
+    .not('content_text', 'is', null) // Chỉ tìm messages có content
     .ilike('content_text', `%${query}%`)
     .order('created_at', { ascending: true });
 
@@ -452,7 +515,12 @@ export const searchMessages = async (
     throw error;
   }
 
-  return data || [];
+  // Filter out null content_text (just in case)
+  return (data || []).filter((msg) => msg.content_text !== null) as { 
+    id: string; 
+    content_text: string; 
+    created_at: string 
+  }[];
 };
 
 // Edit message

@@ -4,15 +4,20 @@ import {
   useRemoveFriend,
   useFriendsRealtime
 } from '../../hooks/useFriends';
+import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
 import useUser from '@/hooks/useUser';
 import FriendItem from './FriendItem';
+import { useNavigate } from 'react-router';
 
 export const FriendsList = () => {
+  const navigate = useNavigate();
   const { user } = useUser();
   const userId = user?.id as string;
   const { data: friends, isLoading, error } = useFriends(userId);
   const removeFriendMutation = useRemoveFriend();
+  const getOrCreateConversation = useGetOrCreateDirectConversation();
   const [selectedFriend, setSelectedFriend] = useState<string | null>(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   // Subscribe realtime
   useFriendsRealtime(userId);
@@ -23,6 +28,25 @@ export const FriendsList = () => {
       setSelectedFriend(null);
     } catch (err) {
       console.error('Error removing friend:', err);
+    }
+  };
+
+  const handleMessage = async (friendId: string) => {
+    if (isCreatingConversation) return;
+
+    try {
+      setIsCreatingConversation(true);
+      const conversationId = await getOrCreateConversation.mutateAsync({
+        currentUserId: userId,
+        otherUserId: friendId
+      });
+
+      // Navigate đến conversation
+      navigate(`/chat/${conversationId}`);
+    } catch (error) {
+      console.error('Error creating/opening conversation:', error);
+    } finally {
+      setIsCreatingConversation(false);
     }
   };
 
@@ -99,6 +123,7 @@ export const FriendsList = () => {
                   key={friend.id}
                   friend={friend}
                   onRemove={() => setSelectedFriend(friend.id)}
+                  onMessage={handleMessage}
                 />
               ))}
             </ul>
@@ -119,6 +144,7 @@ export const FriendsList = () => {
                         key={friend.id}
                         friend={friend}
                         onRemove={() => setSelectedFriend(friend.id)}
+                        onMessage={handleMessage}
                       />
                     ))}
                   </ul>
@@ -151,6 +177,20 @@ export const FriendsList = () => {
               >
                 {removeFriendMutation.isPending ? 'Đang xóa...' : 'Xóa'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading state khi đang tạo conversation */}
+      {isCreatingConversation && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-foreground font-medium">
+                Đang tạo cuộc trò chuyện...
+              </span>
             </div>
           </div>
         </div>

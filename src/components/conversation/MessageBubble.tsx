@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { supabaseUrl } from '@/lib/supabase';
+import { ImageAttachment } from './ImageAttachment';
+import { AudioPlayer } from './AudioPlayer';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -212,35 +214,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                   {message?.attachments?.map((attachment, index) => (
                     <div key={attachment.id} className="mt-2">
                       {attachment.kind === 'image' && attachmentUrls[index] && (
-                        <img
+                        <ImageAttachment
                           src={attachmentUrls[index]}
-                          alt="Attachment"
-                          className="max-w-full rounded cursor-pointer hover:opacity-90"
-                          onClick={() =>
-                            window.open(attachmentUrls[index], '_blank')
-                          }
+                          alt="Image"
+                          isOwn={isOwn}
                         />
                       )}
                       {attachment.kind === 'video' && attachmentUrls[index] && (
                         <video
                           src={attachmentUrls[index]}
                           controls
-                          className="max-w-full rounded"
+                          className="max-w-full rounded-lg"
+                          style={{ maxHeight: '400px' }}
                         />
                       )}
                       {attachment.kind === 'audio' && attachmentUrls[index] && (
-                        <audio
-                          src={attachmentUrls[index]}
-                          controls
-                          className="w-full"
-                        />
+                        <AudioPlayer src={attachmentUrls[index]} isOwn={isOwn} />
                       )}
                       {attachment.kind === 'file' && attachmentUrls[index] && (
                         <a
                           href={attachmentUrls[index]}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-2 bg-white bg-opacity-20 rounded hover:bg-opacity-30"
+                          className="flex items-center gap-2 p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
                         >
                           <svg
                             className="w-5 h-5"
@@ -250,7 +246,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                             <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
                             <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                           </svg>
-                          <span className="text-sm">
+                          <span className="text-sm font-medium">
                             {attachment.storage_path.split('/').pop()}
                           </span>
                         </a>

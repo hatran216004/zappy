@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { twMerge } from 'tailwind-merge';
 
 import { ConversationWithDetails } from '@/services/chatService';
-import { Link } from 'react-router';
+import { Link, useParams } from 'react-router';
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
@@ -16,6 +16,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   userId,
   isSelected
 }) => {
+  const params = useParams();
+  const conversationId = params.conversationId as string;
+
   const otherParticipant = conversation.participants.find(
     (p) => p.user_id !== userId
   );
@@ -75,7 +78,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   // Dùng UI theo comment: Avatar + 2 dòng (name/time + preview/unread/pin)
   // isSelected tương đương isActive trong mẫu comment
-  const isActive = isSelected;
+  const isActive = isSelected || conversationId === conversation.id;
 
   // Unread badge theo mẫu comment (đếm 99+)
   const unread = conversation.unread_count ?? 0;
