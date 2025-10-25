@@ -81,7 +81,7 @@ export default function Navbar() {
 
   return (
     <>
-      <div className="w-[70px] h-full border-r dark:border-gray-800 bg-blue-500 dark:bg-gray-950 flex flex-col items-center py-4 justify-between">
+      <div className="w-[70px] border-r dark:border-gray-800 bg-blue-500 dark:bg-gray-950 flex flex-col items-center py-4 justify-between">
         <div className="flex flex-col items-center gap-6">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

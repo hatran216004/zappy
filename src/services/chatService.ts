@@ -432,6 +432,29 @@ export const getAttachmentUrl = async (
   return data?.signedUrl || '';
 };
 
+// Search messages in a conversation
+export const searchMessages = async (
+  conversationId: string,
+  query: string
+): Promise<{ id: string; content_text: string; created_at: string }[]> => {
+  if (!query.trim()) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, content_text, created_at')
+    .eq('conversation_id', conversationId)
+    .is('recalled_at', null)
+    .ilike('content_text', `%${query}%`)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Search messages error:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
 // Edit message
 export const editMessage = async (
   messageId: string,
@@ -533,19 +556,61 @@ export const markMessagesAsRead = async (
 // TYPING INDICATOR
 // ============================================
 
-// Send typing indicator
-export const sendTypingIndicator = async (
+// Cache channels và last sent state để tránh gửi duplicate
+const typingChannels = new Map<string, any>();
+const lastTypingState = new Map<string, boolean>();
+const pendingTyping = new Map<string, boolean>(); // Track pending sends
+
+// Send typing indicator với rate limiting
+export const sendTypingIndicator = (
   conversationId: string,
   userId: string,
   isTyping: boolean
-): Promise<void> => {
-  // Use Supabase Broadcast for typing indicators (ephemeral)
-  const channel = supabase.channel(`conversation:${conversationId}`);
+): void => {
+  const key = `${conversationId}:${userId}`;
+  const lastState = lastTypingState.get(key);
+  const isPending = pendingTyping.get(key);
 
-  await channel.send({
+  console.log(`🔍 sendTypingIndicator: isTyping=${isTyping}, lastState=${lastState}, pending=${isPending}`);
+
+  // Skip nếu đang pending hoặc state giống nhau
+  if (isPending) {
+    console.log(`⏳ Skip: Already pending`);
+    return;
+  }
+
+  if (lastState !== undefined && lastState === isTyping) {
+    console.log(`⏭️ Skip: State unchanged`);
+    return;
+  }
+
+  // Mark as pending và update state
+  pendingTyping.set(key, true);
+  lastTypingState.set(key, isTyping);
+
+  // Lấy hoặc tạo channel
+  let channel = typingChannels.get(conversationId);
+  
+  if (!channel) {
+    channel = supabase.channel(`typing:${conversationId}`);
+    channel.subscribe();
+    typingChannels.set(conversationId, channel);
+    console.log(`📡 Created channel: ${conversationId}`);
+  }
+
+  // Gửi typing event
+  channel.send({
     type: 'broadcast',
     event: 'typing',
     payload: { user_id: userId, is_typing: isTyping }
+  }).then(() => {
+    console.log(`✅ Sent: ${isTyping ? 'START ▶️' : 'STOP ⏹️'}`);
+    pendingTyping.delete(key);
+  }).catch((error: any) => {
+    console.error('❌ Error:', error);
+    // Rollback
+    lastTypingState.set(key, !isTyping);
+    pendingTyping.delete(key);
   });
 };
 
@@ -777,7 +842,7 @@ export const subscribeTyping = (
   onTyping: (userId: string, isTyping: boolean) => void
 ) => {
   const channel = supabase
-    .channel(`conversation:${conversationId}`)
+    .channel(`typing:${conversationId}`)
     .on('broadcast', { event: 'typing' }, (payload) => {
       onTyping(payload.payload.user_id, payload.payload.is_typing);
     })
