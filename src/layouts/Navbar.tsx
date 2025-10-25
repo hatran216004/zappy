@@ -1,7 +1,7 @@
-import { TooltipBtn } from '@/components/TooltipBtn';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cn } from '@/lib/utils';
-import { avatarVariants } from '@/lib/variants';
+import { TooltipBtn } from "@/components/TooltipBtn";
+// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+// import { cn } from "@/lib/utils";
+// import { avatarVariants } from "@/lib/variants";
 import {
   MessageCircle,
   Users,
@@ -11,26 +11,27 @@ import {
   Moon,
   Sun,
   User,
-  LogOut
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+  LogOut,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { useProfile } from '@/hooks/useProfile';
-import ProfileModal from '@/components/profile/ProfileModal';
-import useLogout from '@/hooks/useLogout';
-import { useAuth } from '@/stores/user';
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useProfile } from "@/hooks/useProfile";
+import ProfileModal from "@/components/profile/ProfileModal";
+import useLogout from "@/hooks/useLogout";
+import { useAuth } from "@/stores/user";
 import {
   useFriendRequestsRealtime,
-  usePendingFriendRequests
-} from '@/hooks/useFriends';
+  usePendingFriendRequests,
+} from "@/hooks/useFriends";
+import { UserAvatarWithStatus } from "@/components/user/UserAvatarWithStatus";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -49,27 +50,27 @@ export default function Navbar() {
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('theme');
+    const saved = localStorage.getItem("theme");
     if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   });
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.body.classList.remove('light');
-      document.body.classList.add('dark');
+    if (theme === "dark") {
+      document.body.classList.remove("light");
+      document.body.classList.add("dark");
     } else {
-      document.body.classList.remove('dark');
-      document.body.classList.add('light');
+      document.body.classList.remove("dark");
+      document.body.classList.add("light");
     }
 
-    localStorage.setItem('theme', theme);
+    localStorage.setItem("theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    setTheme(theme === "light" ? "dark" : "light");
   };
 
   if (!requests || requests.length === 0) {
@@ -82,18 +83,23 @@ export default function Navbar() {
         <div className="flex flex-col items-center gap-6">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-full">
-                <Avatar className={cn(avatarVariants({ size: 'md' }))}>
-                  <AvatarImage
-                    src={
-                      profile?.avatar_url ||
-                      'https://s120-ava-talk.zadn.vn/e/6/4/0/11/120/f56b25f4693f07db6244c569eeb86226.jpg'
-                    }
-                  />
+              {/* <button className="focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-full">
+                <Avatar className={cn(avatarVariants({ size: "md" }))}>
+                  <AvatarImage src={profile?.avatar_url} />
+
                   <AvatarFallback className="bg-zinc-300">
-                    {profile?.display_name?.[0] || 'U'}
+                    {profile?.display_name?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
+              </button> */}
+              <button className="select-none">
+                <UserAvatarWithStatus
+                  userId={profile?.id || ""}
+                  avatarUrl={profile?.avatar_url}
+                  displayName={profile?.display_name}
+                  size="md"
+                  showStatusBadge={true}
+                />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -103,7 +109,7 @@ export default function Navbar() {
               <DropdownMenuLabel className="dark:text-gray-200">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {profile?.display_name || 'Chưa có tên'}
+                    {profile?.display_name || "Chưa có tên"}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground dark:text-gray-400">
                     {user?.email}
@@ -134,17 +140,17 @@ export default function Navbar() {
           </DropdownMenu>
 
           <TooltipBtn
-            onClick={() => navigate('/chat')}
-            isActive={pathname.includes('chat') || pathname === '/'}
+            onClick={() => navigate("/chat")}
+            isActive={pathname.includes("chat") || pathname === "/"}
             icon={MessageCircle}
             label="Tin nhắn"
             className="text-white hover:text-white hover:bg-zinc-600/50"
           />
           <TooltipBtn
-            onClick={() => navigate('/friends')}
+            onClick={() => navigate("/friends")}
             icon={Users}
             hasBadge={hasFriendRequest}
-            isActive={pathname.includes('friends')}
+            isActive={pathname.includes("friends")}
             label="Danh bạ"
             className="text-white hover:text-white hover:bg-zinc-600/50"
           />
@@ -152,8 +158,8 @@ export default function Navbar() {
         <div className="flex flex-col items-center gap-6">
           <TooltipBtn
             onClick={toggleTheme}
-            icon={theme === 'light' ? Moon : Sun}
-            label={`${theme === 'light' ? 'Chế độ tối' : 'Chế độ sáng'}`}
+            icon={theme === "light" ? Moon : Sun}
+            label={`${theme === "light" ? "Chế độ tối" : "Chế độ sáng"}`}
             className="text-white hover:text-white hover:bg-zinc-600/50"
           />
           <TooltipBtn
