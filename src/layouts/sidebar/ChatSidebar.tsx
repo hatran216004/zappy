@@ -28,7 +28,7 @@ export default function ChatSidebar() {
   return (
     <aside className="col-span-3 border-r dark:border-gray-900 bg-gray-50 dark:bg-gray-800 flex flex-col">
       <SearchBar />
-      <div className="flex-1 border-r dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
+      <div className="flex flex-col flex-1 border-r dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center gap-1 px-3 mt-2 border-b border-gray-300 dark:border-gray-700 text-sm">
           <div className="flex flex-1">
             {tabs.map((t) => {

@@ -10,10 +10,18 @@ interface FriendItemProps {
     status: string; // 'online' | 'offline' ...
   };
   onRemove: () => void;
+  onMessage?: (friendId: string) => void;
 }
 
-export default function FriendItem({ friend, onRemove }: FriendItemProps) {
+export default function FriendItem({ friend, onRemove, onMessage }: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
+  
+  const handleMessage = () => {
+    if (onMessage) {
+      onMessage(friend.id);
+    }
+  };
+
   return (
     <li className="relative">
       {/* Row */}
@@ -25,6 +33,7 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
         <div className="relative shrink-0">
           <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
             <AvatarImage
+              className='object-cover rounded-full size-full'
               src={friend.avatar_url || '/default-avatar.png'}
               alt={friend.display_name}
             />
@@ -56,8 +65,10 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
         {/* Quick actions (show on hover like Zalo) */}
         <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
+            onClick={handleMessage}
             className="h-8 px-3 text-sm rounded-full bg-primary text-primary-foreground hover:opacity-90"
             title="Nhắn tin"
+            type="button"
           >
             Nhắn tin
           </button>
@@ -85,7 +96,10 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
           onMouseLeave={() => setShowMenu(false)}
         >
           <button
-            onClick={() => setShowMenu(false)}
+            onClick={() => {
+              handleMessage();
+              setShowMenu(false);
+            }}
             className="w-full px-4 py-2 text-left text-sm hover:bg-accent/50"
           >
             Nhắn tin
