@@ -75,26 +75,19 @@ export default function Navbar() {
     hasFriendRequest = false;
   }
 
+  console.log({ username: profile?.username, status: profile?.status });
+
   return (
     <>
       <div className="w-[70px] border-r dark:border-gray-800 bg-blue-500 dark:bg-gray-950 flex flex-col items-center py-4 justify-between">
         <div className="flex flex-col items-center gap-6">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {/* <button className="focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-full">
-                <Avatar className={cn(avatarVariants({ size: "md" }))}>
-                  <AvatarImage src={profile?.avatar_url} />
-
-                  <AvatarFallback className="bg-zinc-300">
-                    {profile?.display_name?.[0] || "U"}
-                  </AvatarFallback>
-                </Avatar>
-          
-              </button> */}
               <button className="select-none">
                 <UserAvatar
-                  userId={profile?.id as string}
-                  size="md"
+                  avatarUrl={profile?.avatar_url}
+                  displayName={profile?.display_name}
+                  status={profile?.status}
                   showStatus={true}
                 />
               </button>

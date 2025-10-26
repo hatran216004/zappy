@@ -7,14 +7,18 @@ interface FriendItemProps {
     display_name: string;
     username: string;
     avatar_url: string;
-    status: string; // 'online' | 'offline' ...
+    status: string;
   };
   onRemove: () => void;
 }
 
 export default function FriendItem({ friend, onRemove }: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
-  console.log(friend);
+  // console.log({
+  //   username: friend.username,
+  //   displayname: friend.display_name,
+  //   status: friend.status,
+  // });
   return (
     <li className="relative">
       {/* Row */}
@@ -24,7 +28,15 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
       >
         {/* Avatar */}
         <div className="relative shrink-0">
-          <UserAvatar userId={friend.id} showStatus={true} />
+          {/* <UserAvatar userId={friend.id} showStatus={true} /> */}
+          <div className="relative shrink-0">
+            <UserAvatar
+              avatarUrl={friend.avatar_url}
+              displayName={friend.display_name}
+              status={friend.status}
+              showStatus={true}
+            />
+          </div>
         </div>
 
         {/* Texts */}

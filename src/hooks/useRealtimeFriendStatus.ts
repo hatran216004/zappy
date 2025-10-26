@@ -1,7 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  RealtimeChannel,
+  RealtimePostgresUpdatePayload,
+} from "@supabase/supabase-js";
 
+// Định nghĩa kiểu dữ liệu của bảng "profiles"
 export interface FriendStatus {
   id: string;
   status: "online" | "offline" | "away" | "busy";
@@ -19,13 +23,7 @@ interface UseRealtimeFriendStatusOptions {
 }
 
 /**
- * Custom Hook để lắng nghe và hiển thị trạng thái bạn bè theo thời gian thực
- *
- * Tính năng:
- * - Subscribe realtime changes cho danh sách bạn bè
- * - Tự động cập nhật trạng thái khi có thay đổi
- * - Quản lý connection lifecycle
- * - Xử lý lỗi và reconnection
+ * Custom Hook: Theo dõi trạng thái online/offline của bạn bè (realtime)
  */
 export const useRealtimeFriendStatus = ({
   friendIds,
@@ -39,11 +37,14 @@ export const useRealtimeFriendStatus = ({
   const [error, setError] = useState<Error | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  // Hàm xử lý khi có cập nhật trạng thái
+  // ✅ Xử lý khi có bản ghi cập nhật realtime từ Supabase
   const handleStatusUpdate = useCallback(
-    (payload: any) => {
+    (payload: RealtimePostgresUpdatePayload<FriendStatus>) => {
       try {
-        const updated = payload.new as any;
+        const updated = payload.new;
+
+        if (!updated || !updated.id) return;
+
         const friendStatus: FriendStatus = {
           id: updated.id,
           status: updated.status,
@@ -54,30 +55,27 @@ export const useRealtimeFriendStatus = ({
           username: updated.username,
         };
 
-        // Cập nhật state
         setFriendStatuses((prev) => {
           const newMap = new Map(prev);
           newMap.set(friendStatus.id, friendStatus);
           return newMap;
         });
 
-        // Gọi callback nếu có
         onStatusUpdate?.(friendStatus);
       } catch (err) {
-        const error = new Error(`Failed to process status update: ${err}`);
-        setError(error);
-        onError?.(error);
+        const e = new Error(`Failed to process status update: ${String(err)}`);
+        setError(e);
+        onError?.(e);
       }
     },
     [onStatusUpdate, onError]
   );
 
-  // Hàm subscribe realtime
+  // ✅ Đăng ký realtime subscription
   const subscribeToStatusChanges = useCallback(() => {
     if (friendIds.length === 0) return;
 
     try {
-      // Tạo channel mới
       const channel = supabase
         .channel("friend_status_changes")
         .on(
@@ -88,32 +86,34 @@ export const useRealtimeFriendStatus = ({
             table: "profiles",
             filter: `id=in.(${friendIds.join(",")})`,
           },
-          handleStatusUpdate
+          (payload) =>
+            handleStatusUpdate(
+              payload as RealtimePostgresUpdatePayload<FriendStatus>
+            )
         )
+
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             setIsConnected(true);
             setError(null);
           } else if (status === "CHANNEL_ERROR") {
-            const error = new Error(
-              "Failed to subscribe to friend status changes"
-            );
-            setError(error);
+            const e = new Error("Failed to subscribe to friend status changes");
+            setError(e);
             setIsConnected(false);
-            onError?.(error);
+            onError?.(e);
           }
         });
 
       channelRef.current = channel;
     } catch (err) {
-      const error = new Error(`Failed to subscribe: ${err}`);
-      setError(error);
+      const e = new Error(`Failed to subscribe: ${String(err)}`);
+      setError(e);
       setIsConnected(false);
-      onError?.(error);
+      onError?.(e);
     }
   }, [friendIds, handleStatusUpdate, onError]);
 
-  // Hàm unsubscribe
+  // ✅ Hủy đăng ký
   const unsubscribe = useCallback(() => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -122,87 +122,68 @@ export const useRealtimeFriendStatus = ({
     }
   }, []);
 
-  // Hàm lấy trạng thái hiện tại của một bạn bè
+  // ✅ Lấy trạng thái 1 bạn bè
   const getFriendStatus = useCallback(
-    (friendId: string): FriendStatus | null => {
-      return friendStatuses.get(friendId) || null;
-    },
+    (friendId: string): FriendStatus | null =>
+      friendStatuses.get(friendId) || null,
     [friendStatuses]
   );
 
-  // Hàm kiểm tra bạn bè có online không
+  // ✅ Kiểm tra bạn có online không
   const isFriendOnline = useCallback(
     (friendId: string): boolean => {
       const status = getFriendStatus(friendId);
-      if (!status) return false;
-
-      if (status.status === "offline") return false;
-      if (!status.last_seen_at) return false;
+      if (!status || status.status === "offline" || !status.last_seen_at)
+        return false;
 
       const lastSeen = new Date(status.last_seen_at);
-      const now = new Date();
-      const diffMinutes = (now.getTime() - lastSeen.getTime()) / 1000 / 60;
-
-      // Nếu last_seen > 3 phút thì coi là offline
+      const diffMinutes = (Date.now() - lastSeen.getTime()) / 1000 / 60;
       return diffMinutes <= 3;
     },
     [getFriendStatus]
   );
 
-  // Hàm format thời gian last seen
+  // ✅ Format thời gian "hoạt động gần đây"
   const formatLastSeen = useCallback(
     (friendId: string): string => {
       const status = getFriendStatus(friendId);
       if (!status) return "Ngoại tuyến";
 
-      if (status.status === "online" && status.last_seen_at) {
-        const isOnline = isFriendOnline(friendId);
-        if (isOnline) return "Đang hoạt động";
-      }
-
+      if (isFriendOnline(friendId)) return "Đang hoạt động";
       if (!status.last_seen_at) return "Ngoại tuyến";
 
       const lastSeen = new Date(status.last_seen_at);
-      const now = new Date();
       const diffMinutes = Math.floor(
-        (now.getTime() - lastSeen.getTime()) / 1000 / 60
+        (Date.now() - lastSeen.getTime()) / 1000 / 60
       );
 
       if (diffMinutes < 1) return "Vừa xong";
       if (diffMinutes < 60) return `${diffMinutes} phút trước`;
-
-      const diffHours = Math.floor(diffMinutes / 60);
-      if (diffHours < 24) return `${diffHours} giờ trước`;
-
-      const diffDays = Math.floor(diffHours / 24);
-      if (diffDays < 7) return `${diffDays} ngày trước`;
+      if (diffMinutes < 1440)
+        return `${Math.floor(diffMinutes / 60)} giờ trước`;
+      if (diffMinutes < 10080)
+        return `${Math.floor(diffMinutes / 1440)} ngày trước`;
 
       return lastSeen.toLocaleDateString("vi-VN");
     },
     [getFriendStatus, isFriendOnline]
   );
 
-  // Hàm lấy màu sắc trạng thái
+  // ✅ Lấy màu trạng thái
   const getStatusColor = useCallback(
-    (friendId: string): string => {
-      const isOnline = isFriendOnline(friendId);
-      return isOnline ? "bg-green-500" : "bg-gray-400";
-    },
+    (friendId: string): string =>
+      isFriendOnline(friendId) ? "bg-green-500" : "bg-gray-400",
     [isFriendOnline]
   );
 
-  // Effect để subscribe/unsubscribe
+  // ✅ Subscribe lifecycle
   useEffect(() => {
     if (friendIds.length === 0) return;
-
     subscribeToStatusChanges();
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [friendIds.join(","), subscribeToStatusChanges, unsubscribe]);
 
-  // Effect để load trạng thái ban đầu
+  // ✅ Load dữ liệu ban đầu
   useEffect(() => {
     if (friendIds.length === 0) return;
 
@@ -218,23 +199,15 @@ export const useRealtimeFriendStatus = ({
         if (error) throw error;
 
         const statusMap = new Map<string, FriendStatus>();
-        data?.forEach((profile: any) => {
-          statusMap.set(profile.id, {
-            id: profile.id,
-            status: profile.status,
-            last_seen_at: profile.last_seen_at,
-            status_updated_at: profile.status_updated_at,
-            display_name: profile.display_name,
-            avatar_url: profile.avatar_url,
-            username: profile.username,
-          });
+        data?.forEach((profile) => {
+          statusMap.set(profile.id, profile);
         });
 
         setFriendStatuses(statusMap);
       } catch (err) {
-        const error = new Error(`Failed to load initial statuses: ${err}`);
-        setError(error);
-        onError?.(error);
+        const e = new Error(`Failed to load initial statuses: ${String(err)}`);
+        setError(e);
+        onError?.(e);
       }
     };
 

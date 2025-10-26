@@ -1,25 +1,25 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { useProfile } from "@/hooks/useProfile";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
-  userId: string;
+  avatarUrl?: string | null;
+  displayName?: string;
+  status?: string;
   size?: "sm" | "md" | "lg" | "xl";
   showStatus?: boolean;
   className?: string;
 }
 
 export function UserAvatar({
-  userId,
+  avatarUrl,
+  displayName,
+  status = "offline",
   size = "md",
   showStatus = true,
   className,
 }: UserAvatarProps) {
-  const { data: profile } = useProfile(userId);
-  const isOnline = profile?.status === "online";
-  const statusColor = isOnline ? "bg-green-500" : "bg-gray-400";
+  const statusColor = status === "online" ? "bg-green-500" : "bg-gray-400";
 
-  // Kích thước avatar
   const sizeClasses = {
     sm: "w-8 h-8",
     md: "w-12 h-12",
@@ -27,7 +27,6 @@ export function UserAvatar({
     xl: "w-20 h-20",
   };
 
-  // Kích thước badge tương ứng
   const badgeSize = {
     sm: "w-2.5 h-2.5",
     md: "w-3 h-3",
@@ -35,7 +34,6 @@ export function UserAvatar({
     xl: "w-4 h-4",
   };
 
-  // Vị trí badge
   const badgePosition = {
     sm: "bottom-0 right-0",
     md: "bottom-0 right-0",
@@ -46,9 +44,9 @@ export function UserAvatar({
   return (
     <div className={cn("relative inline-block", className)}>
       <Avatar className={sizeClasses[size]}>
-        <AvatarImage src={profile?.avatar_url || undefined} />
+        <AvatarImage src={avatarUrl || undefined} />
         <AvatarFallback className="bg-zinc-300">
-          {profile?.display_name?.[0]?.toUpperCase() || "U"}
+          {displayName?.[0]?.toUpperCase() || "U"}
         </AvatarFallback>
       </Avatar>
 
@@ -60,7 +58,7 @@ export function UserAvatar({
             badgeSize[size],
             badgePosition[size]
           )}
-          title={isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
+          title={status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
         />
       )}
     </div>
