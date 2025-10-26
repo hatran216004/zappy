@@ -87,15 +87,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         isActive ? "bg-blue-600/20" : "hover:bg-gray-200 dark:hover:bg-gray-800"
       )}
     >
-      {/* <Avatar className="h-10 w-10">
-        <AvatarImage src={avatarUrl || ''} alt={displayName || ''} />
-        <AvatarFallback className="bg-zinc-300">
-          {(displayName || '?').charAt(0)}
-        </AvatarFallback>
-      </Avatar> */}
       <UserAvatar
-        userId={otherParticipant?.profile?.id as string}
-        size="md"
+        avatarUrl={otherParticipant?.profile?.avatar_url}
+        displayName={otherParticipant?.profile?.display_name}
+        status={otherParticipant?.profile?.status}
         showStatus={true}
       />
 

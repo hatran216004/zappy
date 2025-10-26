@@ -1,9 +1,10 @@
 // components/ConversationsList.tsx
-import React from 'react';
-import { useConversations, useConversationsRealtime } from '@/hooks/useChat';
-import ConversationItem from './ConversationItem';
-import { useFriends, useFriendsRealtime } from '@/hooks/useFriends';
-import FriendsListForChat from '../friends/FriendsListForChat';
+import React, { useMemo } from "react";
+import { useConversations, useConversationsRealtime } from "@/hooks/useChat";
+import ConversationItem from "./ConversationItem";
+import { useFriends, useFriendsRealtime } from "@/hooks/useFriends";
+import FriendsListForChat from "../friends/FriendsListForChat";
+import useRealtimeFriendStatus from "@/hooks/useRealtimeFriendStatus";
 
 interface ConversationsListProps {
   userId: string;
@@ -16,7 +17,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
   selectedConversationId,
   onSelectConversation,
-  onSelectFriend
+  onSelectFriend,
 }) => {
   const { data: conversations, isLoading } = useConversations(userId);
   const { data: friends } = useFriends(userId);
@@ -24,6 +25,12 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
 
   // Subscribe to realtime updates
   useConversationsRealtime(userId);
+
+  const friendIds = useMemo(() => friends?.map((f) => f.id) ?? [], [friends]);
+
+  const { getFriendStatus } = useRealtimeFriendStatus({
+    friendIds,
+  });
 
   if (isLoading) {
     return (
