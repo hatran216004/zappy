@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// hooks/useChat.ts
 import {
   useMutation,
   useQuery,
   useQueryClient,
   useInfiniteQuery
 } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   getConversations,
   getConversation,
@@ -23,6 +24,7 @@ import {
   subscribeMessages,
   subscribeReactions,
   subscribeTyping,
+  searchMessages,
   // type ConversationWithDetails,
   // type MessageWithDetails,
   type Message
@@ -116,7 +118,7 @@ export const useMessages = (conversationId: string) => {
   });
 };
 
-// Hook gửi text message - BỎ OPTIMISTIC UPDATE
+// Hook gửi text message với optimistic update
 export const useSendTextMessage = () => {
   const queryClient = useQueryClient();
 
@@ -133,10 +135,68 @@ export const useSendTextMessage = () => {
       replyToId?: string;
     }) => sendTextMessage(conversationId, senderId, content, replyToId),
 
-    // Không có onMutate nữa - để realtime xử lý hết
+    // Optimistic update - thêm message ngay lập tức
+    onMutate: async ({ conversationId, senderId, content, replyToId }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.messages(conversationId)
+      });
 
-    onSuccess: (_, variables) => {
-      // Chỉ invalidate conversations
+      // Snapshot the previous value
+      const previousMessages = queryClient.getQueryData(
+        chatKeys.messages(conversationId)
+      );
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(
+        chatKeys.messages(conversationId),
+        (old: any) => {
+          if (!old) return old;
+
+          const tempMessage = {
+            id: `temp-${Date.now()}`,
+            conversation_id: conversationId,
+            sender_id: senderId,
+            content_text: content,
+            type: 'text',
+            created_at: new Date().toISOString(),
+            reply_to_id: replyToId,
+            recalled_at: null,
+            edited_at: null,
+            sender: { id: senderId, display_name: 'You', avatar_url: '' },
+            attachments: [],
+            reactions: [],
+            read_receipts: [],
+            reply_to: null
+          };
+
+          return {
+            ...old,
+            pages: old.pages.map((page: any[], index: number) =>
+              index === old.pages.length - 1 ? [...page, tempMessage] : page
+            )
+          };
+        }
+      );
+
+      return { previousMessages };
+    },
+
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (_err, variables, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          chatKeys.messages(variables.conversationId),
+          context.previousMessages
+        );
+      }
+    },
+
+    // Always refetch after error or success to sync with server
+    onSettled: (_, __, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(variables.conversationId)
+      });
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversations(variables.senderId)
       });
@@ -205,7 +265,7 @@ export const useRecallMessage = () => {
   });
 };
 
-// Hook subscribe messages realtime - ĐƠN GIẢN
+// Hook subscribe messages realtime - CẢI TIẾN ĐỂ MƯỢT MÀ HƠN
 export const useMessagesRealtime = (
   conversationId: string,
   currentUserId: string
@@ -222,24 +282,29 @@ export const useMessagesRealtime = (
           (old: any) => {
             if (!old) return old;
 
-            // Check if message already exists
-            const exists = old.pages.some((page: any[]) =>
-              page.some((msg: any) => msg.id === newMessage.id)
+            // Check if message already exists (avoid duplicates)
+            const allMessages = old.pages.flat();
+            const exists = allMessages.some(
+              (msg: any) => msg.id === newMessage.id
             );
+            if (exists) return old;
 
-            if (exists) return old; // Đã có rồi thì bỏ qua
+            // Remove temporary messages (optimistic updates) before adding real message
+            const updatedPages = old.pages.map((page: any[]) =>
+              page.filter((msg: any) => !msg.id.startsWith('temp-'))
+            );
 
             // Add new message to the last page
             return {
               ...old,
-              pages: old.pages.map((page: any[], index: number) =>
-                index === old.pages.length - 1 ? [...page, newMessage] : page
+              pages: updatedPages.map((page: any[], index: number) =>
+                index === updatedPages.length - 1 ? [...page, newMessage] : page
               )
             };
           }
         );
 
-        // Invalidate conversations để update last_message
+        // Chỉ invalidate conversations để update last_message
         queryClient.invalidateQueries({
           queryKey: chatKeys.conversations(currentUserId)
         });
@@ -398,11 +463,20 @@ export const useTypingIndicator = (conversationId: string, userId: string) => {
         setTypingUsers((prev) => {
           const newSet = new Set(prev);
           if (isTyping) {
-            newSet.add(typingUserId);
+            // Chỉ update nếu user chưa có trong set
+            if (!newSet.has(typingUserId)) {
+              newSet.add(typingUserId);
+              return newSet;
+            }
           } else {
-            newSet.delete(typingUserId);
+            // Chỉ update nếu user có trong set
+            if (newSet.has(typingUserId)) {
+              newSet.delete(typingUserId);
+              return newSet;
+            }
           }
-          return newSet;
+          // Không có thay đổi, return prev để tránh re-render
+          return prev;
         });
       }
     );
@@ -412,12 +486,30 @@ export const useTypingIndicator = (conversationId: string, userId: string) => {
     };
   }, [conversationId, userId]);
 
-  const sendTyping = (isTyping: boolean) => {
+  // Memoize sendTyping function để tránh re-create
+  const sendTyping = useCallback((isTyping: boolean) => {
     sendTypingIndicator(conversationId, userId, isTyping);
-  };
+  }, [conversationId, userId]);
+
+  // Memoize typingUsers array
+  const typingUsersArray = useMemo(() => Array.from(typingUsers), [typingUsers]);
 
   return {
-    typingUsers: Array.from(typingUsers),
+    typingUsers: typingUsersArray,
     sendTyping
   };
+};
+
+// ============================================
+// MESSAGE SEARCH
+// ============================================
+
+// Hook search messages
+export const useSearchMessages = (conversationId: string, query: string) => {
+  return useQuery({
+    queryKey: ['search', conversationId, query],
+    queryFn: () => searchMessages(conversationId, query),
+    enabled: !!query && query.trim().length > 0,
+    staleTime: 60000 // Cache for 1 minute
+  });
 };

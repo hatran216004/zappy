@@ -13,7 +13,7 @@ export default function AddFriendModal() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <TooltipBtn icon={UserPlus} label="Thêm bạn" />
+        <TooltipBtn icon={UserPlus} label="Thêm bạn" tooltipSide="bottom" />
       </DialogTrigger>
 
       <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">

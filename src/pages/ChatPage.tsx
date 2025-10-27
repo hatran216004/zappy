@@ -1,48 +1,20 @@
-import { useState } from 'react';
+import ConversationListPane from '@/components/chat/ConversationListPane';
 import ChatWindow from '@/components/conversation/ChatWindow';
-import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
 import { useAuth } from '@/stores/user';
-import Sidebar from '@/components/conversation/Sidebar';
+import { useParams } from 'react-router';
 
 function ChatPage() {
   const { user } = useAuth();
   const currentUserId = user?.id as string;
-
-  const [selectedConversationId, setSelectedConversationId] = useState<
-    string | null
-  >(null);
-
-  const createConversationMutation = useGetOrCreateDirectConversation();
-
-  const handleSelectFriend = async (friendId: string) => {
-    try {
-      const conversationId = await createConversationMutation.mutateAsync({
-        currentUserId,
-        otherUserId: friendId
-      });
-      setSelectedConversationId(conversationId);
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-    }
-  };
+  const params = useParams();
+  const selectedConversationId = params.conversationId;
 
   return (
-    <div className="grid grid-cols-12 h-screen bg-gray-100 flex-1">
-      {/* Sidebar tách riêng */}
-      <Sidebar
-        userId={currentUserId}
-        selectedConversationId={selectedConversationId || undefined}
-        onSelectConversation={setSelectedConversationId}
-        onSelectFriend={handleSelectFriend}
-      />
-
+    <div className="grid grid-cols-12 h-screen bg-gray-100">
       {/* Main Chat Area */}
-      <div className="col-span-9 flex flex-col">
+      <div className="col-span-8 flex flex-col">
         {selectedConversationId ? (
-          <ChatWindow
-            conversationId={selectedConversationId}
-            userId={currentUserId}
-          />
+          <ChatWindow userId={currentUserId} />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">
@@ -70,6 +42,9 @@ function ChatPage() {
             </div>
           </div>
         )}
+      </div>
+      <div className="col-span-4">
+        <ConversationListPane />
       </div>
     </div>
   );

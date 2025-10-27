@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { useState } from "react";
 import { UserAvatar } from "../UserAvatar";
+=======
+import { Avatar, AvatarFallback, AvatarImage } from '@radix-ui/react-avatar';
+import { useState } from 'react';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface FriendItemProps {
   friend: {
@@ -10,15 +15,26 @@ interface FriendItemProps {
     status: string;
   };
   onRemove: () => void;
+  onMessage?: (friendId: string) => void;
 }
 
-export default function FriendItem({ friend, onRemove }: FriendItemProps) {
+export default function FriendItem({ friend, onRemove, onMessage }: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
+<<<<<<< HEAD
   // console.log({
   //   username: friend.username,
   //   displayname: friend.display_name,
   //   status: friend.status,
   // });
+=======
+  
+  const handleMessage = () => {
+    if (onMessage) {
+      onMessage(friend.id);
+    }
+  };
+
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
   return (
     <li className="relative">
       {/* Row */}
@@ -28,6 +44,7 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
       >
         {/* Avatar */}
         <div className="relative shrink-0">
+<<<<<<< HEAD
           {/* <UserAvatar userId={friend.id} showStatus={true} /> */}
           <div className="relative shrink-0">
             <UserAvatar
@@ -37,6 +54,25 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
               showStatus={true}
             />
           </div>
+=======
+          <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
+            <AvatarImage
+              className='object-cover rounded-full size-full'
+              src={friend.avatar_url || '/default-avatar.png'}
+              alt={friend.display_name}
+            />
+            <AvatarFallback>
+              {friend.display_name?.[0]?.toUpperCase() || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          {friend.status === 'online' && (
+            <span
+              className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card
+                         bg-[oklch(0.79_0.14_145)]"
+              title="Online"
+            />
+          )}
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
         </div>
 
         {/* Texts */}
@@ -54,8 +90,10 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
         {/* Quick actions (show on hover like Zalo) */}
         <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
+            onClick={handleMessage}
             className="h-8 px-3 text-sm rounded-full bg-primary text-primary-foreground hover:opacity-90"
             title="Nhắn tin"
+            type="button"
           >
             Nhắn tin
           </button>
@@ -83,7 +121,10 @@ export default function FriendItem({ friend, onRemove }: FriendItemProps) {
           onMouseLeave={() => setShowMenu(false)}
         >
           <button
-            onClick={() => setShowMenu(false)}
+            onClick={() => {
+              handleMessage();
+              setShowMenu(false);
+            }}
             className="w-full px-4 py-2 text-left text-sm hover:bg-accent/50"
           >
             Nhắn tin

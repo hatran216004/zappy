@@ -1,4 +1,7 @@
 import { TooltipBtn } from "@/components/TooltipBtn";
+// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+// import { cn } from "@/lib/utils";
+// import { avatarVariants } from "@/lib/variants";
 
 import {
   MessageCircle,
@@ -29,8 +32,9 @@ import {
   useFriendRequestsRealtime,
   usePendingFriendRequests,
 } from "@/hooks/useFriends";
-
-import { UserAvatar } from "@/components/UserAvatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { twMerge } from "tailwind-merge";
+import { avatarVariants } from "@/lib/variants";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -83,13 +87,14 @@ export default function Navbar() {
         <div className="flex flex-col items-center gap-6">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="select-none">
-                <UserAvatar
-                  avatarUrl={profile?.avatar_url}
-                  displayName={profile?.display_name}
-                  status={profile?.status}
-                  showStatus={true}
-                />
+              <button className="focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-full">
+                <Avatar className={twMerge(avatarVariants({ size: "md" }))}>
+                  <AvatarImage src={profile?.avatar_url} />
+
+                  <AvatarFallback className="bg-zinc-300">
+                    {profile?.display_name?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

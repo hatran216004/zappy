@@ -8,15 +8,19 @@ import {
 } from '@/hooks/useChat';
 import { getAttachmentUrl } from '@/services/chatService';
 import type { MessageWithDetails } from '@/services/chatService';
-import { supabaseUrl } from '@/lib/supabase';
+import { formatTime } from '@/utils/date';
+import clsx from 'clsx';
+
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import clsx from 'clsx';
+import { supabaseUrl } from '@/lib/supabase';
+import { ImageAttachment } from './ImageAttachment';
+import { AudioPlayer } from './AudioPlayer';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -24,15 +28,17 @@ interface MessageBubbleProps {
   showAvatar: boolean;
   showTimestamp: boolean;
   onReply: () => void;
+  onEdit: (content: string) => void;
   currentUserId: string;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   message,
   isOwn,
   showAvatar,
   showTimestamp,
   onReply,
+  onEdit,
   currentUserId
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -48,16 +54,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   useEffect(() => {
     const loadAttachments = async () => {
       if (!message.attachments || message.attachments.length === 0) return;
+
       const urls = await Promise.all(
         message.attachments.map((att) => getAttachmentUrl(att.storage_path))
       );
       setAttachmentUrls(urls);
     };
+
     loadAttachments();
   }, [message.attachments]);
 
   const handleEdit = async () => {
     if (!editText.trim()) return;
+
     try {
       await editMutation.mutateAsync({
         messageId: message.id,
@@ -71,6 +80,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const handleRecall = async () => {
     if (!confirm('Bạn có chắc muốn thu hồi tin nhắn này?')) return;
+
     try {
       await recallMutation.mutateAsync(message.id);
     } catch (error) {
@@ -80,9 +90,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const handleReaction = async (emoji: string) => {
     if (!message.reactions) return;
+
     const existingReaction = message.reactions.find(
       (r) => r.user_id === currentUserId && r.emoji === emoji
     );
+
     try {
       if (existingReaction) {
         await removeReactionMutation.mutateAsync({
@@ -102,23 +114,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Group reactions by emoji
+  // Group reactions by emoji - THÊM CHECK NULL
   const groupedReactions =
     message?.reactions?.reduce((acc, reaction) => {
       if (!reaction || !reaction.emoji) return acc;
-      if (!acc[reaction.emoji]) acc[reaction.emoji] = [];
+      if (!acc[reaction.emoji]) {
+        acc[reaction.emoji] = [];
+      }
       acc[reaction.emoji].push(reaction);
       return acc;
     }, {} as Record<string, typeof message.reactions>) || {};
 
-  // Message recalled
   if (message.recalled_at) {
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -137,7 +143,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Avatar */}
         {showAvatar && !isOwn && message?.sender && (
           <img
-            src={`${supabaseUrl}${message.sender.avatar_url}`}
+            src={`${supabaseUrl}/${message.sender.avatar_url}`}
             alt={message.sender.display_name}
             className="w-8 h-8 rounded-full object-cover"
           />
@@ -163,14 +169,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <div
             className={clsx(
               'flex items-center gap-2',
-              isOwn ? 'flex-row-reverse' : ''
+              isOwn && 'flex-row-reverse'
             )}
           >
             <div
-              className={`px-4 py-2 rounded-lg ${
+              className={clsx(
+                'px-4 py-2 rounded-lg',
                 isOwn ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
-              }`}
+              )}
             >
+              {/* Text content */}
               {isEditing ? (
                 <div>
                   <textarea
@@ -206,35 +214,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   {message?.attachments?.map((attachment, index) => (
                     <div key={attachment.id} className="mt-2">
                       {attachment.kind === 'image' && attachmentUrls[index] && (
-                        <img
+                        <ImageAttachment
                           src={attachmentUrls[index]}
-                          alt="Attachment"
-                          className="max-w-full rounded cursor-pointer hover:opacity-90"
-                          onClick={() =>
-                            window.open(attachmentUrls[index], '_blank')
-                          }
+                          alt="Image"
+                          isOwn={isOwn}
                         />
                       )}
                       {attachment.kind === 'video' && attachmentUrls[index] && (
                         <video
                           src={attachmentUrls[index]}
                           controls
-                          className="max-w-full rounded"
+                          className="max-w-full rounded-lg"
+                          style={{ maxHeight: '400px' }}
                         />
                       )}
                       {attachment.kind === 'audio' && attachmentUrls[index] && (
-                        <audio
-                          src={attachmentUrls[index]}
-                          controls
-                          className="w-full"
-                        />
+                        <AudioPlayer src={attachmentUrls[index]} isOwn={isOwn} />
                       )}
                       {attachment.kind === 'file' && attachmentUrls[index] && (
                         <a
                           href={attachmentUrls[index]}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-2 bg-white bg-opacity-20 rounded hover:bg-opacity-30"
+                          className="flex items-center gap-2 p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
                         >
                           <svg
                             className="w-5 h-5"
@@ -244,7 +246,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                             <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
                             <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
                           </svg>
-                          <span className="text-sm">
+                          <span className="text-sm font-medium">
                             {attachment.storage_path.split('/').pop()}
                           </span>
                         </a>
@@ -252,6 +254,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     </div>
                   ))}
 
+                  {/* Edited indicator */}
                   {message.edited_at && (
                     <span
                       className={`text-xs ${
@@ -265,12 +268,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               )}
             </div>
 
+            {/* ✅ Dropdown menu (shadcn) */}
             <div
               className={'opacity-0 group-hover:opacity-100 transition-opacity'}
             >
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full">
+                  <button
+                    className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+                    type="button"
+                    aria-label="Mở menu"
+                  >
                     <svg
                       className="w-4 h-4"
                       fill="currentColor"
@@ -280,31 +288,33 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     </svg>
                   </button>
                 </DropdownMenuTrigger>
-
                 <DropdownMenuContent
                   align={isOwn ? 'end' : 'start'}
-                  className="w-40"
+                  className="min-w-[180px]"
                 >
-                  <DropdownMenuItem onClick={onReply}>
-                    💬 Trả lời
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onReply}>Trả lời</DropdownMenuItem>
 
                   {isOwn && message.type === 'text' && (
-                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                      ✏️ Chỉnh sửa
+                    <DropdownMenuItem
+                      onClick={() => {
+                        onEdit(message.content_text || '');
+                        // trạng thái edit thực tế do parent quản
+                        // nếu muốn edit inline ở đây thì gọi setIsEditing(true)
+                      }}
+                    >
+                      Chỉnh sửa
                     </DropdownMenuItem>
                   )}
 
+                  {isOwn && <DropdownMenuSeparator />}
+
                   {isOwn && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={handleRecall}
-                        className="text-red-600 focus:text-red-600"
-                      >
-                        🗑️ Thu hồi
-                      </DropdownMenuItem>
-                    </>
+                    <DropdownMenuItem
+                      onClick={handleRecall}
+                      className="text-red-600 focus:text-red-700"
+                    >
+                      Thu hồi
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -327,7 +337,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
 
-          {/* Timestamp */}
+          {/* Timestamp and read receipts */}
           {showTimestamp && (
             <div
               className={`flex items-center gap-2 mt-1 px-2 ${
@@ -346,6 +356,4 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
     </div>
   );
-};
-
-export default MessageBubble;
+});

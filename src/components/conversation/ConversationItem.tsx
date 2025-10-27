@@ -1,22 +1,33 @@
 // import { Pin } from 'lucide-react';
 import { twMerge } from "tailwind-merge";
 
+<<<<<<< HEAD
 import { ConversationWithDetails } from "@/services/chatService";
 import { UserAvatar } from "../UserAvatar";
+=======
+import { ConversationWithDetails } from '@/services/chatService';
+import { Link, useParams } from 'react-router';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
   userId: string;
   isSelected: boolean;
-  onClick: () => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   userId,
+<<<<<<< HEAD
   isSelected,
   onClick,
+=======
+  isSelected
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 }) => {
+  const params = useParams();
+  const conversationId = params.conversationId as string;
+
   const otherParticipant = conversation.participants.find(
     (p) => p.user_id !== userId
   );
@@ -72,7 +83,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   // Dùng UI theo comment: Avatar + 2 dòng (name/time + preview/unread/pin)
   // isSelected tương đương isActive trong mẫu comment
-  const isActive = isSelected;
+  const isActive = isSelected || conversationId === conversation.id;
 
   // Unread badge theo mẫu comment (đếm 99+)
   const unread = conversation.unread_count ?? 0;
@@ -80,8 +91,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     unread > 0 ? (unread > 99 ? "99+" : String(unread)) : null;
 
   return (
-    <div
-      onClick={onClick}
+    <Link
+      to={`/chat/${conversation.id}`}
       className={twMerge(
         "flex items-center gap-3 p-4 cursor-pointer",
         isActive ? "bg-blue-600/20" : "hover:bg-gray-200 dark:hover:bg-gray-800"
@@ -122,7 +133,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 
