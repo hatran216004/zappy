@@ -1,10 +1,15 @@
 // components/ConversationsList.tsx
-import React, { useState } from 'react';
-import { useConversations, useConversationsRealtime, useGetOrCreateDirectConversation } from '@/hooks/useChat';
-import ConversationItem from './ConversationItem';
-import { useFriends, useFriendsRealtime } from '@/hooks/useFriends';
-import { useNavigate } from 'react-router';
-import { supabaseUrl } from '@/lib/supabase';
+
+import React, { useState } from "react";
+import {
+  useConversations,
+  useConversationsRealtime,
+  useGetOrCreateDirectConversation,
+} from "@/hooks/useChat";
+import ConversationItem from "./ConversationItem";
+import { useFriends, useFriendsRealtime } from "@/hooks/useFriends";
+import { useNavigate } from "react-router";
+import { supabaseUrl } from "@/lib/supabase";
 
 interface ConversationsListProps {
   userId: string;
@@ -13,7 +18,8 @@ interface ConversationsListProps {
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
-  selectedConversationId
+
+  selectedConversationId,
 }) => {
   const navigate = useNavigate();
   const { data: conversations, isLoading } = useConversations(userId);
@@ -32,34 +38,39 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
       setIsCreating(true);
       const conversationId = await getOrCreateConversation.mutateAsync({
         currentUserId: userId,
-        otherUserId: friendId
+        otherUserId: friendId,
       });
 
       // Navigate đến conversation
       navigate(`/chat/${conversationId}`);
     } catch (error) {
-      console.error('Error creating/opening conversation:', error);
+      console.error("Error creating/opening conversation:", error);
     } finally {
       setIsCreating(false);
     }
   };
 
   // Lọc ra các bạn bè chưa có conversation
-  const friendsWithoutConversation = friends?.filter((friend) => {
-    // Check xem đã có conversation với friend này chưa
-    const hasConversation = conversations?.some((conv) => {
-      // Direct conversation: must have exactly 2 participants (current user + friend)
-      if (conv.participants.length !== 2) return false;
-      
-      // Check if friend is in participants
-      const hasFriend = conv.participants.some((p) => p.user_id === friend.id);
-      const hasCurrentUser = conv.participants.some((p) => p.user_id === userId);
-      
-      return hasFriend && hasCurrentUser;
-    });
-    
-    return !hasConversation;
-  }) || [];
+  const friendsWithoutConversation =
+    friends?.filter((friend) => {
+      // Check xem đã có conversation với friend này chưa
+      const hasConversation = conversations?.some((conv) => {
+        // Direct conversation: must have exactly 2 participants (current user + friend)
+        if (conv.participants.length !== 2) return false;
+
+        // Check if friend is in participants
+        const hasFriend = conv.participants.some(
+          (p) => p.user_id === friend.id
+        );
+        const hasCurrentUser = conv.participants.some(
+          (p) => p.user_id === userId
+        );
+
+        return hasFriend && hasCurrentUser;
+      });
+
+      return !hasConversation;
+    }) || [];
 
   if (isLoading) {
     return (
@@ -164,7 +175,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
                       alt={friend.display_name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
-                    {friend.status === 'online' && (
+                    {friend.status === "online" && (
                       <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-800" />
                     )}
                   </div>
