@@ -41,98 +41,106 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 }
-
-/* 🌞 ZALO LIGHT MODE */
+/* 🎮 DISCORD LIGHT */
 :root {
   --radius: 0.625rem;
 
-  /* Tone trắng-xanh Zalo */
-  --background: oklch(0.99 0 0); /* trắng */
-  --foreground: oklch(0.17 0 0); /* xám đen nhẹ */
+  /* Nền xám rất nhạt, thẻ trắng – kiểu Discord light */
+  --background: #F2F3F5;
+  --foreground: #060607;
 
-  --card: oklch(0.99 0 0);
+  --card: #FFFFFF;
   --card-foreground: var(--foreground);
 
-  --popover: oklch(0.99 0 0);
+  --popover: #FFFFFF;
   --popover-foreground: var(--foreground);
 
-  /* Xanh Zalo (#1E88E5 ~ oklch(0.61 0.16 260)) */
-  --primary: oklch(0.61 0.16 260);
-  --primary-foreground: oklch(0.99 0 0);
+  /* Blurple Discord */
+  --primary: #5865F2;
+  --primary-foreground: #FFFFFF;
 
-  --secondary: oklch(0.96 0 0);
+  /* Vùng phụ/hover */
+  --secondary: #EDEFF2;
   --secondary-foreground: var(--foreground);
 
-  --muted: oklch(0.95 0 0);
-  --muted-foreground: oklch(0.45 0 0);
+  --muted: #E3E5E8;
+  --muted-foreground: #4F545C;
 
-  --accent: oklch(0.96 0.02 260);
-  --accent-foreground: oklch(0.22 0 0);
+  /* Accent hồng Discord */
+  --accent: #EB459E;
+  --accent-foreground: #0B0B0B;
 
-  --destructive: oklch(0.65 0.2 30);
-  --border: oklch(0.92 0 0);
+  --destructive: #ED4245;
+
+  /* Viền/inputs/ring */
+  --border: #DCDDDE;
   --input: var(--border);
   --ring: var(--primary);
 
-  /* Chart giữ nguyên */
-  --chart-1: oklch(0.61 0.16 260);
-  --chart-2: oklch(0.56 0.12 180);
-  --chart-3: oklch(0.46 0.08 230);
-  --chart-4: oklch(0.82 0.19 80);
-  --chart-5: oklch(0.74 0.17 70);
+  /* Chart (giữ tông Discord) */
+  --chart-1: #5865F2;
+  --chart-2: #57F287;
+  --chart-3: #EB459E;
+  --chart-4: #FEE75C;
+  --chart-5: #ED4245;
 
-  /* Sidebar tông nhạt xanh */
-  --sidebar: oklch(0.98 0 0);
+  /* Sidebar kiểu Discord light */
+  --sidebar: #FFFFFF;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.97 0.02 260);
-  --sidebar-accent-foreground: oklch(0.22 0 0);
-  --sidebar-border: oklch(0.93 0 0);
+  --sidebar-accent: #E3E5E8;
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: #DCDDDE;
   --sidebar-ring: var(--primary);
 }
 
-/* 🌚 ZALO DARK MODE */
+/* 🌚 DISCORD DARK */
 .dark {
-  /* Nền xanh đậm pha xám (Zalo Dark) */
-  --background: oklch(0.22 0.02 260);
-  --foreground: oklch(0.95 0 0);
+  /* Nền xám đậm Discord */
+  --background: #2B2D31;
+  --foreground: #F2F3F5;
 
-  --card: oklch(0.26 0.02 260);
-  --card-foreground: oklch(0.97 0 0);
+  --card: #313338;
+  --card-foreground: #FFFFFF;
 
   --popover: var(--card);
   --popover-foreground: var(--foreground);
 
-  /* Xanh Zalo tươi sáng hơn ở dark mode */
-  --primary: oklch(0.74 0.18 260);
-  --primary-foreground: oklch(0.15 0 0);
+  /* Blurple nổi trên nền tối */
+  --primary: #5865F2;
+  --primary-foreground: #0B0B0B;
 
-  --secondary: oklch(0.32 0 0);
-  --secondary-foreground: oklch(0.97 0 0);
+  /* Vùng phụ/hover tối */
+  --secondary: #1E1F22;
+  --secondary-foreground: #E6E7E8;
 
-  --muted: oklch(0.3 0 0);
-  --muted-foreground: oklch(0.7 0 0);
+  --muted: #3F4246;
+  --muted-foreground: #B5BAC1;
 
-  --accent: oklch(0.28 0.03 260);
-  --accent-foreground: oklch(0.98 0 0);
+  /* Accent hồng */
+  --accent: #EB459E;
+  --accent-foreground: #0B0B0B;
 
-  --border: oklch(0.45 0 0);
+  --destructive: #ED4245;
+
+  /* Viền/inputs/ring */
+  --border: #3F4246;
   --input: var(--border);
   --ring: var(--primary);
 
-  --destructive: oklch(0.65 0.2 30);
-
-  /* Sidebar xanh đậm */
-  --sidebar: oklch(0.22 0.02 260);
-  --sidebar-foreground: oklch(0.95 0 0);
+  /* Sidebar tối kiểu Discord */
+  --sidebar: #1E1F22;
+  --sidebar-foreground: #E6E7E8;
   --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: oklch(0.15 0 0);
-  --sidebar-accent: oklch(0.3 0.03 260);
-  --sidebar-accent-foreground: oklch(0.97 0 0);
-  --sidebar-border: oklch(0.45 0 0);
+  --sidebar-primary-foreground: #0B0B0B;
+  --sidebar-accent: #2B2D31;
+  --sidebar-accent-foreground: #F2F3F5;
+  --sidebar-border: #3F4246;
   --sidebar-ring: var(--primary);
 }
+
+
 
 /* Base layer */
 @layer base {
