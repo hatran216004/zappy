@@ -1,14 +1,17 @@
-<<<<<<< HEAD
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Phone, Video, Users, Info } from "lucide-react";
+import {
+  Search,
+  Phone,
+  Video,
+  Users,
+  Info,
+  X,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { TooltipBtn } from "../TooltipBtn";
-=======
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Search, Phone, Video, Users, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { TooltipBtn } from '../TooltipBtn';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -21,7 +24,7 @@ interface ChatHeaderProps {
       }
     | undefined;
   typingUsers: string[];
-  onSearch?: (query: string, direction: 'next' | 'prev') => void;
+  onSearch?: (query: string, direction: "next" | "prev") => void;
   searchResults?: { current: number; total: number };
   onCloseSearch?: () => void;
 }
@@ -29,19 +32,16 @@ interface ChatHeaderProps {
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   otherParticipant,
   typingUsers,
-<<<<<<< HEAD
-}) => {
-  const displayName = otherParticipant?.profile.display_name || "Người dùng";
-=======
+
   onSearch,
   searchResults,
-  onCloseSearch
+  onCloseSearch,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const displayName = otherParticipant?.profile.display_name || 'Người dùng';
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
+  const displayName = otherParticipant?.profile.display_name || "Người dùng";
+
   const avatarUrl =
     otherParticipant?.profile.avatar_url || "/default-avatar.png";
   const statusText =
@@ -54,13 +54,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     if (onSearch && e.target.value) {
-      onSearch(e.target.value, 'next');
+      onSearch(e.target.value, "next");
     }
   };
 
   const handleCloseSearch = () => {
     setShowSearch(false);
-    setSearchQuery('');
+    setSearchQuery("");
     onCloseSearch?.();
   };
 
@@ -119,7 +119,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               {searchQuery && (
                 <button
                   onClick={() => {
-                    setSearchQuery('');
+                    setSearchQuery("");
                     onCloseSearch?.();
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -138,7 +138,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  onClick={() => onSearch?.(searchQuery, 'prev')}
+                  onClick={() => onSearch?.(searchQuery, "prev")}
                   disabled={searchResults.current <= 1}
                 >
                   <ChevronUp className="size-4" />
@@ -147,7 +147,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  onClick={() => onSearch?.(searchQuery, 'next')}
+                  onClick={() => onSearch?.(searchQuery, "next")}
                   disabled={searchResults.current >= searchResults.total}
                 >
                   <ChevronDown className="size-4" />
