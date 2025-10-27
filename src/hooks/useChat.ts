@@ -25,6 +25,9 @@ import {
   subscribeReactions,
   subscribeTyping,
   searchMessages,
+  getConversationMedia,
+  getConversationFiles,
+  getConversationLinks,
   // type ConversationWithDetails,
   // type MessageWithDetails,
   type Message
@@ -511,5 +514,42 @@ export const useSearchMessages = (conversationId: string, query: string) => {
     queryFn: () => searchMessages(conversationId, query),
     enabled: !!query && query.trim().length > 0,
     staleTime: 60000 // Cache for 1 minute
+  });
+};
+
+// ============================================
+// CONVERSATION MEDIA & FILES
+// ============================================
+
+// Hook lấy media từ conversation
+export const useConversationMedia = (
+  conversationId: string,
+  type: 'image' | 'video' | 'both' = 'both'
+) => {
+  return useQuery({
+    queryKey: ['conversation-media', conversationId, type],
+    queryFn: () => getConversationMedia(conversationId, type),
+    enabled: !!conversationId,
+    staleTime: 60000
+  });
+};
+
+// Hook lấy files từ conversation
+export const useConversationFiles = (conversationId: string) => {
+  return useQuery({
+    queryKey: ['conversation-files', conversationId],
+    queryFn: () => getConversationFiles(conversationId),
+    enabled: !!conversationId,
+    staleTime: 60000
+  });
+};
+
+// Hook lấy links từ conversation
+export const useConversationLinks = (conversationId: string) => {
+  return useQuery({
+    queryKey: ['conversation-links', conversationId],
+    queryFn: () => getConversationLinks(conversationId),
+    enabled: !!conversationId,
+    staleTime: 60000
   });
 };
