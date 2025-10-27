@@ -12,21 +12,20 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
-import SidebarDangerItem from '@/components/Sidebar/SidebarDangerItem';
+import SidebarDangerItem from '@/components/sidebar/SidebarDangerItem';
 import { TooltipBtn } from '@/components/TooltipBtn';
-import { SidebarAccordionSection } from '../Sidebar/SidebarAccordionSection';
+import { SidebarAccordionSection } from '../sidebar/SidebarAccordionSection';
 
 export default function ConversationListPane() {
   return (
-    <div className="flex flex-col h-full border-l dark:border-gray-800 bg-white dark:bg-gray-900">
+    <div className="flex flex-col border-l dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="p-4 border-b dark:border-gray-700 text-center">
         <h2 className="font-semibold text-gray-800 dark:text-gray-200">
           Thông tin nhóm
         </h2>
       </div>
-      <div className="overflow-y-auto scrollbar-custom [scrollbar-gutter:stable]">
-        {/* Group Info */}
+      <div className="h-[calc(100vh-56.8px)] overflow-y-auto">
         <div className="flex flex-col items-center py-6 border-b dark:border-gray-700">
           <Avatar className="h-16 w-16">
             <AvatarImage src="/avatar.png" />
@@ -36,14 +35,26 @@ export default function ConversationListPane() {
             Nhóm 1
           </p>
           <div className="flex gap-6 mt-4">
-            {/* <SidebarAction icon={<BellOff />} label="Tắt thông báo" />
-            <SidebarAction icon={<Pin />} label="Ghim hội thoại" />
-            <SidebarAction icon={<UserPlus />} label="Thêm thành viên" />
-            <SidebarAction icon={<Settings />} label="Quản lý nhóm" /> */}
-            <TooltipBtn icon={BellOff} label="Tắt thông báo" />
-            <TooltipBtn icon={Pin} label="Ghim hội thoại" />
-            <TooltipBtn icon={UserPlus} label="Thêm thành viên" />
-            <TooltipBtn icon={Settings} label="Quản lý nhóm" />
+            <TooltipBtn
+              icon={BellOff}
+              label="Tắt thông báo"
+              tooltipSide="bottom"
+            />
+            <TooltipBtn
+              icon={Pin}
+              label="Ghim hội thoại"
+              tooltipSide="bottom"
+            />
+            <TooltipBtn
+              icon={UserPlus}
+              label="Thêm thành viên"
+              tooltipSide="bottom"
+            />
+            <TooltipBtn
+              icon={Settings}
+              label="Quản lý nhóm"
+              tooltipSide="bottom"
+            />
           </div>
         </div>
 
@@ -133,7 +144,7 @@ export default function ConversationListPane() {
           />
 
           {/* Thiết lập bảo mật */}
-          <div className="px-2 py-3 border-b dark:border-gray-700">
+          <div className="px-6 py-3 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Thiết lập bảo mật
             </h3>

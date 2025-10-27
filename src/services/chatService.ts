@@ -86,74 +86,133 @@ export const getOrCreateDirectConversation = async (
   return newConvo.id;
 };
 
-// Lấy danh sách conversations
+// Lấy danh sách conversations (bao gồm cả direct và group)
 export const getConversations = async (
   userId: string
 ): Promise<ConversationWithDetails[]> => {
-  // Cách 1: Query trực tiếp từ conversations
-  const { data, error } = await supabase
-    .from('conversations')
+  // Step 1: Get direct conversations từ direct_pairs
+  const { data: directPairs, error: directError } = await supabase
+    .from('direct_pairs')
     .select(
       `
-    id, title, updated_at, created_at,
-    conversation_participants!inner(
-      user_id,
-      joined_at,
-      last_read_at,
-      left_at,
-      profile:profiles(id, display_name, avatar_url, username, status, last_seen_at)
-    ),
-    last_message:messages!conversations_last_message_id_fkey(
-      id, content_text, type, sender_id, created_at,
-      sender:profiles!messages_sender_id_fkey(id, display_name, avatar_url)
+      conversation_id,
+      user_a,
+      user_b,
+      conversations:conversation_id (
+        id,
+        title,
+        type,
+        updated_at,
+        created_at,
+        last_message_id
+      )
+    `
     )
-  `
+    .or(`user_a.eq.${userId},user_b.eq.${userId}`);
+
+  if (directError) {
+    console.error('Error fetching direct conversations:', directError);
+    throw directError;
+  }
+
+  // Step 2: Get group conversations từ conversation_participants
+  const { data: groupConvos, error: groupError } = await supabase
+    .from('conversation_participants')
+    .select(
+      `
+      conversation_id,
+      conversations:conversation_id (
+        id,
+        title,
+        type,
+        updated_at,
+        created_at,
+        last_message_id
+      )
+    `
     )
-    .eq('conversation_participants.user_id', userId)
-    .is('conversation_participants.left_at', null)
-    .order('updated_at', { ascending: false });
+    .eq('user_id', userId)
+    .is('left_at', null);
 
-  if (error) throw error;
+  if (groupError) {
+    console.error('Error fetching group conversations:', groupError);
+    throw groupError;
+  }
 
-  // Get participants and unread count for each conversation
+  // Step 3: Combine và deduplicate conversations
+  const allConvoIds = new Set<string>();
+  const conversationsMap = new Map<string, any>();
+
+  // Add direct conversations
+  directPairs?.forEach((pair) => {
+    if (pair.conversations) {
+      allConvoIds.add(pair.conversation_id);
+      conversationsMap.set(pair.conversation_id, {
+        ...pair.conversations,
+        direct_pair: { user_a: pair.user_a, user_b: pair.user_b }
+      });
+    }
+  });
+
+  // Add group conversations (nếu chưa có)
+  groupConvos?.forEach((item) => {
+    if (item.conversations && item.conversations.type === 'group') {
+      allConvoIds.add(item.conversation_id);
+      if (!conversationsMap.has(item.conversation_id)) {
+        conversationsMap.set(item.conversation_id, item.conversations);
+      }
+    }
+  });
+
+  // Step 4: Get full details for each conversation
   const conversationsWithDetails = await Promise.all(
-    (data || []).map(async (convo) => {
-      // Get all participants with profiles
-      const { data: participants, error: error1 } = await supabase
+    Array.from(conversationsMap.values()).map(async (convo) => {
+      // Get all participants
+      const { data: participants } = await supabase
         .from('conversation_participants')
-        .select(
-          `
-          *,
-          profile:profiles(*)
-        `
-        )
+        .select('*, profile:profiles(*)')
         .eq('conversation_id', convo.id)
         .is('left_at', null);
 
-      if (error1) throw error1;
-
-      // Find current user's participant record
-      const userParticipant = participants?.find((p) => p.user_id === userId);
+      // Get last message
+      let lastMessage = null;
+      if (convo.last_message_id) {
+        const { data: msgData } = await supabase
+          .from('messages')
+          .select(
+            `
+            id, content_text, type, sender_id, created_at,
+            sender:profiles!messages_sender_id_fkey(id, display_name, avatar_url)
+          `
+          )
+          .eq('id', convo.last_message_id)
+          .single();
+        lastMessage = msgData;
+      }
 
       // Get unread count
-      const { count: unreadCount, error: error2 } = await supabase
+      const userParticipant = participants?.find((p) => p.user_id === userId);
+      const { count: unreadCount } = await supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
         .eq('conversation_id', convo.id)
         .gt('created_at', userParticipant?.last_read_at || '1970-01-01')
         .neq('sender_id', userId);
 
-      if (error2) throw error2;
-
       return {
         ...convo,
         participants: participants || [],
+        last_message: lastMessage,
         unread_count: unreadCount || 0
       };
     })
   );
 
-  return conversationsWithDetails;
+  // Sort by updated_at descending
+  return conversationsWithDetails.sort(
+    (a, b) =>
+      new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
+  );
 };
 
 // Lấy thông tin conversation
@@ -210,6 +269,9 @@ export const getMessages = async (
       created_at,
       reply_to_id,
       recalled_at,
+      edited_at,
+      fts,
+      location,
       sender:profiles!messages_sender_id_fkey(*),
       attachments(*)
     `
@@ -432,6 +494,35 @@ export const getAttachmentUrl = async (
   return data?.signedUrl || '';
 };
 
+// Search messages in a conversation
+export const searchMessages = async (
+  conversationId: string,
+  query: string
+): Promise<{ id: string; content_text: string; created_at: string }[]> => {
+  if (!query.trim()) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, content_text, created_at')
+    .eq('conversation_id', conversationId)
+    .is('recalled_at', null)
+    .not('content_text', 'is', null) // Chỉ tìm messages có content
+    .ilike('content_text', `%${query}%`)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Search messages error:', error);
+    throw error;
+  }
+
+  // Filter out null content_text (just in case)
+  return (data || []).filter((msg) => msg.content_text !== null) as { 
+    id: string; 
+    content_text: string; 
+    created_at: string 
+  }[];
+};
+
 // Edit message
 export const editMessage = async (
   messageId: string,
@@ -533,19 +624,61 @@ export const markMessagesAsRead = async (
 // TYPING INDICATOR
 // ============================================
 
-// Send typing indicator
-export const sendTypingIndicator = async (
+// Cache channels và last sent state để tránh gửi duplicate
+const typingChannels = new Map<string, any>();
+const lastTypingState = new Map<string, boolean>();
+const pendingTyping = new Map<string, boolean>(); // Track pending sends
+
+// Send typing indicator với rate limiting
+export const sendTypingIndicator = (
   conversationId: string,
   userId: string,
   isTyping: boolean
-): Promise<void> => {
-  // Use Supabase Broadcast for typing indicators (ephemeral)
-  const channel = supabase.channel(`conversation:${conversationId}`);
+): void => {
+  const key = `${conversationId}:${userId}`;
+  const lastState = lastTypingState.get(key);
+  const isPending = pendingTyping.get(key);
 
-  await channel.send({
+  console.log(`🔍 sendTypingIndicator: isTyping=${isTyping}, lastState=${lastState}, pending=${isPending}`);
+
+  // Skip nếu đang pending hoặc state giống nhau
+  if (isPending) {
+    console.log(`⏳ Skip: Already pending`);
+    return;
+  }
+
+  if (lastState !== undefined && lastState === isTyping) {
+    console.log(`⏭️ Skip: State unchanged`);
+    return;
+  }
+
+  // Mark as pending và update state
+  pendingTyping.set(key, true);
+  lastTypingState.set(key, isTyping);
+
+  // Lấy hoặc tạo channel
+  let channel = typingChannels.get(conversationId);
+  
+  if (!channel) {
+    channel = supabase.channel(`typing:${conversationId}`);
+    channel.subscribe();
+    typingChannels.set(conversationId, channel);
+    console.log(`📡 Created channel: ${conversationId}`);
+  }
+
+  // Gửi typing event
+  channel.send({
     type: 'broadcast',
     event: 'typing',
     payload: { user_id: userId, is_typing: isTyping }
+  }).then(() => {
+    console.log(`✅ Sent: ${isTyping ? 'START ▶️' : 'STOP ⏹️'}`);
+    pendingTyping.delete(key);
+  }).catch((error: any) => {
+    console.error('❌ Error:', error);
+    // Rollback
+    lastTypingState.set(key, !isTyping);
+    pendingTyping.delete(key);
   });
 };
 
@@ -777,7 +910,7 @@ export const subscribeTyping = (
   onTyping: (userId: string, isTyping: boolean) => void
 ) => {
   const channel = supabase
-    .channel(`conversation:${conversationId}`)
+    .channel(`typing:${conversationId}`)
     .on('broadcast', { event: 'typing' }, (payload) => {
       onTyping(payload.payload.user_id, payload.payload.is_typing);
     })

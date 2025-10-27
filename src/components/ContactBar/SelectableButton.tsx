@@ -17,7 +17,7 @@ export default function SelectableButton({
 
   return (
     <Link
-      to={`friends${url}`}
+      to={`${url}`}
       className={clsx(
         'rounded-none flex items-center justify-start gap-3 px-3 py-6 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer',
         isActive &&
