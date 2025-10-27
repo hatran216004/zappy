@@ -1,8 +1,14 @@
+<<<<<<< HEAD
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Search, Phone, Video, Users, Info } from "lucide-react";
+import { TooltipBtn } from "../TooltipBtn";
+=======
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Search, Phone, Video, Users, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { TooltipBtn } from '../TooltipBtn';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -23,6 +29,10 @@ interface ChatHeaderProps {
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   otherParticipant,
   typingUsers,
+<<<<<<< HEAD
+}) => {
+  const displayName = otherParticipant?.profile.display_name || "Người dùng";
+=======
   onSearch,
   searchResults,
   onCloseSearch
@@ -31,14 +41,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
 
   const displayName = otherParticipant?.profile.display_name || 'Người dùng';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
   const avatarUrl =
-    otherParticipant?.profile.avatar_url || '/default-avatar.png';
+    otherParticipant?.profile.avatar_url || "/default-avatar.png";
   const statusText =
     typingUsers.length > 0
-      ? 'Đang nhập...'
-      : otherParticipant?.profile.status === 'online'
-      ? 'Đang hoạt động'
-      : 'Không hoạt động';
+      ? "Đang nhập..."
+      : otherParticipant?.profile.status === "online"
+      ? "Đang hoạt động"
+      : "Không hoạt động";
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);

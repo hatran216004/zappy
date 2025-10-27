@@ -1,13 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from "react";
 import {
   useFriends,
   useRemoveFriend,
+<<<<<<< HEAD
+  useFriendsRealtime,
+} from "../../hooks/useFriends";
+import useUser from "@/hooks/useUser";
+import FriendItem from "./FriendItem";
+import useRealtimeFriendStatus from "@/hooks/useRealtimeFriendStatus";
+=======
   useFriendsRealtime
 } from '../../hooks/useFriends';
 import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
 import useUser from '@/hooks/useUser';
 import FriendItem from './FriendItem';
 import { useNavigate } from 'react-router';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 export const FriendsList = () => {
   const navigate = useNavigate();
@@ -22,12 +30,18 @@ export const FriendsList = () => {
   // Subscribe realtime
   useFriendsRealtime(userId);
 
+  const friendIds = useMemo(() => friends?.map((f) => f.id) ?? [], [friends]);
+
+  const { getFriendStatus } = useRealtimeFriendStatus({
+    friendIds,
+  });
+
   const handleRemoveFriend = async (friendId: string) => {
     try {
       await removeFriendMutation.mutateAsync(friendId);
       setSelectedFriend(null);
     } catch (err) {
-      console.error('Error removing friend:', err);
+      console.error("Error removing friend:", err);
     }
   };
 
@@ -58,8 +72,8 @@ export const FriendsList = () => {
         acc[labelId].push(friend);
       });
     } else {
-      if (!acc['no_label']) acc['no_label'] = [];
-      acc['no_label'].push(friend);
+      if (!acc["no_label"]) acc["no_label"] = [];
+      acc["no_label"].push(friend);
     }
     return acc;
   }, {} as Record<string, typeof friends>);
@@ -116,8 +130,20 @@ export const FriendsList = () => {
       ) : (
         <div className="space-y-6">
           {/* No label */}
-          {groupedFriends?.['no_label'] && (
+          {groupedFriends?.["no_label"] && (
             <ul className="bg-card rounded-xl border border-border divide-y divide-border">
+<<<<<<< HEAD
+              {groupedFriends["no_label"].map((friend) => {
+                const status = getFriendStatus(friend.id);
+                return (
+                  <FriendItem
+                    key={friend.id}
+                    friend={{ ...friend, status: status?.status as string }}
+                    onRemove={() => setSelectedFriend(friend.id)}
+                  />
+                );
+              })}
+=======
               {groupedFriends['no_label'].map((friend) => (
                 <FriendItem
                   key={friend.id}
@@ -126,11 +152,34 @@ export const FriendsList = () => {
                   onMessage={handleMessage}
                 />
               ))}
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
             </ul>
           )}
 
           {/* Labeled groups */}
           {Object.entries(groupedFriends || {})
+<<<<<<< HEAD
+            .filter(([key]) => key !== "no_label")
+            .map(([labelId, friendsList]) => (
+              <section key={labelId}>
+                <h3 className="px-2 sm:px-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase mb-2">
+                  Nhãn: {labelId}
+                </h3>
+                <ul className="bg-card rounded-xl border border-border divide-y divide-border">
+                  {(friendsList ?? []).map((friend) => {
+                    const status = getFriendStatus(friend.id);
+                    return (
+                      <FriendItem
+                        key={friend.id}
+                        friend={{ ...friend, status: status?.status as string }}
+                        onRemove={() => setSelectedFriend(friend.id)}
+                      />
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+=======
             .filter(([key]) => key !== 'no_label')
             .map(([labelId, friendsList]) => {
               return (
@@ -151,6 +200,7 @@ export const FriendsList = () => {
                 </section>
               );
             })}
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
         </div>
       )}
 
@@ -175,7 +225,7 @@ export const FriendsList = () => {
                 disabled={removeFriendMutation.isPending}
                 className="flex-1 h-9 px-4 rounded-lg bg-destructive text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
-                {removeFriendMutation.isPending ? 'Đang xóa...' : 'Xóa'}
+                {removeFriendMutation.isPending ? "Đang xóa..." : "Xóa"}
               </button>
             </div>
           </div>

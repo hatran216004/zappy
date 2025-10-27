@@ -1,10 +1,19 @@
 // components/ConversationsList.tsx
+<<<<<<< HEAD
+import React, { useMemo } from "react";
+import { useConversations, useConversationsRealtime } from "@/hooks/useChat";
+import ConversationItem from "./ConversationItem";
+import { useFriends, useFriendsRealtime } from "@/hooks/useFriends";
+import FriendsListForChat from "../friends/FriendsListForChat";
+import useRealtimeFriendStatus from "@/hooks/useRealtimeFriendStatus";
+=======
 import React, { useState } from 'react';
 import { useConversations, useConversationsRealtime, useGetOrCreateDirectConversation } from '@/hooks/useChat';
 import ConversationItem from './ConversationItem';
 import { useFriends, useFriendsRealtime } from '@/hooks/useFriends';
 import { useNavigate } from 'react-router';
 import { supabaseUrl } from '@/lib/supabase';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface ConversationsListProps {
   userId: string;
@@ -13,7 +22,13 @@ interface ConversationsListProps {
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
+<<<<<<< HEAD
+  selectedConversationId,
+  onSelectConversation,
+  onSelectFriend,
+=======
   selectedConversationId
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 }) => {
   const navigate = useNavigate();
   const { data: conversations, isLoading } = useConversations(userId);
@@ -24,6 +39,13 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   useFriendsRealtime(userId);
   useConversationsRealtime(userId);
 
+<<<<<<< HEAD
+  const friendIds = useMemo(() => friends?.map((f) => f.id) ?? [], [friends]);
+
+  const { getFriendStatus } = useRealtimeFriendStatus({
+    friendIds,
+  });
+=======
   // Handle click vào bạn bè -> tạo hoặc mở conversation
   const handleSelectFriend = async (friendId: string) => {
     if (isCreating) return;
@@ -60,6 +82,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
     
     return !hasConversation;
   }) || [];
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
   if (isLoading) {
     return (

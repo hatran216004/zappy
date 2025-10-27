@@ -1,5 +1,10 @@
+<<<<<<< HEAD
+import { useState } from "react";
+import { UserAvatar } from "../UserAvatar";
+=======
 import { Avatar, AvatarFallback, AvatarImage } from '@radix-ui/react-avatar';
 import { useState } from 'react';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface FriendItemProps {
   friend: {
@@ -7,7 +12,7 @@ interface FriendItemProps {
     display_name: string;
     username: string;
     avatar_url: string;
-    status: string; // 'online' | 'offline' ...
+    status: string;
   };
   onRemove: () => void;
   onMessage?: (friendId: string) => void;
@@ -15,6 +20,13 @@ interface FriendItemProps {
 
 export default function FriendItem({ friend, onRemove, onMessage }: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
+<<<<<<< HEAD
+  // console.log({
+  //   username: friend.username,
+  //   displayname: friend.display_name,
+  //   status: friend.status,
+  // });
+=======
   
   const handleMessage = () => {
     if (onMessage) {
@@ -22,6 +34,7 @@ export default function FriendItem({ friend, onRemove, onMessage }: FriendItemPr
     }
   };
 
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
   return (
     <li className="relative">
       {/* Row */}
@@ -31,6 +44,17 @@ export default function FriendItem({ friend, onRemove, onMessage }: FriendItemPr
       >
         {/* Avatar */}
         <div className="relative shrink-0">
+<<<<<<< HEAD
+          {/* <UserAvatar userId={friend.id} showStatus={true} /> */}
+          <div className="relative shrink-0">
+            <UserAvatar
+              avatarUrl={friend.avatar_url}
+              displayName={friend.display_name}
+              status={friend.status}
+              showStatus={true}
+            />
+          </div>
+=======
           <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
             <AvatarImage
               className='object-cover rounded-full size-full'
@@ -48,6 +72,7 @@ export default function FriendItem({ friend, onRemove, onMessage }: FriendItemPr
               title="Online"
             />
           )}
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
         </div>
 
         {/* Texts */}

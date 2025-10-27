@@ -1,9 +1,4 @@
-// components/UserStatus.tsx - Component hiển thị status badge
-import {
-  useUserStatus,
-  useUserStatusRealtime,
-  useStatusDisplay,
-} from "@/hooks/useUserStatus";
+import { useUserStatus, useUserStatusRealtime } from "@/hooks/useUserStatus";
 import { cn } from "@/lib/utils";
 
 interface UserStatusBadgeProps {
@@ -20,12 +15,11 @@ export function UserStatusBadge({
   className,
 }: UserStatusBadgeProps) {
   const { data: statusData } = useUserStatus(userId);
-  useUserStatusRealtime(userId); // Subscribe to realtime updates
+  useUserStatusRealtime(userId); // Subscribe realtime
 
-  const { statusColor, statusText, isOnline } = useStatusDisplay(
-    statusData?.status,
-    statusData?.last_seen_at
-  );
+  const isOnline = statusData?.status === "online";
+  const statusColor = isOnline ? "bg-green-500" : "bg-gray-400";
+  const statusText = isOnline ? "Đang hoạt động" : "Ngoại tuyến";
 
   const sizeClasses = {
     sm: "w-2 h-2",
