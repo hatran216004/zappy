@@ -188,3 +188,70 @@
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
+
+/* Scrollbar mảnh kiểu Discord */
+.discord-scroll {
+  --sb-bg: transparent;
+  --sb-thumb: rgba(255,255,255,0.2);
+  --sb-thumb-light: rgba(0,0,0,0.2);
+}
+.discord-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) var(--sb-bg);
+}
+.light .discord-scroll { scrollbar-color: var(--sb-thumb-light) var(--sb-bg); }
+
+.discord-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.discord-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.discord-scroll::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb);
+  border-radius: 8px;
+}
+.light .discord-scroll::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb-light);
+}
+
+/* Icon button tròn kiểu Discord rail */
+.discord-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: transparent;
+  transition: background-color .15s ease, color .15s ease, transform .05s ease;
+}
+.discord-icon-btn:hover {
+  background: rgba(255,255,255,0.06);
+}
+.light .discord-icon-btn:hover {
+  background: rgba(0,0,0,0.06);
+}
+.discord-icon-btn:active {
+  transform: scale(0.98);
+}
+
+/* KBD nhỏ gọn */
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Nhấn mạnh hover blob cho rows (Discord vibe) */
+@supports (backdrop-filter: blur(2px)) {
+  .row-blob {
+    background: transparent;
+  }
+  .row-blob:hover {
+    background: rgba(255,255,255,0.06);
+  }
+  .light .row-blob:hover {
+    background: rgba(0,0,0,0.04);
+  }
+}

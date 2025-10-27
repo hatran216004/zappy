@@ -1,4 +1,5 @@
 // components/ConversationsList.tsx
+// 🎨 Discord-like styling with DARK/LIGHT modes (UI-only, no logic changes)
 
 import React, { useState } from "react";
 import {
@@ -18,7 +19,6 @@ interface ConversationsListProps {
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
-
   selectedConversationId,
 }) => {
   const navigate = useNavigate();
@@ -30,18 +30,14 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   useFriendsRealtime(userId);
   useConversationsRealtime(userId);
 
-  // Handle click vào bạn bè -> tạo hoặc mở conversation
   const handleSelectFriend = async (friendId: string) => {
     if (isCreating) return;
-
     try {
       setIsCreating(true);
       const conversationId = await getOrCreateConversation.mutateAsync({
         currentUserId: userId,
         otherUserId: friendId,
       });
-
-      // Navigate đến conversation
       navigate(`/chat/${conversationId}`);
     } catch (error) {
       console.error("Error creating/opening conversation:", error);
@@ -50,32 +46,21 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
     }
   };
 
-  // Lọc ra các bạn bè chưa có conversation
   const friendsWithoutConversation =
     friends?.filter((friend) => {
-      // Check xem đã có conversation với friend này chưa
       const hasConversation = conversations?.some((conv) => {
-        // Direct conversation: must have exactly 2 participants (current user + friend)
         if (conv.participants.length !== 2) return false;
-
-        // Check if friend is in participants
-        const hasFriend = conv.participants.some(
-          (p) => p.user_id === friend.id
-        );
-        const hasCurrentUser = conv.participants.some(
-          (p) => p.user_id === userId
-        );
-
+        const hasFriend = conv.participants.some((p) => p.user_id === friend.id);
+        const hasCurrentUser = conv.participants.some((p) => p.user_id === userId);
         return hasFriend && hasCurrentUser;
       });
-
       return !hasConversation;
     }) || [];
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center flex-1">
-        <div className="text-gray-500">Đang tải...</div>
+      <div className="flex items-center justify-center flex-1 text-gray-600 dark:text-[#B5BAC1]">
+        Đang tải...
       </div>
     );
   }
@@ -83,8 +68,8 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   // Empty state: không có conversation và không có bạn bè
   if (conversations?.length === 0 && friends?.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-        <div className="text-gray-400 mb-4">
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]">
+        <div className="mb-4 text-gray-400 dark:text-[#B5BAC1]">
           <svg
             className="w-16 h-16 mx-auto"
             fill="none"
@@ -99,10 +84,8 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
             />
           </svg>
         </div>
-        <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
-          Chưa có tin nhắn nào
-        </p>
-        <p className="text-sm text-gray-400 dark:text-gray-500">
+        <p className="font-medium mb-2">Chưa có tin nhắn nào</p>
+        <p className="text-sm text-gray-500 dark:text-[#B5BAC1]">
           Hãy kết bạn để bắt đầu trò chuyện
         </p>
       </div>
@@ -110,25 +93,41 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   }
 
   return (
-    <div className="overflow-y-auto">
+    <div className="overflow-y-auto bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]">
       {/* Danh sách conversations */}
       {conversations && conversations.length > 0 && (
         <>
           {conversations.map((conversation) => (
-            <ConversationItem
+            <div
               key={conversation.id}
-              conversation={conversation}
-              userId={userId}
-              isSelected={conversation.id === selectedConversationId}
-            />
+              className="
+                group relative transition-colors
+                hover:bg-gray-100 dark:hover:bg-white/5
+                data-[active=true]:bg-gray-200 dark:data-[active=true]:bg-[#404249]
+              "
+              data-active={conversation.id === selectedConversationId}
+            >
+              {/* Active pill (trái) */}
+              <div
+                className={`
+                  absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full
+                  ${conversation.id === selectedConversationId ? "h-8 bg-[#5865F2]" : "h-0 bg-transparent"}
+                `}
+              />
+              <ConversationItem
+                conversation={conversation}
+                userId={userId}
+                isSelected={conversation.id === selectedConversationId}
+              />
+            </div>
           ))}
         </>
       )}
 
       {/* Empty state cho conversations nếu chỉ có bạn bè */}
       {conversations?.length === 0 && friendsWithoutConversation.length > 0 && (
-        <div className="flex flex-col items-center justify-center p-8 text-center border-b border-gray-200 dark:border-gray-700">
-          <div className="text-gray-400 dark:text-gray-500 mb-3">
+        <div className="flex flex-col items-center justify-center p-6 text-center border-b border-gray-200 dark:border-[#2B2D31]">
+          <div className="mb-3 text-gray-400 dark:text-[#B5BAC1]">
             <svg
               className="w-12 h-12 mx-auto"
               fill="none"
@@ -143,10 +142,8 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
               />
             </svg>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 font-medium mb-1">
-            Chưa có tin nhắn nào
-          </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500">
+          <p className="font-medium mb-1 text-gray-900 dark:text-white">Chưa có tin nhắn nào</p>
+          <p className="text-sm text-gray-500 dark:text-[#B5BAC1]">
             Chọn bạn bè bên dưới để bắt đầu trò chuyện
           </p>
         </div>
@@ -155,7 +152,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
       {/* Danh sách bạn bè chưa có conversation */}
       {friendsWithoutConversation.length > 0 && (
         <div className="mt-2">
-          <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-[#B5BAC1]">
             Bạn bè ({friendsWithoutConversation.length})
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -167,7 +164,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
                 type="button"
                 disabled={isCreating}
               >
-                <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
+                <div className="flex items-center gap-3 px-3 py-2.5 transition-colors disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-white/5">
                   {/* Avatar + status dot */}
                   <div className="relative flex-shrink-0">
                     <img
@@ -176,28 +173,32 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
                       className="w-10 h-10 rounded-full object-cover"
                     />
                     {friend.status === "online" && (
-                      <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-800" />
+                      <span className="
+                        absolute bottom-0 right-0 block w-3 h-3 rounded-full
+                        bg-[#23A55A] ring-2
+                        ring-white dark:ring-[#1E1F22]
+                      " />
                     )}
                   </div>
 
                   {/* Text area */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-[15px] text-gray-900 dark:text-gray-100 truncate">
+                      <p className="font-medium text-[15px] text-gray-900 dark:text-white truncate">
                         {friend.display_name}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <p className="text-[13px] text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-[13px] text-gray-500 dark:text-[#B5BAC1] truncate">
                         @{friend.username}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* divider mảnh kiểu Zalo */}
-                <div className="mx-16 border-b border-gray-100 dark:border-gray-800" />
+                {/* divider */}
+                <div className="mx-16 border-b border-gray-200 dark:border-[#2B2D31]" />
               </button>
             ))}
           </div>
@@ -206,13 +207,13 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
 
       {/* Loading state khi đang tạo conversation */}
       {isCreating && (
-        <div className="fixed inset-0 bg-black/20 dark:bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-lg">
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
+          <div className="rounded-lg p-4 shadow-xl border
+                          bg-white text-gray-900 border-gray-200
+                          dark:bg-[#2B2D31] dark:text-[#F2F3F5] dark:border-[#3F4246]">
             <div className="flex items-center gap-3">
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-gray-700 dark:text-gray-300">
-                Đang tạo cuộc trò chuyện...
-              </span>
+              <div className="w-5 h-5 border-2 border-[#5865F2] border-t-transparent rounded-full animate-spin" />
+              <span>Đang tạo cuộc trò chuyện...</span>
             </div>
           </div>
         </div>

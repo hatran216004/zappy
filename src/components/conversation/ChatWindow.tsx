@@ -15,6 +15,7 @@ import ChatFooter from '../ChatWindow/ChatFooter';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { ImagePreview } from './ImagePreview';
+import { twMerge } from 'tailwind-merge';
 
 interface ChatWindowProps {
   userId: string;
@@ -75,7 +76,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -115,9 +115,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
   // ✅ Auto-scroll khi có typing indicator xuất hiện lần đầu
   const prevTypingLengthRef = useRef(0);
-  
   useEffect(() => {
-    // Chỉ scroll khi typing indicator MỚI XUẤT HIỆN (từ 0 -> 1+)
     if (typingUsers.length > 0 && prevTypingLengthRef.current === 0 && isNearBottom()) {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -166,7 +164,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           messageIds: unreadMessageIds
         });
       }
-    }, 500); // Debounce 500ms
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [messages.length, conversationId, userId]);
@@ -187,50 +185,36 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     [conversationId, sendTyping]
   );
 
-  // ✅ 5. Handle typing indicator - OPTIMIZED & DEBUGGED
+  // ✅ 5. Handle typing indicator
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setMessageText(newValue);
 
-    // LUÔN clear timeout cũ trước
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
 
-    // CASE 1: Input rỗng hoàn toàn
-    if (newValue.length === 0) {
+    if (newValue.length === 0 || newValue.trim().length === 0) {
       if (isTypingRef.current) {
         isTypingRef.current = false;
         sendTyping(false);
-        console.log('🛑 OFF: Empty');
+        console.log('🛑 OFF');
       }
       return;
     }
 
-    // CASE 2: Chỉ khoảng trắng
-    if (newValue.trim().length === 0) {
-      if (isTypingRef.current) {
-        isTypingRef.current = false;
-        sendTyping(false);
-        console.log('🛑 OFF: Whitespace');
-      }
-      return;
-    }
-
-    // CASE 3: Có nội dung
     if (!isTypingRef.current) {
       isTypingRef.current = true;
       sendTyping(true);
-      console.log('▶️ ON: First char');
+      console.log('▶️ ON');
     }
 
-    // Set timeout 5s
     typingTimeoutRef.current = setTimeout(() => {
       if (isTypingRef.current) {
         isTypingRef.current = false;
         sendTyping(false);
-        console.log('⏱️ OFF: Timeout');
+        console.log('⏱️ OFF');
       }
     }, 5000);
   }, [sendTyping]);
@@ -238,13 +222,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const handleSendMessage = useCallback(async () => {
     if (!messageText.trim()) return;
 
-    // Clear timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
-
-    // Tắt typing
     if (isTypingRef.current) {
       isTypingRef.current = false;
       sendTyping(false);
@@ -267,7 +248,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     }
   }, [messageText, conversationId, userId, replyTo, sendTextMutation, sendTyping]);
 
-  // ✅ 5. Handle edit message - FOCUS & FILL INPUT
   const handleEditMessage = useCallback((_messageId: string, content: string) => {
     setIsEditing(true);
     setMessageText(content);
@@ -285,16 +265,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
     console.log('📁 File selected:', { name: file.name, type: file.type, detectedType: type });
 
-    // Nếu là ảnh, show preview trước khi gửi
     if (type === 'image') {
       setImageToSend(file);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    // Các file khác gửi luôn
     try {
       await sendFileMutation.mutateAsync({
         conversationId,
@@ -307,9 +283,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       console.error('❌ Error sending file:', error);
     }
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [conversationId, userId, sendFileMutation]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
@@ -319,16 +293,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     }
   }, [handleSendMessage]);
 
-  // ✅ 6. Handle emoji select
   const handleEmojiSelect = useCallback((emoji: string) => {
     setMessageText((prev) => prev + emoji);
     inputRef.current?.focus();
   }, []);
 
-  // ✅ Handle image send from preview
   const handleSendImage = useCallback(async () => {
     if (!imageToSend) return;
-
     try {
       await sendFileMutation.mutateAsync({
         conversationId,
@@ -347,7 +318,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     setImageToSend(null);
   }, []);
 
-  // ✅ 7. Search functionality - Using API search
   const searchResults = useMemo(() => {
     return searchData?.map((msg) => msg.id) || [];
   }, [searchData]);
@@ -360,21 +330,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         return;
       }
 
-      // Check if query changed
       const queryChanged = query !== searchQuery;
-
       if (queryChanged) {
         setSearchQuery(query);
         setCurrentSearchIndex(0);
-        // Wait for search data to load, then scroll to first result
         return;
       }
 
-      if (searchResults.length === 0) {
-        return;
-      }
+      if (searchResults.length === 0) return;
 
-      // Navigate through results
       let newIndex = currentSearchIndex;
       if (direction === 'next') {
         newIndex =
@@ -388,39 +352,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
       setCurrentSearchIndex(newIndex);
 
-      // Get the message ID
       const messageId = searchResults[newIndex];
-
-      // Check if message is loaded
       const isLoaded = messages.some((msg) => msg.id === messageId);
 
       if (isLoaded) {
-        // Message is loaded, just scroll to it
         const messageElement = messageRefs.current[messageId];
         if (messageElement) {
           messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       } else {
-        // Message not loaded yet, need to fetch older messages
         console.log('Message not loaded, fetching older messages...');
-        
-        // Find the timestamp of the target message from searchData
         const targetMessage = searchData?.find((msg) => msg.id === messageId);
-        
         if (targetMessage) {
-          // Keep fetching until we find the message or run out of pages
           let attempts = 0;
           const maxAttempts = 10;
-          
           while (!messages.some((msg) => msg.id === messageId) && attempts < maxAttempts && hasNextPage) {
             await fetchNextPage();
             attempts++;
-            
-            // Small delay to let React update
             await new Promise(resolve => setTimeout(resolve, 100));
           }
-          
-          // Try to scroll again after loading
           setTimeout(() => {
             const messageElement = messageRefs.current[messageId];
             if (messageElement) {
@@ -433,12 +383,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     [searchQuery, searchResults, currentSearchIndex, messages, searchData, hasNextPage, fetchNextPage]
   );
 
-  // Auto-scroll to first search result when search data changes
   useEffect(() => {
     if (searchResults.length > 0 && searchQuery && currentSearchIndex === 0) {
       const messageId = searchResults[0];
       const messageElement = messageRefs.current[messageId];
-      
       if (messageElement) {
         setTimeout(() => {
           messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -458,7 +406,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   );
 
   return (
-    <div className="flex flex-col h-screen justify-between">
+    <div
+      className="
+        flex flex-col h-screen justify-between
+        bg-white text-gray-900
+        dark:bg-[#313338] dark:text-[#F2F3F5]
+      "
+    >
       <ChatHeader
         otherParticipant={otherParticipant}
         typingUsers={typingUsers}
@@ -473,15 +427,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
       <div
         ref={listRef}
-        className="h-[calc(100%-122px)] overflow-y-auto p-4 space-y-2"
+        className="
+          h-[calc(100%-122px)] overflow-y-auto p-4 space-y-2
+          bg-white dark:bg-[#2B2D31]
+          discord-scroll
+        "
       >
-        {/* ✅ 4. Load button - 50 messages at a time */}
+        {/* Load older */}
         {hasNextPage && (
-          <div className="text-center pb-4">
+          <div className="text-center pb-2">
             <button
               onClick={handleLoadOlder}
               disabled={isFetchingNextPage}
-              className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+              className="
+                inline-flex items-center gap-2
+                text-xs px-3 py-1.5 rounded-full
+                bg-gray-100 text-gray-700 hover:bg-gray-200
+                dark:bg-[#1E1F22] dark:text-[#F2F3F5] dark:hover:bg-white/5
+                disabled:opacity-50 transition
+                ring-1 ring-transparent hover:ring-[#5865F2]/40
+              "
             >
               {isFetchingNextPage ? 'Đang tải...' : 'Tải tin nhắn cũ hơn'}
             </button>
@@ -508,11 +473,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
               ref={(el) => {
                 messageRefs.current[message.id] = el;
               }}
-              className={`transition-all ${
+              className={twMerge(
+                "transition-all rounded-lg",
                 isHighlighted
-                  ? 'bg-blue-100 dark:bg-blue-900/30 rounded-lg p-2 '
-                  : ''
-              }`}
+                  ? "ring-2 ring-[#5865F2]/40 bg-gray-100 dark:bg-white/5"
+                  : ""
+              )}
             >
               <MessageBubble
                 message={message}
@@ -540,16 +506,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
       {/* Reply preview */}
       {replyTo && (
-        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <div
+          className="
+            px-4 py-2 flex items-center justify-between
+            bg-gray-50 border-t border-gray-200 text-gray-700
+            dark:bg-[#2B2D31] dark:border-[#3F4246] dark:text-[#B5BAC1]
+          "
+        >
           <div className="flex-1">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm">
               Đang trả lời:{' '}
               {messages.find((m) => m.id === replyTo)?.content_text}
             </p>
           </div>
           <button
             onClick={() => setReplyTo(null)}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="
+              text-[#5865F2] hover:opacity-80
+              dark:text-[#5865F2]
+            "
+            aria-label="Đóng"
           >
             <svg
               className="w-5 h-5"
@@ -557,12 +533,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
@@ -570,16 +541,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
       {/* Edit indicator */}
       {isEditing && (
-        <div className="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-t border-yellow-200 dark:border-yellow-800 flex items-center justify-between">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            Đang chỉnh sửa tin nhắn
-          </p>
+        <div
+          className="
+            px-4 py-2 flex items-center justify-between
+            bg-gray-50 border-t border-gray-200 text-gray-700
+            dark:bg-[#2B2D31] dark:border-[#3F4246] dark:text-[#B5BAC1]
+          "
+        >
+          <p className="text-sm">Đang chỉnh sửa tin nhắn</p>
           <button
             onClick={() => {
               setIsEditing(false);
               setMessageText('');
             }}
-            className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200"
+            className="text-[#5865F2] hover:opacity-80 dark:text-[#5865F2]"
           >
             Hủy
           </button>

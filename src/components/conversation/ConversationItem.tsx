@@ -1,3 +1,6 @@
+// components/ConversationItem.tsx
+// 🎨 Discord-like styling (UI only, no logic changes)
+
 // import { Pin } from 'lucide-react';
 import { twMerge } from "tailwind-merge";
 
@@ -14,7 +17,6 @@ interface ConversationItemProps {
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   userId,
-
   isSelected,
 }) => {
   const params = useParams();
@@ -73,11 +75,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  // Dùng UI theo comment: Avatar + 2 dòng (name/time + preview/unread/pin)
-  // isSelected tương đương isActive trong mẫu comment
   const isActive = isSelected || conversationId === conversation.id;
 
-  // Unread badge theo mẫu comment (đếm 99+)
   const unread = conversation.unread_count ?? 0;
   const unreadBadge =
     unread > 0 ? (unread > 99 ? "99+" : String(unread)) : null;
@@ -86,8 +85,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     <Link
       to={`/chat/${conversation.id}`}
       className={twMerge(
-        "flex items-center gap-3 p-4 cursor-pointer",
-        isActive ? "bg-blue-600/20" : "hover:bg-gray-200 dark:hover:bg-gray-800"
+        "flex items-center gap-3 p-4 cursor-pointer transition-colors",
+        // Hover & active nền theo Discord (light/dark)
+        isActive
+          ? "bg-gray-200 dark:bg-[#404249]"
+          : "hover:bg-gray-100 dark:hover:bg-white/5"
       )}
     >
       <UserAvatar
@@ -99,28 +101,33 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center">
-          <p className="font-medium truncate text-gray-900 dark:text-gray-100">
+          <p
+            className={twMerge(
+              "truncate text-gray-900 dark:text-[#F2F3F5]",
+              unread > 0 ? "font-semibold" : "font-medium"
+            )}
+          >
             {displayName}
           </p>
           {conversation.last_message && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-gray-500 dark:text-[#B5BAC1]">
               {formatTime(conversation.last_message.created_at)}
             </span>
           )}
         </div>
 
         <div className="flex justify-between items-center">
-          <p className="text-xs truncate text-gray-500 dark:text-gray-400">
+          <p className="text-xs truncate text-gray-600 dark:text-[#B5BAC1]">
             {getLastMessagePreview()}
           </p>
           <div className="flex items-center gap-1">
             {unreadBadge && (
-              <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5">
+              <span className="bg-[#ED4245] text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
                 {unreadBadge}
               </span>
             )}
             {/* {conversation.pinned && (
-              <Pin className="size-3 text-gray-400 dark:text-gray-500" />
+              <Pin className="size-3 text-[#B5BAC1]" />
             )} */}
           </div>
         </div>

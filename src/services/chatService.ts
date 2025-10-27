@@ -86,132 +86,121 @@ export const getOrCreateDirectConversation = async (
   return newConvo.id;
 };
 
-// Lấy danh sách conversations (bao gồm cả direct và group)
+// Lấy danh sách conversations (bao gồm cả direct và group) - OPTIMIZED
 export const getConversations = async (
   userId: string
 ): Promise<ConversationWithDetails[]> => {
-  // Step 1: Get direct conversations từ direct_pairs
-  const { data: directPairs, error: directError } = await supabase
-    .from('direct_pairs')
-    .select(
-      `
-      conversation_id,
-      user_a,
-      user_b,
-      conversations:conversation_id (
-        id,
-        title,
-        type,
-        updated_at,
-        created_at,
-        last_message_id
-      )
-    `
-    )
-    .or(`user_a.eq.${userId},user_b.eq.${userId}`);
-
-  if (directError) {
-    console.error('Error fetching direct conversations:', directError);
-    throw directError;
-  }
-
-  // Step 2: Get group conversations từ conversation_participants
-  const { data: groupConvos, error: groupError } = await supabase
+  // Step 1: Get all conversation IDs for this user (both direct and group)
+  const { data: userConvos, error: convoError } = await supabase
     .from('conversation_participants')
-    .select(
-      `
-      conversation_id,
-      conversations:conversation_id (
-        id,
-        title,
-        type,
-        updated_at,
-        created_at,
-        last_message_id
-      )
-    `
-    )
+    .select('conversation_id, last_read_at')
     .eq('user_id', userId)
     .is('left_at', null);
 
-  if (groupError) {
-    console.error('Error fetching group conversations:', groupError);
-    throw groupError;
+  if (convoError) throw convoError;
+  if (!userConvos || userConvos.length === 0) return [];
+
+  const conversationIds = userConvos.map((c) => c.conversation_id);
+  const lastReadMap = new Map(
+    userConvos.map((c) => [c.conversation_id, c.last_read_at])
+  );
+
+  // Step 2: Fetch conversations and participants in PARALLEL
+  const [conversationsRes, participantsRes, directPairsRes] =
+    await Promise.all([
+      // Get conversations basic info
+      supabase
+        .from('conversations')
+        .select('id, title, type, updated_at, created_at, last_message_id, photo_url')
+        .in('id', conversationIds),
+
+      // Get ALL participants for these conversations in ONE query
+      supabase
+        .from('conversation_participants')
+        .select('conversation_id, user_id, profile:profiles(id, display_name, avatar_url, status)')
+        .in('conversation_id', conversationIds)
+        .is('left_at', null),
+
+      // Get direct pairs info in ONE query
+      supabase
+        .from('direct_pairs')
+        .select('conversation_id, user_a, user_b')
+        .in('conversation_id', conversationIds)
+    ]);
+
+  if (conversationsRes.error) throw conversationsRes.error;
+
+  // Step 3: Get last messages based on last_message_id from conversations
+  const messageIds = conversationsRes.data
+    ?.map((c) => c.last_message_id)
+    .filter(Boolean) as string[];
+
+  let messagesMap = new Map<string, any>();
+  if (messageIds && messageIds.length > 0) {
+    const { data: messagesData } = await supabase
+      .from('messages')
+      .select('id, content_text, type, sender_id, created_at, recalled_at')
+      .in('id', messageIds);
+    
+    messagesMap = new Map(
+      messagesData?.map((msg) => [msg.id, msg]) || []
+    );
   }
 
-  // Step 3: Combine và deduplicate conversations
-  const allConvoIds = new Set<string>();
-  const conversationsMap = new Map<string, any>();
-
-  // Add direct conversations
-  directPairs?.forEach((pair) => {
-    if (pair.conversations) {
-      allConvoIds.add(pair.conversation_id);
-      conversationsMap.set(pair.conversation_id, {
-        ...pair.conversations,
-        direct_pair: { user_a: pair.user_a, user_b: pair.user_b }
-      });
+  // Step 4: Create lookup maps for efficient data assembly
+  const participantsByConvo = new Map<string, any[]>();
+  participantsRes.data?.forEach((p) => {
+    if (!participantsByConvo.has(p.conversation_id)) {
+      participantsByConvo.set(p.conversation_id, []);
     }
+    participantsByConvo.get(p.conversation_id)!.push(p);
   });
 
-  // Add group conversations (nếu chưa có)
-  groupConvos?.forEach((item) => {
-    if (item.conversations && item.conversations.type === 'group') {
-      allConvoIds.add(item.conversation_id);
-      if (!conversationsMap.has(item.conversation_id)) {
-        conversationsMap.set(item.conversation_id, item.conversations);
-      }
-    }
-  });
+  const directPairsMap = new Map(
+    directPairsRes.data?.map((dp) => [dp.conversation_id, dp]) || []
+  );
 
-  // Step 4: Get full details for each conversation
-  const conversationsWithDetails = await Promise.all(
-    Array.from(conversationsMap.values()).map(async (convo) => {
-      // Get all participants
-      const { data: participants } = await supabase
-        .from('conversation_participants')
-        .select('*, profile:profiles(*)')
-        .eq('conversation_id', convo.id)
-        .is('left_at', null);
-
-      // Get last message
-      let lastMessage = null;
-      if (convo.last_message_id) {
-        const { data: msgData } = await supabase
-          .from('messages')
-          .select(
-            `
-            id, content_text, type, sender_id, created_at,
-            sender:profiles!messages_sender_id_fkey(id, display_name, avatar_url)
-          `
-          )
-          .eq('id', convo.last_message_id)
-          .single();
-        lastMessage = msgData;
-      }
-
-      // Get unread count
-      const userParticipant = participants?.find((p) => p.user_id === userId);
-      const { count: unreadCount } = await supabase
+  // Step 5: Get unread counts in parallel for all conversations
+  const unreadCountsRes = await Promise.all(
+    conversationIds.map(async (convId) => {
+      const lastReadAt = lastReadMap.get(convId);
+      const { count } = await supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
-        .eq('conversation_id', convo.id)
-        .gt('created_at', userParticipant?.last_read_at || '1970-01-01')
+        .eq('conversation_id', convId)
+        .gt('created_at', lastReadAt || '1970-01-01')
         .neq('sender_id', userId);
+      return [convId, count || 0] as const;
+    })
+  );
+  
+  const unreadCounts = new Map<string, number>();
+  unreadCountsRes.forEach(([convId, count]) => {
+    unreadCounts.set(convId, count);
+  });
+
+  // Step 6: Assemble final data structure
+  const conversationsWithDetails: ConversationWithDetails[] =
+    conversationsRes.data?.map((convo) => {
+      const participants = participantsByConvo.get(convo.id) || [];
+      const lastMessage = convo.last_message_id
+        ? messagesMap.get(convo.last_message_id)
+        : null;
+      const unreadCount = unreadCounts.get(convo.id) || 0;
 
       return {
         ...convo,
-        participants: participants || [],
+        participants,
         last_message: lastMessage,
-        unread_count: unreadCount || 0
+        unread_count: unreadCount
       };
-    })
-  );
+    }) || [];
 
   // Sort by updated_at descending
   return conversationsWithDetails.sort(
     (a, b) =>
-      new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
+      new Date(b.updated_at || 0).getTime() -
+      new Date(a.updated_at || 0).getTime()
   );
 };
 
@@ -248,7 +237,7 @@ export const getConversation = async (
 // MESSAGES
 // ============================================
 
-// Lấy messages
+// Lấy messages - OPTIMIZED với batch queries
 export const getMessages = async (
   conversationId: string,
   limit: number = 50,
@@ -289,9 +278,13 @@ export const getMessages = async (
     throw error;
   }
 
+  if (!messages || messages.length === 0) return [];
+
+  const messageIds = messages.map((m) => m.id);
+
   // --- STEP 2: lấy các message được reply_to ---
   const replyIds = [
-    ...new Set((messages ?? []).map((m) => m.reply_to_id).filter(Boolean))
+    ...new Set(messages.map((m) => m.reply_to_id).filter(Boolean))
   ];
 
   let repliesById: Record<string, any> = {};
@@ -310,30 +303,44 @@ export const getMessages = async (
     repliesById = Object.fromEntries((replies ?? []).map((r) => [r.id, r]));
   }
 
-  // --- STEP 3: lấy reactions + read receipts cho từng message ---
-  const messagesWithDetails = await Promise.all(
-    (messages || []).map(async (msg) => {
-      const [reactionsRes, receiptsRes] = await Promise.all([
-        supabase
-          .from('message_reactions')
-          .select(
-            `
-            *,
-            user:profiles!message_reactions_user_id_fkey(*)
-          `
-          )
-          .eq('message_id', msg.id),
-        supabase.from('read_receipts').select('*').eq('message_id', msg.id)
-      ]);
+  // --- STEP 3: BATCH fetch reactions + read receipts cho TẤT CẢ messages ---
+  const [reactionsRes, receiptsRes] = await Promise.all([
+    supabase
+      .from('message_reactions')
+      .select(
+        `
+        *,
+        user:profiles!message_reactions_user_id_fkey(*)
+      `
+      )
+      .in('message_id', messageIds),
+    supabase.from('read_receipts').select('*').in('message_id', messageIds)
+  ]);
 
-      return {
-        ...msg,
-        reply_to: msg.reply_to_id ? repliesById[msg.reply_to_id] ?? null : null,
-        reactions: reactionsRes.data || [],
-        read_receipts: receiptsRes.data || []
-      };
-    })
-  );
+  // Create lookup maps for reactions and receipts by message_id
+  const reactionsByMessageId = new Map<string, any[]>();
+  reactionsRes.data?.forEach((reaction) => {
+    if (!reactionsByMessageId.has(reaction.message_id)) {
+      reactionsByMessageId.set(reaction.message_id, []);
+    }
+    reactionsByMessageId.get(reaction.message_id)!.push(reaction);
+  });
+
+  const receiptsByMessageId = new Map<string, any[]>();
+  receiptsRes.data?.forEach((receipt) => {
+    if (!receiptsByMessageId.has(receipt.message_id)) {
+      receiptsByMessageId.set(receipt.message_id, []);
+    }
+    receiptsByMessageId.get(receipt.message_id)!.push(receipt);
+  });
+
+  // --- STEP 4: Assemble messages with details ---
+  const messagesWithDetails = messages.map((msg) => ({
+    ...msg,
+    reply_to: msg.reply_to_id ? repliesById[msg.reply_to_id] ?? null : null,
+    reactions: reactionsByMessageId.get(msg.id) || [],
+    read_receipts: receiptsByMessageId.get(msg.id) || []
+  }));
 
   return messagesWithDetails.reverse(); // để tin cũ trước, mới sau
 };
@@ -919,6 +926,120 @@ export const subscribeTyping = (
   return () => {
     supabase.removeChannel(channel);
   };
+};
+
+// ============================================
+// CONVERSATION MEDIA & FILES
+// ============================================
+
+// Lấy ảnh/video từ conversation
+export const getConversationMedia = async (
+  conversationId: string,
+  type: 'image' | 'video' | 'both' = 'both',
+  limit: number = 50
+): Promise<Attachment[]> => {
+  let query = supabase
+    .from('attachments')
+    .select(
+      `
+      *,
+      messages!inner(conversation_id, created_at)
+    `
+    )
+    .eq('messages.conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (type === 'image') {
+    query = query.eq('kind', 'image');
+  } else if (type === 'video') {
+    query = query.eq('kind', 'video');
+  } else {
+    query = query.in('kind', ['image', 'video']);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Error fetching media:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Lấy files từ conversation
+export const getConversationFiles = async (
+  conversationId: string,
+  limit: number = 50
+): Promise<
+  Array<
+    Attachment & {
+      messages: { created_at: string };
+    }
+  >
+> => {
+  const { data, error } = await supabase
+    .from('attachments')
+    .select(
+      `
+      *,
+      messages!inner(conversation_id, created_at)
+    `
+    )
+    .eq('messages.conversation_id', conversationId)
+    .in('kind', ['file', 'audio'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching files:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Lấy links từ conversation - extract từ messages
+export const getConversationLinks = async (
+  conversationId: string,
+  limit: number = 50
+): Promise<
+  Array<{
+    id: string;
+    content_text: string;
+    created_at: string;
+    urls: string[];
+  }>
+> => {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, content_text, created_at')
+    .eq('conversation_id', conversationId)
+    .not('content_text', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200); // Fetch more to find links
+
+  if (error) {
+    console.error('Error fetching messages for links:', error);
+    throw error;
+  }
+
+  // Extract URLs using regex
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const messagesWithLinks = (data || [])
+    .map((msg) => {
+      const urls = msg.content_text?.match(urlRegex) || [];
+      return {
+        id: msg.id,
+        content_text: msg.content_text || '',
+        created_at: msg.created_at,
+        urls
+      };
+    })
+    .filter((msg) => msg.urls.length > 0)
+    .slice(0, limit);
+
+  return messagesWithLinks;
 };
 
 export { supabase };
