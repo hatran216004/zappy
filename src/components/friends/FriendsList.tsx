@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   useFriends,
   useRemoveFriend,
-  useFriendsRealtime
-} from '../../hooks/useFriends';
-import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
-import useUser from '@/hooks/useUser';
-import FriendItem from './FriendItem';
-import { useNavigate } from 'react-router';
+  useFriendsRealtime,
+} from "../../hooks/useFriends";
+import { useGetOrCreateDirectConversation } from "@/hooks/useChat";
+import useUser from "@/hooks/useUser";
+import FriendItem from "./FriendItem";
+import { useNavigate } from "react-router";
 
 export const FriendsList = () => {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ export const FriendsList = () => {
       await removeFriendMutation.mutateAsync(friendId);
       setSelectedFriend(null);
     } catch (err) {
-      console.error('Error removing friend:', err);
+      console.error("Error removing friend:", err);
     }
   };
 
@@ -38,13 +38,13 @@ export const FriendsList = () => {
       setIsCreatingConversation(true);
       const conversationId = await getOrCreateConversation.mutateAsync({
         currentUserId: userId,
-        otherUserId: friendId
+        otherUserId: friendId,
       });
 
       // Navigate đến conversation
       navigate(`/chat/${conversationId}`);
     } catch (error) {
-      console.error('Error creating/opening conversation:', error);
+      console.error("Error creating/opening conversation:", error);
     } finally {
       setIsCreatingConversation(false);
     }
@@ -58,8 +58,8 @@ export const FriendsList = () => {
         acc[labelId].push(friend);
       });
     } else {
-      if (!acc['no_label']) acc['no_label'] = [];
-      acc['no_label'].push(friend);
+      if (!acc["no_label"]) acc["no_label"] = [];
+      acc["no_label"].push(friend);
     }
     return acc;
   }, {} as Record<string, typeof friends>);
@@ -116,9 +116,9 @@ export const FriendsList = () => {
       ) : (
         <div className="space-y-6">
           {/* No label */}
-          {groupedFriends?.['no_label'] && (
+          {groupedFriends?.["no_label"] && (
             <ul className="bg-card rounded-xl border border-border divide-y divide-border">
-              {groupedFriends['no_label'].map((friend) => (
+              {groupedFriends["no_label"].map((friend) => (
                 <FriendItem
                   key={friend.id}
                   friend={friend}
@@ -131,7 +131,8 @@ export const FriendsList = () => {
 
           {/* Labeled groups */}
           {Object.entries(groupedFriends || {})
-            .filter(([key]) => key !== 'no_label')
+
+            .filter(([key]) => key !== "no_label")
             .map(([labelId, friendsList]) => {
               return (
                 <section key={labelId}>
@@ -175,7 +176,7 @@ export const FriendsList = () => {
                 disabled={removeFriendMutation.isPending}
                 className="flex-1 h-9 px-4 rounded-lg bg-destructive text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
-                {removeFriendMutation.isPending ? 'Đang xóa...' : 'Xóa'}
+                {removeFriendMutation.isPending ? "Đang xóa..." : "Xóa"}
               </button>
             </div>
           </div>

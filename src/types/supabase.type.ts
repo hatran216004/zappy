@@ -1024,6 +1024,7 @@ export const Constants = {
       notif_level: ["all", "mentions", "none"],
       role_type: ["admin", "member"],
       user_status: ["online", "offline"],
+      user_status: ["online", "offline"],
     },
   },
 } as const

@@ -1,5 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@radix-ui/react-avatar';
-import { useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
+import { useState } from "react";
 
 interface FriendItemProps {
   friend: {
@@ -7,15 +7,19 @@ interface FriendItemProps {
     display_name: string;
     username: string;
     avatar_url: string;
-    status: string; // 'online' | 'offline' ...
+    status: string;
   };
   onRemove: () => void;
   onMessage?: (friendId: string) => void;
 }
 
-export default function FriendItem({ friend, onRemove, onMessage }: FriendItemProps) {
+export default function FriendItem({
+  friend,
+  onRemove,
+  onMessage,
+}: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
-  
+
   const handleMessage = () => {
     if (onMessage) {
       onMessage(friend.id);
@@ -33,15 +37,15 @@ export default function FriendItem({ friend, onRemove, onMessage }: FriendItemPr
         <div className="relative shrink-0">
           <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
             <AvatarImage
-              className='object-cover rounded-full size-full'
-              src={friend.avatar_url || '/default-avatar.png'}
+              className="object-cover rounded-full size-full"
+              src={friend.avatar_url || "/default-avatar.png"}
               alt={friend.display_name}
             />
             <AvatarFallback>
-              {friend.display_name?.[0]?.toUpperCase() || 'U'}
+              {friend.display_name?.[0]?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
-          {friend.status === 'online' && (
+          {friend.status === "online" && (
             <span
               className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card
                          bg-[oklch(0.79_0.14_145)]"

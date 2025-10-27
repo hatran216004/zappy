@@ -3,19 +3,51 @@ import profileServices, {
   UpdateProfileData,
   ChangePasswordData,
 } from "@/services/profileServices";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const profileKeys = {
   all: ["profile"] as const,
   detail: (userId: string) => [...profileKeys.all, "detail", userId] as const,
 };
 
-// Hook lấy profile
+// Hook lấy profile có realtime
 export const useProfile = (userId: string) => {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: profileKeys.detail(userId),
     queryFn: () => profileServices.getProfile(userId),
     staleTime: 60000,
+    enabled: !!userId,
   });
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`profile_status_${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          const updatedProfile = payload.new;
+          queryClient.setQueryData(profileKeys.detail(userId), updatedProfile);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
+
+  return query;
 };
 
 // Hook cập nhật profile

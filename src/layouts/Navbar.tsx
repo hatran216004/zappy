@@ -11,29 +11,29 @@ import {
   Moon,
   Sun,
   User,
-  LogOut
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+  LogOut,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { useProfile } from '@/hooks/useProfile';
-import ProfileModal from '@/components/profile/ProfileModal';
-import useLogout from '@/hooks/useLogout';
-import { useAuth } from '@/stores/user';
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useProfile } from "@/hooks/useProfile";
+import ProfileModal from "@/components/profile/ProfileModal";
+import useLogout from "@/hooks/useLogout";
+import { useAuth } from "@/stores/user";
 import {
   useFriendRequestsRealtime,
-  usePendingFriendRequests
-} from '@/hooks/useFriends';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { twMerge } from 'tailwind-merge';
-import { avatarVariants } from '@/lib/variants';
+  usePendingFriendRequests,
+} from "@/hooks/useFriends";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { twMerge } from "tailwind-merge";
+import { avatarVariants } from "@/lib/variants";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -50,20 +50,20 @@ export default function Navbar() {
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('theme');
+    const saved = localStorage.getItem("theme");
     if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   });
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.body.classList.remove('light');
-      document.body.classList.add('dark');
+    if (theme === "dark") {
+      document.body.classList.remove("light");
+      document.body.classList.add("dark");
     } else {
-      document.body.classList.remove('dark');
-      document.body.classList.add('light');
+      document.body.classList.remove("dark");
+      document.body.classList.add("light");
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
@@ -106,7 +106,7 @@ export default function Navbar() {
               <DropdownMenuLabel className="text-white">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {profile?.display_name || 'Chưa có tên'}
+                    {profile?.display_name || "Chưa có tên"}
                   </p>
                   <p className="text-xs leading-none text-[#B5BAC1]">
                     {user?.email}
@@ -142,8 +142,8 @@ export default function Navbar() {
           </DropdownMenu>
 
           <TooltipBtn
-            onClick={() => navigate('/chat')}
-            isActive={pathname.includes('chat') || pathname === '/'}
+            onClick={() => navigate("/chat")}
+            isActive={pathname.includes("chat") || pathname === "/"}
             icon={MessageCircle}
             label="Tin nhắn"
             className="
@@ -154,10 +154,10 @@ export default function Navbar() {
           />
 
           <TooltipBtn
-            onClick={() => navigate('/friends')}
+            onClick={() => navigate("/friends")}
             icon={Users}
             hasBadge={hasFriendRequest}
-            isActive={pathname.includes('friends')}
+            isActive={pathname.includes("friends")}
             label="Danh bạ"
             className="
               text-white
