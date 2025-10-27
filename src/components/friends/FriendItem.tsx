@@ -1,10 +1,5 @@
-<<<<<<< HEAD
+import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
 import { useState } from "react";
-import { UserAvatar } from "../UserAvatar";
-=======
-import { Avatar, AvatarFallback, AvatarImage } from '@radix-ui/react-avatar';
-import { useState } from 'react';
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface FriendItemProps {
   friend: {
@@ -18,23 +13,19 @@ interface FriendItemProps {
   onMessage?: (friendId: string) => void;
 }
 
-export default function FriendItem({ friend, onRemove, onMessage }: FriendItemProps) {
+export default function FriendItem({
+  friend,
+  onRemove,
+  onMessage,
+}: FriendItemProps) {
   const [showMenu, setShowMenu] = useState(false);
-<<<<<<< HEAD
-  // console.log({
-  //   username: friend.username,
-  //   displayname: friend.display_name,
-  //   status: friend.status,
-  // });
-=======
-  
+
   const handleMessage = () => {
     if (onMessage) {
       onMessage(friend.id);
     }
   };
 
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
   return (
     <li className="relative">
       {/* Row */}
@@ -44,35 +35,23 @@ export default function FriendItem({ friend, onRemove, onMessage }: FriendItemPr
       >
         {/* Avatar */}
         <div className="relative shrink-0">
-<<<<<<< HEAD
-          {/* <UserAvatar userId={friend.id} showStatus={true} /> */}
-          <div className="relative shrink-0">
-            <UserAvatar
-              avatarUrl={friend.avatar_url}
-              displayName={friend.display_name}
-              status={friend.status}
-              showStatus={true}
-            />
-          </div>
-=======
           <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
             <AvatarImage
-              className='object-cover rounded-full size-full'
-              src={friend.avatar_url || '/default-avatar.png'}
+              className="object-cover rounded-full size-full"
+              src={friend.avatar_url || "/default-avatar.png"}
               alt={friend.display_name}
             />
             <AvatarFallback>
-              {friend.display_name?.[0]?.toUpperCase() || 'U'}
+              {friend.display_name?.[0]?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
-          {friend.status === 'online' && (
+          {friend.status === "online" && (
             <span
               className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card
                          bg-[oklch(0.79_0.14_145)]"
               title="Online"
             />
           )}
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
         </div>
 
         {/* Texts */}

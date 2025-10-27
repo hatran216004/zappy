@@ -1,21 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   useFriends,
   useRemoveFriend,
-<<<<<<< HEAD
   useFriendsRealtime,
 } from "../../hooks/useFriends";
+import { useGetOrCreateDirectConversation } from "@/hooks/useChat";
 import useUser from "@/hooks/useUser";
 import FriendItem from "./FriendItem";
-import useRealtimeFriendStatus from "@/hooks/useRealtimeFriendStatus";
-=======
-  useFriendsRealtime
-} from '../../hooks/useFriends';
-import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
-import useUser from '@/hooks/useUser';
-import FriendItem from './FriendItem';
-import { useNavigate } from 'react-router';
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
+import { useNavigate } from "react-router";
 
 export const FriendsList = () => {
   const navigate = useNavigate();
@@ -29,12 +21,6 @@ export const FriendsList = () => {
 
   // Subscribe realtime
   useFriendsRealtime(userId);
-
-  const friendIds = useMemo(() => friends?.map((f) => f.id) ?? [], [friends]);
-
-  const { getFriendStatus } = useRealtimeFriendStatus({
-    friendIds,
-  });
 
   const handleRemoveFriend = async (friendId: string) => {
     try {
@@ -52,13 +38,13 @@ export const FriendsList = () => {
       setIsCreatingConversation(true);
       const conversationId = await getOrCreateConversation.mutateAsync({
         currentUserId: userId,
-        otherUserId: friendId
+        otherUserId: friendId,
       });
 
       // Navigate đến conversation
       navigate(`/chat/${conversationId}`);
     } catch (error) {
-      console.error('Error creating/opening conversation:', error);
+      console.error("Error creating/opening conversation:", error);
     } finally {
       setIsCreatingConversation(false);
     }
@@ -132,19 +118,7 @@ export const FriendsList = () => {
           {/* No label */}
           {groupedFriends?.["no_label"] && (
             <ul className="bg-card rounded-xl border border-border divide-y divide-border">
-<<<<<<< HEAD
-              {groupedFriends["no_label"].map((friend) => {
-                const status = getFriendStatus(friend.id);
-                return (
-                  <FriendItem
-                    key={friend.id}
-                    friend={{ ...friend, status: status?.status as string }}
-                    onRemove={() => setSelectedFriend(friend.id)}
-                  />
-                );
-              })}
-=======
-              {groupedFriends['no_label'].map((friend) => (
+              {groupedFriends["no_label"].map((friend) => (
                 <FriendItem
                   key={friend.id}
                   friend={friend}
@@ -152,35 +126,13 @@ export const FriendsList = () => {
                   onMessage={handleMessage}
                 />
               ))}
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
             </ul>
           )}
 
           {/* Labeled groups */}
           {Object.entries(groupedFriends || {})
-<<<<<<< HEAD
+
             .filter(([key]) => key !== "no_label")
-            .map(([labelId, friendsList]) => (
-              <section key={labelId}>
-                <h3 className="px-2 sm:px-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase mb-2">
-                  Nhãn: {labelId}
-                </h3>
-                <ul className="bg-card rounded-xl border border-border divide-y divide-border">
-                  {(friendsList ?? []).map((friend) => {
-                    const status = getFriendStatus(friend.id);
-                    return (
-                      <FriendItem
-                        key={friend.id}
-                        friend={{ ...friend, status: status?.status as string }}
-                        onRemove={() => setSelectedFriend(friend.id)}
-                      />
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
-=======
-            .filter(([key]) => key !== 'no_label')
             .map(([labelId, friendsList]) => {
               return (
                 <section key={labelId}>
@@ -200,7 +152,6 @@ export const FriendsList = () => {
                 </section>
               );
             })}
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
         </div>
       )}
 

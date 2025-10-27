@@ -1,13 +1,9 @@
 // import { Pin } from 'lucide-react';
 import { twMerge } from "tailwind-merge";
 
-<<<<<<< HEAD
 import { ConversationWithDetails } from "@/services/chatService";
+import { Link, useParams } from "react-router";
 import { UserAvatar } from "../UserAvatar";
-=======
-import { ConversationWithDetails } from '@/services/chatService';
-import { Link, useParams } from 'react-router';
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
@@ -18,12 +14,8 @@ interface ConversationItemProps {
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   userId,
-<<<<<<< HEAD
+
   isSelected,
-  onClick,
-=======
-  isSelected
->>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 }) => {
   const params = useParams();
   const conversationId = params.conversationId as string;
