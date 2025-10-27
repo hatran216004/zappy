@@ -1,9 +1,13 @@
 // import { Pin } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { twMerge } from 'tailwind-merge';
+import { twMerge } from "tailwind-merge";
 
+<<<<<<< HEAD
+import { ConversationWithDetails } from "@/services/chatService";
+import { UserAvatar } from "../UserAvatar";
+=======
 import { ConversationWithDetails } from '@/services/chatService';
 import { Link, useParams } from 'react-router';
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
@@ -14,7 +18,12 @@ interface ConversationItemProps {
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   userId,
+<<<<<<< HEAD
+  isSelected,
+  onClick,
+=======
   isSelected
+>>>>>>> ee00eca7e11c71cdf1c338f67e2fb27a323db145
 }) => {
   const params = useParams();
   const conversationId = params.conversationId as string;
@@ -23,13 +32,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     (p) => p.user_id !== userId
   );
   const displayName =
-    conversation.type === 'direct'
+    conversation.type === "direct"
       ? otherParticipant?.profile.display_name
       : conversation.title;
-  const avatarUrl =
-    conversation.type === 'direct'
-      ? otherParticipant?.profile.avatar_url
-      : conversation.photo_url;
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -37,42 +42,42 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 24) {
-      return date.toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit'
+      return date.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
       });
     } else if (diffInHours < 48) {
-      return 'Hôm qua';
+      return "Hôm qua";
     } else {
-      return date.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit'
+      return date.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
       });
     }
   };
 
   const getLastMessagePreview = () => {
-    if (!conversation.last_message) return 'Chưa có tin nhắn';
+    if (!conversation.last_message) return "Chưa có tin nhắn";
 
     const msg = conversation.last_message;
     const senderName =
-      msg.sender_id === userId ? 'Bạn' : otherParticipant?.profile.display_name;
+      msg.sender_id === userId ? "Bạn" : otherParticipant?.profile.display_name;
 
     if (msg.recalled_at) return `${senderName}: Tin nhắn đã thu hồi`;
 
     switch (msg.type) {
-      case 'text':
+      case "text":
         return `${senderName}: ${msg.content_text}`;
-      case 'image':
+      case "image":
         return `${senderName}: Đã gửi ảnh`;
-      case 'video':
+      case "video":
         return `${senderName}: Đã gửi video`;
-      case 'file':
+      case "file":
         return `${senderName}: Đã gửi file`;
-      case 'audio':
+      case "audio":
         return `${senderName}: Đã gửi tin nhắn thoại`;
       default:
-        return 'Tin nhắn mới';
+        return "Tin nhắn mới";
     }
   };
 
@@ -83,22 +88,22 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   // Unread badge theo mẫu comment (đếm 99+)
   const unread = conversation.unread_count ?? 0;
   const unreadBadge =
-    unread > 0 ? (unread > 99 ? '99+' : String(unread)) : null;
+    unread > 0 ? (unread > 99 ? "99+" : String(unread)) : null;
 
   return (
     <Link
       to={`/chat/${conversation.id}`}
       className={twMerge(
-        'flex items-center gap-3 p-4 cursor-pointer',
-        isActive ? 'bg-blue-600/20' : 'hover:bg-gray-200 dark:hover:bg-gray-800'
+        "flex items-center gap-3 p-4 cursor-pointer",
+        isActive ? "bg-blue-600/20" : "hover:bg-gray-200 dark:hover:bg-gray-800"
       )}
     >
-      <Avatar className="h-10 w-10">
-        <AvatarImage src={avatarUrl || ''} alt={displayName || ''} />
-        <AvatarFallback className="bg-zinc-300">
-          {(displayName || '?').charAt(0)}
-        </AvatarFallback>
-      </Avatar>
+      <UserAvatar
+        avatarUrl={otherParticipant?.profile?.avatar_url}
+        displayName={otherParticipant?.profile?.display_name}
+        status={otherParticipant?.profile?.status}
+        showStatus={true}
+      />
 
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center">
