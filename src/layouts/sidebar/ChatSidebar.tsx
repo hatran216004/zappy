@@ -4,7 +4,9 @@ import useUrl from '@/hooks/useUrl';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '@/stores/user';
 import SearchBar from '@/components/SearchBar';
-import { Plus, MoreVertical } from 'lucide-react';
+import { Plus, MoreVertical, Users } from 'lucide-react';
+import { useState } from 'react';
+import { CreateGroupModal } from '@/components/modal/CreateGroupModal';
 
 const classifyTags = [
   { color: 'bg-[#ED4245]', label: 'Khóa luận cử nhân' }, // red Discord
@@ -20,6 +22,7 @@ const tabs = [
 export default function ChatSidebar() {
   const { user } = useAuth();
   const userId = user?.id;
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
 
   const { currentValue, handler } = useUrl({
     field: 'tab',
@@ -53,6 +56,21 @@ export default function ChatSidebar() {
           Tin nhắn trực tiếp
         </h3>
         <div className="flex items-center gap-1.5">
+          {/* Create Group Button */}
+          <button
+            type="button"
+            aria-label="Tạo nhóm mới"
+            onClick={() => setShowCreateGroupModal(true)}
+            className="
+              discord-icon-btn
+              text-gray-600 hover:text-gray-900
+              dark:text-[#B5BAC1] dark:hover:text-white
+            "
+            title="Tạo nhóm"
+          >
+            <Users className="w-4 h-4" />
+          </button>
+
           {/* New DM (decorative – UI only) */}
           <button
             type="button"
@@ -156,6 +174,13 @@ export default function ChatSidebar() {
         <span className="text-gray-500 dark:text-[#B5BAC1]">Mẹo: Nhấn <kbd className="px-1 py-[1px] rounded border border-gray-300 bg-white text-gray-700 dark:bg-[#1E1F22] dark:border-[#3F4246] dark:text-[#F2F3F5]">/</kbd> để tìm nhanh</span>
         <span className="text-gray-400 dark:text-[#B5BAC1]">Blurple UI · Discord style</span>
       </div>
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        open={showCreateGroupModal}
+        onOpenChange={setShowCreateGroupModal}
+        userId={userId as string}
+      />
     </aside>
   );
 }

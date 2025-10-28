@@ -8,6 +8,7 @@ import FriendRequestsPage from '@/pages/friends/FriendRequestsPage';
 import LoginPage from '@/pages/LoginPage';
 import NotFound from '@/pages/NotFound';
 import RegisterPage from '@/pages/RegisterPage';
+import { JoinGroupPage } from '@/pages/JoinGroupPage';
 import { useAuth } from '@/stores/user';
 import { BrowserRouter, Outlet, Route, Routes, Navigate } from 'react-router';
 
@@ -45,6 +46,9 @@ export default function AppRoutes() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
+
+        {/* Public route for joining via invite */}
+        <Route path="/invite/:inviteCode" element={<JoinGroupPage />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

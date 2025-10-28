@@ -8,10 +8,14 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Link as LinkIcon,
 } from "lucide-react";
 import { TooltipBtn } from "../TooltipBtn";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { ConversationWithDetails } from "@/services/chatService";
+import { InviteLinkModal } from "../modal/InviteLinkModal";
+import { supabaseUrl } from "@/lib/supabase";
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -27,29 +31,44 @@ interface ChatHeaderProps {
   onSearch?: (query: string, direction: "next" | "prev") => void;
   searchResults?: { current: number; total: number };
   onCloseSearch?: () => void;
+  conversation?: ConversationWithDetails;
+  currentUserId?: string;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   otherParticipant,
   typingUsers,
-
   onSearch,
   searchResults,
   onCloseSearch,
+  conversation,
+  currentUserId,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
-  const displayName = otherParticipant?.profile.display_name || "Người dùng";
+  const isGroupChat = conversation?.type === 'group';
+  const displayName = isGroupChat 
+    ? (conversation?.title || "Nhóm")
+    : (otherParticipant?.profile.display_name || "Người dùng");
 
-  const avatarUrl =
-    otherParticipant?.profile.avatar_url || "/default-avatar.png";
-  const statusText =
-    typingUsers.length > 0
-      ? "Đang nhập..."
-      : otherParticipant?.profile.status === "online"
-      ? "Đang hoạt động"
-      : "Không hoạt động";
+  const avatarUrl = isGroupChat
+    ? `${supabaseUrl}/${conversation?.photo_url}`
+    : (otherParticipant?.profile.avatar_url || "/default-avatar.png");
+    
+  const statusText = isGroupChat
+    ? `${conversation?.participants?.length || 0} thành viên`
+    : (typingUsers.length > 0
+        ? "Đang nhập..."
+        : otherParticipant?.profile.status === "online"
+        ? "Đang hoạt động"
+        : "Không hoạt động");
+
+  // Check if current user is admin
+  const isAdmin = isGroupChat && conversation?.participants?.some(
+    (p) => p.user_id === currentUserId && p.role === 'admin'
+  );
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -96,8 +115,22 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           >
             <Search className="size-5" />
           </Button>
-          <TooltipBtn icon={Phone} label="Gọi thoại" />
-          <TooltipBtn icon={Video} label="Gọi video" />
+          
+          {/* Show invite button for group admins */}
+          {isGroupChat && isAdmin && conversation && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={() => setShowInviteModal(true)}
+              title="Tạo link mời"
+            >
+              <LinkIcon className="size-5" />
+            </Button>
+          )}
+          
+          {!isGroupChat && <TooltipBtn icon={Phone} label="Gọi thoại" />}
+          {!isGroupChat && <TooltipBtn icon={Video} label="Gọi video" />}
           <TooltipBtn icon={Users} label="Thành viên" />
           <TooltipBtn icon={Info} label="Thông tin" />
         </div>
@@ -165,6 +198,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Invite Link Modal */}
+      {isGroupChat && isAdmin && conversation && currentUserId && (
+        <InviteLinkModal
+          open={showInviteModal}
+          onOpenChange={setShowInviteModal}
+          conversationId={conversation.id}
+          userId={currentUserId}
+        />
       )}
     </div>
   );
