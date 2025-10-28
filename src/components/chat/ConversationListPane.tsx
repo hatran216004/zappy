@@ -28,6 +28,7 @@ import SidebarDangerItem from '@/components/sidebar/SidebarDangerItem';
 import { TooltipBtn } from '@/components/TooltipBtn';
 import { SidebarAccordionSection } from '../sidebar/SidebarAccordionSection';
 import { twMerge } from 'tailwind-merge';
+import { supabaseUrl } from '@/lib/supabase';
 
 
 export default function ConversationListPane() {
@@ -88,7 +89,7 @@ export default function ConversationListPane() {
   const avatarUrl =
     conversation?.type === 'direct'
       ? otherParticipant?.profile.avatar_url
-      : conversation?.photo_url;
+      : `${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation?.photo_url || 'default-group-photo.png'}`;
 
   const participantsCount = conversation?.participants.length || 0;
 
@@ -226,17 +227,6 @@ export default function ConversationListPane() {
               <div className="mt-0.5 text-xs text-gray-500 dark:text-[#B5BAC1]">{participantsCount} thành viên</div>
             )}
           </div>
-
-          <div className="flex gap-1.5 mt-1">
-            <ToolIcon icon={BellOff} label="Tắt thông báo" />
-            <ToolIcon icon={Pin} label="Ghim hội thoại" />
-            {conversation?.type === 'group' && (
-              <>
-                <ToolIcon icon={UserPlus} label="Thêm thành viên" />
-                <ToolIcon icon={Settings} label="Quản lý nhóm" />
-              </>
-            )}
-          </div>
         </div>
 
         {/* Sections */}
@@ -326,7 +316,6 @@ export default function ConversationListPane() {
             </h3>
             <div className="flex flex-col gap-2">
               <SidebarDangerItem icon={AlertTriangle} label="Báo xấu" />
-              <SidebarDangerItem icon={Trash2} label="Xoá lịch sử trò chuyện" />
               {conversation?.type === 'group' && <SidebarDangerItem icon={LogOut} label="Rời nhóm" />}
             </div>
           </div>

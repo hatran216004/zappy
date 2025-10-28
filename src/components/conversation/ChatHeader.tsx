@@ -56,7 +56,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     : (otherParticipant?.profile.display_name || "Người dùng");
 
   const avatarUrl = isGroupChat
-    ? `${supabaseUrl}/${conversation?.photo_url}`
+    ? `${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation?.photo_url}`
     : (otherParticipant?.profile.avatar_url || "/default-avatar.png");
     
   const statusText = isGroupChat
