@@ -15,6 +15,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ConversationWithDetails } from "@/services/chatService";
 import { InviteLinkModal } from "../modal/InviteLinkModal";
+import { GroupInfoModal } from "../modal/GroupInfoModal";
 import { supabaseUrl } from "@/lib/supabase";
 
 interface ChatHeaderProps {
@@ -47,6 +48,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
 
   const isGroupChat = conversation?.type === 'group';
   const displayName = isGroupChat 
@@ -131,8 +133,21 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           
           {!isGroupChat && <TooltipBtn icon={Phone} label="Gọi thoại" />}
           {!isGroupChat && <TooltipBtn icon={Video} label="Gọi video" />}
-          <TooltipBtn icon={Users} label="Thành viên" />
-          <TooltipBtn icon={Info} label="Thông tin" />
+          
+          {/* Group Info Button */}
+          {isGroupChat ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={() => setShowGroupInfoModal(true)}
+              title="Thông tin nhóm"
+            >
+              <Info className="size-5" />
+            </Button>
+          ) : (
+            <TooltipBtn icon={Info} label="Thông tin" />
+          )}
         </div>
       </div>
 
@@ -207,6 +222,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onOpenChange={setShowInviteModal}
           conversationId={conversation.id}
           userId={currentUserId}
+        />
+      )}
+
+      {/* Group Info Modal */}
+      {isGroupChat && conversation && currentUserId && (
+        <GroupInfoModal
+          open={showGroupInfoModal}
+          onOpenChange={setShowGroupInfoModal}
+          conversation={conversation}
+          currentUserId={currentUserId}
         />
       )}
     </div>

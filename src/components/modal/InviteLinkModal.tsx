@@ -25,6 +25,7 @@ import {
 } from '@/services/chatService';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 
 interface InviteLinkModalProps {
   open: boolean;
@@ -80,9 +81,10 @@ export const InviteLinkModal: React.FC<InviteLinkModalProps> = ({
 
       // Reload invites
       await loadInvites();
+      toast.success('Đã tạo link mời thành công');
     } catch (error) {
       console.error('Error generating invite:', error);
-      alert('Lỗi khi tạo link mời. Vui lòng thử lại.');
+      toast.error('Lỗi khi tạo link mời. Vui lòng thử lại.');
     } finally {
       setIsGenerating(false);
     }
@@ -92,16 +94,17 @@ export const InviteLinkModal: React.FC<InviteLinkModalProps> = ({
     try {
       await revokeGroupInvite(inviteId);
       await loadInvites();
-    } catch (error) {
+      toast.success('Đã thu hồi link mời');
+    } catch (error: any) {
       console.error('Error revoking invite:', error);
-      alert('Lỗi khi thu hồi link mời.');
+      toast.error(error?.message || 'Lỗi khi thu hồi link mời');
     }
   };
 
   const copyToClipboard = (inviteCode: string) => {
     const inviteLink = `${window.location.origin}/invite/${inviteCode}`;
     navigator.clipboard.writeText(inviteLink);
-    alert('Đã sao chép link mời!');
+    toast.success('Đã sao chép link mời!');
   };
 
   const getInviteLink = (inviteCode: string) => {
