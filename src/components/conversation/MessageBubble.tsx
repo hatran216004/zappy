@@ -21,6 +21,7 @@ import {
 import { supabaseUrl } from '@/lib/supabase';
 import { ImageAttachment } from './ImageAttachment';
 import { AudioPlayer } from './AudioPlayer';
+import { useConfirm } from '../modal/ModalConfirm';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -31,6 +32,34 @@ interface MessageBubbleProps {
   onEdit: (content: string) => void;
   currentUserId: string;
 }
+
+// Helper function to detect and linkify URLs
+const linkifyText = (text: string, isOwn: boolean) => {
+  // URL regex pattern
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={clsx(
+            'underline hover:opacity-80 font-medium break-all',
+            isOwn ? 'text-blue-100' : 'text-blue-600'
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={index}>{part}</span>;
+  });
+};
 
 export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   message,
@@ -44,6 +73,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.content_text || '');
   const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const confirm = useConfirm();
 
   const editMutation = useEditMessage();
   const recallMutation = useRecallMessage();
@@ -79,7 +109,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   };
 
   const handleRecall = async () => {
-    if (!confirm('Bạn có chắc muốn thu hồi tin nhắn này?')) return;
+    const confirmed = await confirm({
+      title: 'Thu hồi tin nhắn',
+      description: 'Bạn có chắc muốn thu hồi tin nhắn này? Tin nhắn sẽ được thay thế bằng "Tin nhắn đã được thu hồi" cho tất cả mọi người.',
+      confirmText: 'Thu hồi',
+      cancelText: 'Hủy',
+      destructive: true,
+      dismissible: true
+    });
+
+    if (!confirmed) return;
 
     try {
       await recallMutation.mutateAsync(message.id);
@@ -160,7 +199,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
           {/* Reply to */}
           {message?.reply_to && (
-            <div className="px-3 py-1 mb-1 bg-gray-100 rounded-t-lg text-xs text-gray-600 border-l-2 border-blue-500">
+            <div className="px-3 py-1 mb-1 bg-gray-100 rounded-t-lg text-xs text-gray-600 border-l-2 border-primary">
               Trả lời: {message.reply_to.content_text || 'Tin nhắn'}
             </div>
           )}
@@ -175,7 +214,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
             <div
               className={clsx(
                 'px-4 py-2 rounded-lg',
-                isOwn ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
+                isOwn ? 'bg-primary text-white' : 'bg-gray-200 text-gray-900'
               )}
             >
               {/* Text content */}
@@ -190,7 +229,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleEdit}
-                      className="text-xs px-2 py-1 bg-blue-600 text-white rounded"
+                      className="text-xs px-2 py-1 bg-primary text-white rounded"
                     >
                       Lưu
                     </button>
@@ -206,7 +245,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                 <>
                   {message.content_text && (
                     <p className="break-words whitespace-pre-wrap">
-                      {message.content_text}
+                      {linkifyText(message.content_text, isOwn)}
                     </p>
                   )}
 

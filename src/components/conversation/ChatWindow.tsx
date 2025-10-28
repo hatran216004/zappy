@@ -7,7 +7,8 @@ import {
   useTypingIndicator,
   useMarkMessagesAsRead,
   useConversation,
-  useSearchMessages
+  useSearchMessages,
+  useEditMessage
 } from '../../hooks/useChat';
 import ChatHeader from './ChatHeader';
 import { useParams } from 'react-router';
@@ -28,6 +29,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [messageText, setMessageText] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
@@ -50,6 +52,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     useMessages(conversationId);
   const sendTextMutation = useSendTextMessage();
   const sendFileMutation = useSendFileMessage();
+  const editMessageMutation = useEditMessage();
   const markAsReadMutation = useMarkMessagesAsRead();
   const { typingUsers, sendTyping } = useTypingIndicator(
     conversationId,
@@ -233,23 +236,37 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     }
 
     try {
-      await sendTextMutation.mutateAsync({
-        conversationId,
-        senderId: userId,
-        content: messageText.trim(),
-        replyToId: replyTo || undefined
-      });
+      // Check if we're editing a message
+      if (isEditing && editingMessageId) {
+        await editMessageMutation.mutateAsync({
+          messageId: editingMessageId,
+          content: messageText.trim()
+        });
+        
+        setIsEditing(false);
+        setEditingMessageId(null);
+      } else {
+        // Send new message
+        await sendTextMutation.mutateAsync({
+          conversationId,
+          senderId: userId,
+          content: messageText.trim(),
+          replyToId: replyTo || undefined
+        });
+        
+        setReplyTo(null);
+      }
 
       setMessageText('');
-      setReplyTo(null);
       inputRef.current?.focus();
     } catch (error) {
       console.error('❌ Error:', error);
     }
-  }, [messageText, conversationId, userId, replyTo, sendTextMutation, sendTyping]);
+  }, [messageText, conversationId, userId, replyTo, isEditing, editingMessageId, sendTextMutation, editMessageMutation, sendTyping]);
 
-  const handleEditMessage = useCallback((_messageId: string, content: string) => {
+  const handleEditMessage = useCallback((messageId: string, content: string) => {
     setIsEditing(true);
+    setEditingMessageId(messageId);
     setMessageText(content);
     inputRef.current?.focus();
   }, []);
@@ -262,8 +279,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     if (file.type.startsWith('image/')) type = 'image';
     else if (file.type.startsWith('video/')) type = 'video';
     else if (file.type.startsWith('audio/') || file.name.endsWith('.webm')) type = 'audio';
-
-    console.log('📁 File selected:', { name: file.name, type: file.type, detectedType: type });
 
     if (type === 'image') {
       setImageToSend(file);
@@ -552,6 +567,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           <button
             onClick={() => {
               setIsEditing(false);
+              setEditingMessageId(null);
               setMessageText('');
             }}
             className="text-[#5865F2] hover:opacity-80 dark:text-[#5865F2]"
