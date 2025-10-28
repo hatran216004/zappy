@@ -438,6 +438,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             : undefined
         }
         onCloseSearch={handleCloseSearch}
+        conversation={conversation}
+        currentUserId={userId}
       />
 
       <div

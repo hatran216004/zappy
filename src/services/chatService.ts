@@ -12,6 +12,19 @@ export type MessageReaction =
   Database['public']['Tables']['message_reactions']['Row'];
 export type ReadReceipt = Database['public']['Tables']['read_receipts']['Row'];
 
+// Group invite type (based on SQL migration)
+export interface GroupInvite {
+  id: string;
+  conversation_id: string;
+  invite_code: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string | null;
+  max_uses: number | null;
+  used_count: number;
+  is_active: boolean;
+}
+
 export interface ConversationWithDetails extends Conversation {
   participants: (ConversationParticipant & {
     profile: Database['public']['Tables']['profiles']['Row'];
@@ -1039,6 +1052,250 @@ export const getConversationLinks = async (
     .slice(0, limit);
 
   return messagesWithLinks;
+};
+
+// ============================================
+// GROUP CHAT FUNCTIONS
+// ============================================
+
+// Create a new group conversation
+export const createGroupConversation = async (
+  title: string,
+  memberIds: string[], // List of user IDs to add
+  creatorId: string,
+  photoUrl?: string
+): Promise<string> => {
+  // Create conversation
+  const { data: newConvo, error: convoError } = await supabase
+    .from('conversations')
+    .insert({
+      type: 'group',
+      title,
+      photo_url: photoUrl || 'default-image.png',
+      created_by: creatorId
+    })
+    .select()
+    .single();
+
+  if (convoError) throw convoError;
+
+  // Add creator as admin
+  const participants = [
+    {
+      conversation_id: newConvo.id,
+      user_id: creatorId,
+      role: 'admin' as const
+    }
+  ];
+
+  // Add members
+  memberIds.forEach((memberId) => {
+    if (memberId !== creatorId) {
+      participants.push({
+        conversation_id: newConvo.id,
+        user_id: memberId,
+        role: 'member' as const
+      });
+    }
+  });
+
+  const { error: participantsError } = await supabase
+    .from('conversation_participants')
+    .insert(participants);
+
+  if (participantsError) throw participantsError;
+
+  // Create system message
+  const { error: msgError } = await supabase.from('messages').insert({
+    conversation_id: newConvo.id,
+    sender_id: creatorId,
+    type: 'system',
+    content_text: `Nhóm "${title}" đã được tạo`
+  });
+
+  if (msgError) console.error('Error creating system message:', msgError);
+
+  return newConvo.id;
+};
+
+// Generate invite link for a group
+export const generateGroupInvite = async (
+  conversationId: string,
+  createdBy: string,
+  expiresInHours?: number,
+  maxUses?: number
+): Promise<GroupInvite> => {
+  // Generate random invite code
+  const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+  const expiresAt = expiresInHours
+    ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString()
+    : null;
+
+  const { data, error } = await supabase
+    .from('group_invites')
+    .insert({
+      conversation_id: conversationId,
+      invite_code: inviteCode,
+      created_by: createdBy,
+      expires_at: expiresAt,
+      max_uses: maxUses || null
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data as GroupInvite;
+};
+
+// Get active invites for a conversation
+export const getGroupInvites = async (
+  conversationId: string
+): Promise<GroupInvite[]> => {
+  const { data, error } = await supabase
+    .from('group_invites')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data as GroupInvite[]) || [];
+};
+
+// Revoke/deactivate an invite
+export const revokeGroupInvite = async (inviteId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('group_invites')
+    .update({ is_active: false })
+    .eq('id', inviteId);
+
+  if (error) throw error;
+};
+
+// Join group via invite code (calls database function)
+export const joinGroupViaInvite = async (
+  inviteCode: string
+): Promise<string> => {
+  const { data, error } = await supabase.rpc('join_group_via_invite', {
+    _invite_code: inviteCode
+  });
+
+  if (error) throw error;
+
+  return data as string; // Returns conversation_id
+};
+
+// Update group info (name, photo)
+export const updateGroupInfo = async (
+  conversationId: string,
+  updates: {
+    title?: string;
+    photo_url?: string;
+  }
+): Promise<void> => {
+  const { error } = await supabase
+    .from('conversations')
+    .update(updates)
+    .eq('id', conversationId);
+
+  if (error) throw error;
+};
+
+// Add members to group
+export const addGroupMembers = async (
+  conversationId: string,
+  userIds: string[],
+  addedBy: string
+): Promise<void> => {
+  const participants = userIds.map((userId) => ({
+    conversation_id: conversationId,
+    user_id: userId,
+    role: 'member' as const
+  }));
+
+  const { error } = await supabase
+    .from('conversation_participants')
+    .insert(participants);
+
+  if (error) throw error;
+
+  // Create system messages for each added member
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .in('id', userIds);
+
+  if (profiles) {
+    const messages = profiles.map((profile) => ({
+      conversation_id: conversationId,
+      sender_id: addedBy,
+      type: 'system' as const,
+      content_text: `${profile.display_name} đã được thêm vào nhóm`
+    }));
+
+    await supabase.from('messages').insert(messages);
+  }
+};
+
+// Remove member from group
+export const removeGroupMember = async (
+  conversationId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ left_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+};
+
+// Leave group
+export const leaveGroup = async (
+  conversationId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ left_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  // Create system message
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', userId)
+    .single();
+
+  if (profile) {
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: userId,
+      type: 'system',
+      content_text: `${profile.display_name} đã rời khỏi nhóm`
+    });
+  }
+};
+
+// Promote member to admin
+export const promoteToAdmin = async (
+  conversationId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ role: 'admin' })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
 };
 
 export { supabase };
