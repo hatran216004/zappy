@@ -266,7 +266,6 @@ export const getMessages = async (
     `
     )
     .eq('conversation_id', conversationId)
-    .is('recalled_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
 
