@@ -7,6 +7,7 @@ import { twMerge } from "tailwind-merge";
 import { ConversationWithDetails } from "@/services/chatService";
 import { Link, useParams } from "react-router";
 import { UserAvatar } from "../UserAvatar";
+import { supabaseUrl } from "@/lib/supabase";
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
@@ -25,10 +26,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const otherParticipant = conversation.participants.find(
     (p) => p.user_id !== userId
   );
-  const displayName =
-    conversation.type === "direct"
-      ? otherParticipant?.profile.display_name
-      : conversation.title;
+  const isGroupChat = conversation.type === "group";
+  const displayName = isGroupChat
+    ? conversation.title
+    : otherParticipant?.profile.display_name;
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -92,12 +93,26 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           : "hover:bg-gray-100 dark:hover:bg-white/5"
       )}
     >
-      <UserAvatar
-        avatarUrl={otherParticipant?.profile?.avatar_url}
-        displayName={otherParticipant?.profile?.display_name}
-        status={otherParticipant?.profile?.status}
-        showStatus={true}
-      />
+      {isGroupChat ? (
+        <div className="relative inline-block">
+          <img
+            src={`${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation.photo_url}`}
+            alt={conversation.title || 'Group'}
+            className="w-12 h-12 rounded-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = '/default-image.png';
+            }}
+          />
+        </div>
+      ) : (
+        <UserAvatar
+          avatarUrl={otherParticipant?.profile?.avatar_url}
+          displayName={otherParticipant?.profile?.display_name}
+          status={otherParticipant?.profile?.status}
+          showStatus={true}
+        />
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center">

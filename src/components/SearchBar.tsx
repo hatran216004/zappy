@@ -40,19 +40,6 @@ export default function SearchBar() {
       {/* right actions */}
       <div className="flex items-center gap-2">
         <AddFriendModal />
-        <TooltipBtn
-          icon={TbUsersPlus}
-          label="Tạo nhóm"
-          tooltipSide="bottom"
-          className="
-            w-9 h-9 !rounded-full
-            text-gray-600 hover:text-gray-900
-            dark:text-[#B5BAC1] dark:hover:text-white
-            hover:bg-gray-100 active:scale-[0.98]
-            dark:hover:bg-white/5
-            transition
-          "
-        />
       </div>
     </div>
   );

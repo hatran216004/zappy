@@ -223,6 +223,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   }, [sendTyping]);
 
   const handleSendMessage = useCallback(async () => {
+    setMessageText('');
+
     if (!messageText.trim()) return;
 
     if (typingTimeoutRef.current) {
@@ -256,8 +258,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         
         setReplyTo(null);
       }
-
-      setMessageText('');
+      
       inputRef.current?.focus();
     } catch (error) {
       console.error('❌ Error:', error);
