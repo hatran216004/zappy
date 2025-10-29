@@ -421,6 +421,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     (p) => p.user_id !== userId
   );
 
+  // Get background styling from conversation
+  const getBackgroundStyle = () => {
+    if (!conversation) return {};
+    
+    const { background_type, background_value } = conversation;
+    
+    if (background_type === 'color') {
+      return { backgroundColor: background_value };
+    } else if (background_type === 'gradient') {
+      return { background: background_value };
+    } else if (background_type === 'image') {
+      return {
+        backgroundImage: `url(${background_value})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      };
+    }
+    
+    return {};
+  };
+
   return (
     <div
       className="
@@ -447,9 +469,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         ref={listRef}
         className="
           h-[calc(100%-122px)] overflow-y-auto p-4 space-y-2
-          bg-white dark:bg-[#2B2D31]
           discord-scroll
         "
+        style={getBackgroundStyle()}
       >
         {/* Load older */}
         {hasNextPage && (

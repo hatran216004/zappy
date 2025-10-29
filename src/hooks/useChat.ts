@@ -29,6 +29,7 @@ import {
   getConversationMedia,
   getConversationFiles,
   getConversationLinks,
+  updateConversationBackground,
   // type ConversationWithDetails,
   // type MessageWithDetails,
   type Message
@@ -617,5 +618,91 @@ export const useConversationLinks = (conversationId: string) => {
     queryFn: () => getConversationLinks(conversationId),
     enabled: !!conversationId,
     staleTime: 60000
+  });
+};
+
+// ============================================
+// CONVERSATION BACKGROUND
+// ============================================
+
+// Hook update conversation background với optimistic update
+export const useUpdateConversationBackground = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      backgroundType,
+      backgroundValue,
+    }: {
+      conversationId: string;
+      backgroundType: 'color' | 'gradient' | 'image';
+      backgroundValue: string;
+    }) => updateConversationBackground(conversationId, backgroundType, backgroundValue),
+
+    // Optimistic update - UI update ngay lập tức
+    onMutate: async ({ conversationId, backgroundType, backgroundValue }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.conversation(conversationId)
+      });
+
+      // Snapshot previous value
+      const previousConversation = queryClient.getQueryData(
+        chatKeys.conversation(conversationId)
+      );
+
+      // Optimistically update conversation
+      queryClient.setQueryData(
+        chatKeys.conversation(conversationId),
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            background_type: backgroundType,
+            background_value: backgroundValue,
+          };
+        }
+      );
+
+      // Also update in conversations list
+      queryClient.setQueriesData(
+        { predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations' },
+        (old: any) => {
+          if (!old) return old;
+          return old.map((conv: any) =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  background_type: backgroundType,
+                  background_value: backgroundValue,
+                }
+              : conv
+          );
+        }
+      );
+
+      return { previousConversation };
+    },
+
+    // Rollback on error
+    onError: (_err, variables, context) => {
+      if (context?.previousConversation) {
+        queryClient.setQueryData(
+          chatKeys.conversation(variables.conversationId),
+          context.previousConversation
+        );
+      }
+    },
+
+    // Refetch on success
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.conversation(variables.conversationId)
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
+      });
+    },
   });
 };

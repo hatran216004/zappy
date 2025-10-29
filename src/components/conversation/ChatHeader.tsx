@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Link as LinkIcon,
+  Palette,
 } from "lucide-react";
 import { TooltipBtn } from "../TooltipBtn";
 import { useState } from "react";
@@ -17,6 +18,8 @@ import type { ConversationWithDetails } from "@/services/chatService";
 import { InviteLinkModal } from "../modal/InviteLinkModal";
 import { GroupInfoModal } from "../modal/GroupInfoModal";
 import { supabaseUrl } from "@/lib/supabase";
+import { BackgroundPicker } from "./BackgroundPicker";
+import { useUpdateConversationBackground } from "@/hooks/useChat";
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -49,6 +52,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+
+  const updateBackgroundMutation = useUpdateConversationBackground();
 
   const isGroupChat = conversation?.type === 'group';
   const displayName = isGroupChat 
@@ -85,6 +90,19 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     onCloseSearch?.();
   };
 
+  const handleBackgroundChange = (
+    type: 'color' | 'gradient' | 'image',
+    value: string
+  ) => {
+    if (!conversation) return;
+    
+    updateBackgroundMutation.mutate({
+      conversationId: conversation.id,
+      backgroundType: type,
+      backgroundValue: value,
+    });
+  };
+
   return (
     <div className="border-b dark:border-gray-700 bg-white dark:bg-gray-800">
       <div className="flex items-center justify-between px-4 py-2">
@@ -109,6 +127,27 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 sm:gap-3 text-gray-600 dark:text-gray-300">
+          {/* Background Picker */}
+          {conversation && (
+            <BackgroundPicker
+              currentBackground={{
+                type: (conversation.background_type || 'color') as 'color' | 'gradient' | 'image',
+                value: conversation.background_value || '#FFFFFF',
+              }}
+              onSelect={handleBackgroundChange}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  title="Đổi background"
+                >
+                  <Palette className="size-5" />
+                </Button>
+              }
+            />
+          )}
+
           <Button
             variant="ghost"
             size="icon"
