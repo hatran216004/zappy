@@ -612,6 +612,44 @@ export const deleteMessageForMe = async (
   if (error) throw error;
 };
 
+// Send location message
+export const sendLocationMessage = async (
+  conversationId: string,
+  senderId: string,
+  latitude: number,
+  longitude: number,
+  address?: string,
+  displayMode: 'interactive' | 'static' = 'interactive'
+): Promise<Message> => {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      type: 'text',
+      content_text: address || `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      location_latitude: latitude,
+      location_longitude: longitude,
+      location_address: address,
+      location_display_mode: displayMode
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Update conversation's last_message_id and updated_at
+  await supabase
+    .from('conversations')
+    .update({
+      last_message_id: data.id,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', conversationId);
+
+  return data;
+};
+
 // ============================================
 // REACTIONS
 // ============================================

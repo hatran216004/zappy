@@ -5,6 +5,7 @@ import {
   useConversationRealtime,
   useSendTextMessage,
   useSendFileMessage,
+  useSendLocationMessage,
   useTypingIndicator,
   useMarkMessagesAsRead,
   useConversation,
@@ -17,6 +18,7 @@ import ChatFooter from '../ChatWindow/ChatFooter';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { ImagePreview } from './ImagePreview';
+import { LocationPicker } from './LocationPicker';
 import { twMerge } from 'tailwind-merge';
 
 interface ChatWindowProps {
@@ -35,6 +37,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [imageToSend, setImageToSend] = useState<File | null>(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -53,6 +56,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     useMessages(conversationId, userId);
   const sendTextMutation = useSendTextMessage();
   const sendFileMutation = useSendFileMessage();
+  const sendLocationMutation = useSendLocationMessage();
   const editMessageMutation = useEditMessage();
   const markAsReadMutation = useMarkMessagesAsRead();
   const { typingUsers, sendTyping } = useTypingIndicator(
@@ -419,6 +423,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     setCurrentSearchIndex(0);
   }, []);
 
+  const handleLocationClick = useCallback(() => {
+    setShowLocationPicker(true);
+  }, []);
+
+  const handleLocationSelect = useCallback(async (location: { 
+    latitude: number; 
+    longitude: number; 
+    address: string;
+    displayMode: 'interactive' | 'static';
+  }) => {
+    try {
+      await sendLocationMutation.mutateAsync({
+        conversationId,
+        senderId: userId,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address,
+        displayMode: location.displayMode
+      });
+      console.log('✅ Location sent successfully');
+    } catch (error) {
+      console.error('❌ Error sending location:', error);
+    }
+  }, [conversationId, userId, sendLocationMutation]);
+
   const otherParticipant = conversation?.participants.find(
     (p) => p.user_id !== userId
   );
@@ -613,6 +642,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         handleSendMessage={handleSendMessage}
         handleFileSelect={handleFileSelect}
         handleEmojiSelect={handleEmojiSelect}
+        handleLocationClick={handleLocationClick}
         sendFileMutation={sendFileMutation}
         sendTextMutation={sendTextMutation}
       />
@@ -624,6 +654,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           onSend={handleSendImage}
           onCancel={handleCancelImage}
           isSending={sendFileMutation.isPending}
+        />
+      )}
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <LocationPicker
+          onLocationSelect={handleLocationSelect}
+          onClose={() => setShowLocationPicker(false)}
         />
       )}
     </div>

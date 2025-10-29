@@ -25,6 +25,7 @@ import { AudioPlayer } from './AudioPlayer';
 import { useConfirm } from '../modal/ModalConfirm';
 import { EmojiPicker } from './EmojiPicker';
 import { UserAvatar } from '../UserAvatar';
+import { LocationMessage } from './LocationMessage';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -290,7 +291,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                 </div>
               ) : (
                 <>
-                  {message.content_text && (
+                  {/* Location Message */}
+                  {message.location_latitude && message.location_longitude && (
+                    <LocationMessage
+                      latitude={message.location_latitude}
+                      longitude={message.location_longitude}
+                      address={message.location_address}
+                      displayMode={message.location_display_mode}
+                    />
+                  )}
+
+                  {message.content_text && !message.location_latitude && (
                     <p className="break-words whitespace-pre-wrap">
                       {linkifyText(message.content_text, isOwn)}
                     </p>
