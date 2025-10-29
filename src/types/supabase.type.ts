@@ -425,6 +425,8 @@ export type Database = {
           title: string | null
           type: Database["public"]["Enums"]["convo_type"]
           updated_at: string | null
+          background_type: string
+          background_value: string
         }
         Insert: {
           created_at?: string
@@ -435,6 +437,8 @@ export type Database = {
           title?: string | null
           type: Database["public"]["Enums"]["convo_type"]
           updated_at?: string | null
+          background_type?: string
+          background_value?: string
         }
         Update: {
           created_at?: string
@@ -445,6 +449,8 @@ export type Database = {
           title?: string | null
           type?: Database["public"]["Enums"]["convo_type"]
           updated_at?: string | null
+          background_type?: string
+          background_value?: string
         }
         Relationships: [
           {

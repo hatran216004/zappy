@@ -1331,4 +1331,26 @@ export const promoteToAdmin = async (
   if (error) throw error;
 };
 
+// ============================================
+// CONVERSATION BACKGROUND
+// ============================================
+
+// Update conversation background
+export const updateConversationBackground = async (
+  conversationId: string,
+  backgroundType: 'color' | 'gradient' | 'image',
+  backgroundValue: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('conversations')
+    .update({
+      background_type: backgroundType,
+      background_value: backgroundValue,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', conversationId);
+
+  if (error) throw error;
+};
+
 export { supabase };
