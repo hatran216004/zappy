@@ -9,6 +9,7 @@ import {
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   getConversations,
+  getGroupConversations,
   getConversation,
   getMessages,
   getOrCreateDirectConversation,
@@ -42,6 +43,8 @@ export const chatKeys = {
   all: ['chat'] as const,
   conversations: (userId: string) =>
     [...chatKeys.all, 'conversations', userId] as const,
+  groupConversations: (userId: string) =>
+    [...chatKeys.all, 'groupConversations', userId] as const,
   conversation: (conversationId: string) =>
     [...chatKeys.all, 'conversation', conversationId] as const,
   messages: (conversationId: string) =>
@@ -57,6 +60,15 @@ export const useConversations = (userId: string) => {
   return useQuery({
     queryKey: chatKeys.conversations(userId),
     queryFn: () => getConversations(userId),
+    staleTime: 30000
+  });
+};
+
+// Hook lấy danh sách group conversations (chỉ nhóm)
+export const useGroupConversations = (userId: string) => {
+  return useQuery({
+    queryKey: chatKeys.groupConversations(userId),
+    queryFn: () => getGroupConversations(userId),
     staleTime: 30000
   });
 };

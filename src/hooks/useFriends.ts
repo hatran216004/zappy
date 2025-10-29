@@ -12,7 +12,13 @@ import {
   subscribeFriendRequests,
   getFriends,
   subscribeFriends,
-  removeFriend
+  removeFriend,
+  getContactLabels,
+  createContactLabel,
+  updateContactLabel,
+  deleteContactLabel,
+  assignLabelToFriend,
+  removeLabelFromFriend
 } from '@/services/friendServices';
 
 // Keys cho query cache
@@ -24,7 +30,8 @@ export const friendKeys = {
     [...friendKeys.all, 'pending', userId] as const,
   sentRequests: (userId: string) =>
     [...friendKeys.all, 'sent', userId] as const,
-  list: (userId: string) => [...friendKeys.all, 'list', userId] as const
+  list: (userId: string) => [...friendKeys.all, 'list', userId] as const,
+  labels: (userId: string) => [...friendKeys.all, 'labels', userId] as const
 };
 
 // Hook tìm kiếm user
@@ -114,6 +121,7 @@ export const useFriends = (userId: string) => {
   return useQuery({
     queryKey: friendKeys.list(userId),
     queryFn: () => getFriends(),
+    enabled: !!userId, // Chỉ chạy khi có userId
     staleTime: 60000 // 1 minute
   });
 };
@@ -200,4 +208,85 @@ export const useFriendRequestsRealtime = (userId: string) => {
       unsubscribe();
     };
   }, [userId, queryClient]);
+};
+
+// ============================================
+// CONTACT LABELS HOOKS
+// ============================================
+
+// Hook lấy danh sách labels
+export const useContactLabels = (userId: string) => {
+  return useQuery({
+    queryKey: friendKeys.labels(userId),
+    queryFn: () => getContactLabels(userId),
+    enabled: !!userId, // Chỉ chạy khi có userId
+    staleTime: 60000
+  });
+};
+
+// Hook tạo label mới
+export const useCreateContactLabel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, name, color }: { userId: string; name: string; color: number }) =>
+      createContactLabel(userId, name, color),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.labels(variables.userId) });
+    }
+  });
+};
+
+// Hook cập nhật label
+export const useUpdateContactLabel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ labelId, name, color, userId }: { labelId: string; name: string; color: number; userId: string }) =>
+      updateContactLabel(labelId, name, color),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.labels(variables.userId) });
+      queryClient.invalidateQueries({ queryKey: friendKeys.all });
+    }
+  });
+};
+
+// Hook xóa label
+export const useDeleteContactLabel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ labelId, userId }: { labelId: string; userId: string }) =>
+      deleteContactLabel(labelId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.labels(variables.userId) });
+      queryClient.invalidateQueries({ queryKey: friendKeys.all });
+    }
+  });
+};
+
+// Hook gán label cho bạn bè
+export const useAssignLabelToFriend = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ friendId, labelId }: { friendId: string; labelId: string }) =>
+      assignLabelToFriend(friendId, labelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.all });
+    }
+  });
+};
+
+// Hook bỏ gán label
+export const useRemoveLabelFromFriend = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ friendId, labelId }: { friendId: string; labelId: string }) =>
+      removeLabelFromFriend(friendId, labelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.all });
+    }
+  });
 };
