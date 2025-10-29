@@ -273,4 +273,98 @@ export const subscribeFriends = (
   };
 };
 
+// ============================================
+// CONTACT LABELS (Nhãn phân loại bạn bè)
+// ============================================
+
+export type ContactLabel = Database['public']['Tables']['contact_labels']['Row'];
+
+// Lấy tất cả labels của user
+export const getContactLabels = async (userId: string): Promise<ContactLabel[]> => {
+  const { data, error } = await supabase
+    .from('contact_labels')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+};
+
+// Tạo label mới
+export const createContactLabel = async (
+  userId: string,
+  name: string,
+  color: number
+): Promise<ContactLabel> => {
+  const { data, error } = await supabase
+    .from('contact_labels')
+    .insert({
+      owner_id: userId,
+      name,
+      color
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Cập nhật label
+export const updateContactLabel = async (
+  labelId: string,
+  name: string,
+  color: number
+): Promise<ContactLabel> => {
+  const { data, error } = await supabase
+    .from('contact_labels')
+    .update({ name, color })
+    .eq('id', labelId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Xóa label
+export const deleteContactLabel = async (labelId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('contact_labels')
+    .delete()
+    .eq('id', labelId);
+
+  if (error) throw error;
+};
+
+// Gán label cho bạn bè
+export const assignLabelToFriend = async (
+  friendId: string,
+  labelId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('contact_label_map')
+    .insert({
+      friend_id: friendId,
+      label_id: labelId
+    });
+
+  if (error) throw error;
+};
+
+// Bỏ gán label cho bạn bè
+export const removeLabelFromFriend = async (
+  friendId: string,
+  labelId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('contact_label_map')
+    .delete()
+    .eq('friend_id', friendId)
+    .eq('label_id', labelId);
+
+  if (error) throw error;
+};
+
 export { supabase };

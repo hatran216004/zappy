@@ -1,19 +1,27 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useFriends,
   useRemoveFriend,
   useFriendsRealtime,
+  useContactLabels
 } from "../../hooks/useFriends";
 import { useGetOrCreateDirectConversation } from "@/hooks/useChat";
 import useUser from "@/hooks/useUser";
 import FriendItem from "./FriendItem";
 import { useNavigate } from "react-router";
 
-export const FriendsList = () => {
+interface FriendsListProps {
+  searchTerm?: string;
+  selectedFilter?: string | null;
+  sortBy?: string;
+}
+
+export const FriendsList = ({ searchTerm = '', selectedFilter = null, sortBy = 'Tên (A-Z)' }: FriendsListProps) => {
   const navigate = useNavigate();
   const { user } = useUser();
   const userId = user?.id as string;
   const { data: friends, isLoading, error } = useFriends(userId);
+  const { data: labels } = useContactLabels(userId);
   const removeFriendMutation = useRemoveFriend();
   const getOrCreateConversation = useGetOrCreateDirectConversation();
   const [selectedFriend, setSelectedFriend] = useState<string | null>(null);
@@ -50,19 +58,80 @@ export const FriendsList = () => {
     }
   };
 
-  // Group you already had
-  const groupedFriends = friends?.reduce((acc, friend) => {
-    if (friend.label_id && friend.label_id.length > 0) {
-      friend.label_id.forEach((labelId: string) => {
-        if (!acc[labelId]) acc[labelId] = [];
-        acc[labelId].push(friend);
-      });
-    } else {
-      if (!acc["no_label"]) acc["no_label"] = [];
-      acc["no_label"].push(friend);
+  // Filter, search and sort friends
+  const filteredAndSortedFriends = useMemo(() => {
+    if (!friends) return [];
+
+    let result = [...friends];
+
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter(
+        (friend) =>
+          friend.display_name.toLowerCase().includes(searchLower) ||
+          friend.username.toLowerCase().includes(searchLower)
+      );
     }
-    return acc;
-  }, {} as Record<string, typeof friends>);
+
+    // Apply label filter
+    if (selectedFilter) {
+      result = result.filter((friend) =>
+        friend.label_id && friend.label_id.includes(selectedFilter)
+      );
+    }
+
+    // Apply sorting
+    if (sortBy === 'Tên (A-Z)') {
+      result.sort((a, b) =>
+        a.display_name.localeCompare(b.display_name, 'vi')
+      );
+    } else if (sortBy === 'Tên (Z-A)') {
+      result.sort((a, b) =>
+        b.display_name.localeCompare(a.display_name, 'vi')
+      );
+    }
+
+    return result;
+  }, [friends, searchTerm, selectedFilter, sortBy]);
+
+  // Group friends by label
+  const groupedFriends = useMemo(() => {
+    return filteredAndSortedFriends.reduce((acc, friend) => {
+      if (friend.label_id && friend.label_id.length > 0) {
+        friend.label_id.forEach((labelId: string) => {
+          if (!acc[labelId]) acc[labelId] = [];
+          acc[labelId].push(friend);
+        });
+      } else {
+        if (!acc["no_label"]) acc["no_label"] = [];
+        acc["no_label"].push(friend);
+      }
+      return acc;
+    }, {} as Record<string, typeof filteredAndSortedFriends>);
+  }, [filteredAndSortedFriends]);
+
+  // Get label name by ID
+  const getLabelName = (labelId: string) => {
+    const label = labels?.find((l) => l.id === labelId);
+    return label?.name || 'Nhãn không xác định';
+  };
+
+  const LABEL_COLORS = [
+    { value: 0, color: 'bg-gray-500' },
+    { value: 1, color: 'bg-red-500' },
+    { value: 2, color: 'bg-orange-500' },
+    { value: 3, color: 'bg-yellow-500' },
+    { value: 4, color: 'bg-green-500' },
+    { value: 5, color: 'bg-blue-500' },
+    { value: 6, color: 'bg-purple-500' },
+    { value: 7, color: 'bg-pink-500' },
+  ];
+
+  const getLabelColor = (labelId: string) => {
+    const label = labels?.find((l) => l.id === labelId);
+    return LABEL_COLORS[label?.color || 0]?.color || 'bg-gray-500';
+  };
 
   if (isLoading) {
     return (
@@ -94,7 +163,7 @@ export const FriendsList = () => {
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={1.5}
-              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0z"
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
             />
           </svg>
         </div>
@@ -108,50 +177,82 @@ export const FriendsList = () => {
 
   return (
     <div className="py-4">
-      {/* Empty search result */}
-      {friends && !friends.length ? (
+      {/* Empty search/filter result */}
+      {filteredAndSortedFriends.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           Không tìm thấy bạn bè nào
         </div>
       ) : (
         <div className="space-y-6">
-          {/* No label */}
-          {groupedFriends?.["no_label"] && (
-            <ul className="bg-card rounded-xl border border-border divide-y divide-border">
-              {groupedFriends["no_label"].map((friend) => (
-                <FriendItem
-                  key={friend.id}
-                  friend={friend}
-                  onRemove={() => setSelectedFriend(friend.id)}
-                  onMessage={handleMessage}
-                />
-              ))}
-            </ul>
-          )}
-
-          {/* Labeled groups */}
-          {Object.entries(groupedFriends || {})
-
-            .filter(([key]) => key !== "no_label")
-            .map(([labelId, friendsList]) => {
-              return (
-                <section key={labelId}>
-                  <h3 className="px-2 sm:px-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase mb-2">
-                    Nhãn: {labelId}
+          {/* If filtering by label, only show that label group */}
+          {selectedFilter ? (
+            groupedFriends?.[selectedFilter] && (
+              <section>
+                <div className="flex items-center gap-2 px-2 sm:px-0 mb-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${getLabelColor(selectedFilter)}`}
+                  />
+                  <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                    {getLabelName(selectedFilter)}
                   </h3>
-                  <ul className="bg-card rounded-xl border border-border divide-y divide-border">
-                    {(friendsList ?? []).map((friend) => (
-                      <FriendItem
-                        key={friend.id}
-                        friend={friend}
-                        onRemove={() => setSelectedFriend(friend.id)}
-                        onMessage={handleMessage}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
+                </div>
+                <ul className="bg-card rounded-xl border border-border divide-y divide-border">
+                  {groupedFriends[selectedFilter].map((friend) => (
+                    <FriendItem
+                      key={friend.id}
+                      friend={friend}
+                      onRemove={() => setSelectedFriend(friend.id)}
+                      onMessage={handleMessage}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )
+          ) : (
+            <>
+              {/* No label */}
+              {groupedFriends?.["no_label"] && (
+                <ul className="bg-card rounded-xl border border-border divide-y divide-border">
+                  {groupedFriends["no_label"].map((friend) => (
+                    <FriendItem
+                      key={friend.id}
+                      friend={friend}
+                      onRemove={() => setSelectedFriend(friend.id)}
+                      onMessage={handleMessage}
+                    />
+                  ))}
+                </ul>
+              )}
+
+              {/* Labeled groups */}
+              {Object.entries(groupedFriends || {})
+                .filter(([key]) => key !== "no_label")
+                .map(([labelId, friendsList]) => {
+                  return (
+                    <section key={labelId}>
+                      <div className="flex items-center gap-2 px-2 sm:px-0 mb-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${getLabelColor(labelId)}`}
+                        />
+                        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                          {getLabelName(labelId)}
+                        </h3>
+                      </div>
+                      <ul className="bg-card rounded-xl border border-border divide-y divide-border">
+                        {(friendsList ?? []).map((friend) => (
+                          <FriendItem
+                            key={friend.id}
+                            friend={friend}
+                            onRemove={() => setSelectedFriend(friend.id)}
+                            onMessage={handleMessage}
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })}
+            </>
+          )}
         </div>
       )}
 

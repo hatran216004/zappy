@@ -218,6 +218,17 @@ export const getConversations = async (
   );
 };
 
+// Lấy danh sách group conversations (chỉ nhóm, không bao gồm direct chats)
+export const getGroupConversations = async (
+  userId: string
+): Promise<ConversationWithDetails[]> => {
+  // Get all conversations for user
+  const allConversations = await getConversations(userId);
+  
+  // Filter only group type
+  return allConversations.filter(convo => convo.type === 'group');
+};
+
 // Lấy thông tin conversation
 export const getConversation = async (
   conversationId: string
