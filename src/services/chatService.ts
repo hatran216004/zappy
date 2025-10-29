@@ -41,6 +41,7 @@ export interface MessageWithDetails extends Message {
   })[];
   reply_to?: Message;
   read_receipts: ReadReceipt[];
+  deleted_for_me?: boolean; // Flag để hiển thị tin nhắn đã xóa ở phía user
 }
 
 // ============================================
@@ -254,7 +255,8 @@ export const getConversation = async (
 export const getMessages = async (
   conversationId: string,
   limit: number = 50,
-  before?: string
+  before?: string,
+  currentUserId?: string
 ): Promise<MessageWithDetails[]> => {
   console.log('Conversation ID:', conversationId);
 
@@ -291,6 +293,21 @@ export const getMessages = async (
   }
 
   if (!messages || messages.length === 0) return [];
+
+  // --- STEP 1.5: Mark messages deleted by current user ---
+  let deletedMessageIds = new Set<string>();
+  if (currentUserId) {
+    const messageIds = messages.map((m) => m.id);
+    const { data: deletedMessages } = await supabase
+      .from('deleted_messages')
+      .select('message_id')
+      .eq('user_id', currentUserId)
+      .in('message_id', messageIds);
+
+    deletedMessageIds = new Set(
+      deletedMessages?.map((dm) => dm.message_id) || []
+    );
+  }
 
   const messageIds = messages.map((m) => m.id);
 
@@ -351,7 +368,8 @@ export const getMessages = async (
     ...msg,
     reply_to: msg.reply_to_id ? repliesById[msg.reply_to_id] ?? null : null,
     reactions: reactionsByMessageId.get(msg.id) || [],
-    read_receipts: receiptsByMessageId.get(msg.id) || []
+    read_receipts: receiptsByMessageId.get(msg.id) || [],
+    deleted_for_me: deletedMessageIds.has(msg.id) // Thêm flag deleted_for_me
   }));
 
   return messagesWithDetails.reverse(); // để tin cũ trước, mới sau
@@ -558,7 +576,7 @@ export const editMessage = async (
   if (error) throw error;
 };
 
-// Recall message
+// Recall message (delete for everyone)
 export const recallMessage = async (messageId: string): Promise<void> => {
   const { error } = await supabase
     .from('messages')
@@ -566,6 +584,19 @@ export const recallMessage = async (messageId: string): Promise<void> => {
       recalled_at: new Date().toISOString()
     })
     .eq('id', messageId);
+
+  if (error) throw error;
+};
+
+// Delete message for current user only
+export const deleteMessageForMe = async (
+  messageId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase.from('deleted_messages').insert({
+    message_id: messageId,
+    user_id: userId
+  });
 
   if (error) throw error;
 };
@@ -810,7 +841,8 @@ export const subscribeMessages = (
           ...message,
           reply_to: replyTo,
           reactions: reactions || [],
-          read_receipts: readReceipts || []
+          read_receipts: readReceipts || [],
+          deleted_for_me: false // New messages are not deleted
         };
 
         onInsert(fullMessage as unknown as MessageWithDetails);
@@ -877,7 +909,8 @@ export const subscribeMessages = (
           ...message,
           reply_to: replyTo,
           reactions: reactions || [],
-          read_receipts: readReceipts || []
+          read_receipts: readReceipts || [],
+          deleted_for_me: false // Keep existing state or default to false
         };
 
         onUpdate(fullMessage as unknown as MessageWithDetails);
