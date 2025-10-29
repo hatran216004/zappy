@@ -1276,8 +1276,10 @@ export const addGroupMembers = async (
 // Remove member from group
 export const removeGroupMember = async (
   conversationId: string,
-  userId: string
+  userId: string,
+  removedBy: string // ID của admin thực hiện xóa
 ): Promise<void> => {
+  // Update left_at
   const { error } = await supabase
     .from('conversation_participants')
     .update({ left_at: new Date().toISOString() })
@@ -1285,6 +1287,31 @@ export const removeGroupMember = async (
     .eq('user_id', userId);
 
   if (error) throw error;
+
+  // Get member và admin names
+  const [memberResult, adminResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', userId)
+      .single(),
+    supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', removedBy)
+      .single()
+  ]);
+
+  const memberName = memberResult.data?.display_name || 'Thành viên';
+  const adminName = adminResult.data?.display_name || 'Admin';
+
+  // Create system message
+  await supabase.from('messages').insert({
+    conversation_id: conversationId,
+    sender_id: removedBy,
+    type: 'system',
+    content_text: `${memberName} đã bị ${adminName} xóa khỏi nhóm`
+  });
 };
 
 // Leave group

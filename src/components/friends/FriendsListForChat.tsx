@@ -2,6 +2,7 @@ import React from 'react';
 import { useFriends, useFriendsRealtime } from '@/hooks/useFriends';
 import { Friend } from '@/services/friendServices';
 import { supabaseUrl } from '@/lib/supabase';
+import { UserAvatar } from '../UserAvatar';
 
 interface FriendsListForChatProps {
   userId: string;
@@ -27,16 +28,14 @@ const FriendsListForChat: React.FC<FriendsListForChatProps> = ({
           >
             <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               {/* Avatar + status dot */}
-              <div className="relative flex-shrink-0">
-                <img
-                  src={`${supabaseUrl}${friend.avatar_url}`}
-                  alt={friend.display_name}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-                {friend.status === 'online' && (
-                  <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 ring-2 ring-white" />
-                )}
-              </div>
+              <UserAvatar
+                avatarUrl={friend.avatar_url}
+                displayName={friend.display_name}
+                status={friend.status}
+                size="sm"
+                showStatus={true}
+                className="w-10 h-10"
+              />
 
               {/* Text area */}
               <div className="min-w-0 flex-1">

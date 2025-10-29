@@ -1,6 +1,4 @@
 import { Search } from 'lucide-react';
-import { TooltipBtn } from './TooltipBtn';
-import { TbUsersPlus } from 'react-icons/tb';
 import AddFriendModal from './modal/AddFriendModal';
 
 export default function SearchBar() {

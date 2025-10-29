@@ -71,19 +71,6 @@ export default function ChatSidebar() {
             <Users className="w-4 h-4" />
           </button>
 
-          {/* New DM (decorative – UI only) */}
-          <button
-            type="button"
-            aria-label="Tạo đoạn chat mới"
-            className="
-              discord-icon-btn
-              text-gray-600 hover:text-gray-900
-              dark:text-[#B5BAC1] dark:hover:text-white
-            "
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-
           {/* More / context (decorative – UI only) */}
           <button
             type="button"

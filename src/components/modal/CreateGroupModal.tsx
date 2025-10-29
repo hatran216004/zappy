@@ -15,6 +15,7 @@ import { createGroupConversation } from '@/services/chatService';
 import { useFriends } from '@/hooks/useFriends';
 import { supabaseUrl } from '@/lib/supabase';
 import { useNavigate } from 'react-router';
+import { UserAvatar } from '../UserAvatar';
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -178,10 +179,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                           </svg>
                         )}
                       </div>
-                      <img
-                        src={`${supabaseUrl}/${friend.avatar_url}`}
-                        alt={friend.display_name}
-                        className="w-8 h-8 rounded-full object-cover"
+                      <UserAvatar
+                        avatarUrl={friend.avatar_url}
+                        displayName={friend.display_name}
+                        status={friend.status}
+                        size="sm"
+                        showStatus={false}
                       />
                       <div className="flex-1">
                         <div className="font-medium">{friend.display_name}</div>

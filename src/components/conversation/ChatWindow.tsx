@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import {
   useMessages,
   useMessagesRealtime,
+  useConversationRealtime,
   useSendTextMessage,
   useSendFileMessage,
   useTypingIndicator,
@@ -64,6 +65,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   );
 
   useMessagesRealtime(conversationId, userId);
+  useConversationRealtime(conversationId); // ⭐ Subscribe to conversation updates (background, etc.)
 
   // Reset typing state khi chuyển conversation
   useEffect(() => {

@@ -13,14 +13,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   updateGroupInfo,
   addGroupMembers,
-  removeGroupMember,
   promoteToAdmin,
   leaveGroup,
   type ConversationWithDetails
 } from '@/services/chatService';
 import { useFriends } from '@/hooks/useFriends';
+import { useRemoveGroupMember } from '@/hooks/useChat';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { useConfirm } from './ModalConfirm';
+import { UserAvatar } from '../UserAvatar';
 import {
   Crown,
   UserMinus,
@@ -57,6 +58,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: friends = [] } = useFriends(user?.id as string);
+  const removeGroupMemberMutation = useRemoveGroupMember();
 
   // Get current user's role
   const currentUserParticipant = conversation.participants.find(
@@ -166,9 +168,11 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
     if (!confirmed) return;
 
     try {
-      await removeGroupMember(conversation.id, userId);
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+      await removeGroupMemberMutation.mutateAsync({
+        conversationId: conversation.id,
+        userId: userId,
+        removedBy: currentUserId
+      });
       toast.success(`Đã xóa ${userName} khỏi nhóm`);
     } catch (error) {
       console.error('Error removing member:', error);
@@ -364,10 +368,13 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                       className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                       <div className="flex items-center gap-3">
-                        <img
-                          src={`${supabaseUrl}/${participant.profile.avatar_url}`}
-                          alt={participant.profile.display_name}
-                          className="w-10 h-10 rounded-full object-cover"
+                        <UserAvatar
+                          avatarUrl={participant.profile.avatar_url}
+                          displayName={participant.profile.display_name}
+                          status={participant.profile.status}
+                          size="sm"
+                          showStatus={false}
+                          className="w-10 h-10"
                         />
                         <div>
                           <div className="flex items-center gap-2">
@@ -481,10 +488,12 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                                 </svg>
                               )}
                             </div>
-                            <img
-                              src={`${supabaseUrl}/${friend.avatar_url}`}
-                              alt={friend.display_name}
-                              className="w-8 h-8 rounded-full object-cover"
+                            <UserAvatar
+                              avatarUrl={friend.avatar_url}
+                              displayName={friend.display_name}
+                              status={friend.status}
+                              size="sm"
+                              showStatus={false}
                             />
                             <div className="flex-1">
                               <div className="font-medium">

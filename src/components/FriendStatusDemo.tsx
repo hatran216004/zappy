@@ -1,5 +1,6 @@
 import React from "react";
 import useRealtimeFriendStatus from "@/hooks/useRealtimeFriendStatus";
+import { UserAvatar } from "./UserAvatar";
 
 interface FriendStatusDemoProps {
   friendIds: string[];
@@ -68,16 +69,14 @@ const FriendStatusDemo: React.FC<FriendStatusDemoProps> = ({ friendIds }) => {
                   className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <img
-                        src={friend.avatar_url || "/default_user.jpg"}
-                        alt={friend.display_name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                      <div
-                        className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${statusColor}`}
-                      />
-                    </div>
+                    <UserAvatar
+                      avatarUrl={friend.avatar_url}
+                      displayName={friend.display_name}
+                      status={friend.status}
+                      size="sm"
+                      showStatus={true}
+                      className="w-10 h-10"
+                    />
 
                     <div>
                       <p className="font-medium text-gray-900">

@@ -30,6 +30,8 @@ import {
   getConversationFiles,
   getConversationLinks,
   updateConversationBackground,
+  removeGroupMember,
+  supabase,
   // type ConversationWithDetails,
   // type MessageWithDetails,
   type Message
@@ -103,6 +105,53 @@ export const useConversationsRealtime = (userId: string) => {
       unsubscribe();
     };
   }, [userId, queryClient]);
+};
+
+// Hook subscribe to single conversation updates (including background changes)
+export const useConversationRealtime = (conversationId: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    // Subscribe to conversation updates
+    const channel = supabase
+      .channel(`conversation:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        },
+        (payload) => {
+          console.log('🔄 Conversation updated:', payload.new);
+          
+          // Update conversation cache with new data
+          queryClient.setQueryData(
+            chatKeys.conversation(conversationId),
+            (old: any) => {
+              if (!old) return old;
+              return {
+                ...old,
+                ...payload.new,
+              };
+            }
+          );
+
+          // Also invalidate to refetch full details
+          queryClient.invalidateQueries({
+            queryKey: chatKeys.conversation(conversationId)
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, queryClient]);
 };
 
 // ============================================
@@ -699,6 +748,79 @@ export const useUpdateConversationBackground = () => {
     onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversation(variables.conversationId)
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
+      });
+    },
+  });
+};
+
+// ============================================
+// GROUP MANAGEMENT
+// ============================================
+
+// Hook remove group member với optimistic update
+export const useRemoveGroupMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      userId,
+      removedBy,
+    }: {
+      conversationId: string;
+      userId: string;
+      removedBy: string;
+    }) => removeGroupMember(conversationId, userId, removedBy),
+
+    // Optimistic update - remove member ngay
+    onMutate: async ({ conversationId, userId }) => {
+      // Cancel ongoing queries
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.conversation(conversationId)
+      });
+
+      // Snapshot for rollback
+      const previousConversation = queryClient.getQueryData(
+        chatKeys.conversation(conversationId)
+      );
+
+      // Optimistically remove member from participants list
+      queryClient.setQueryData(
+        chatKeys.conversation(conversationId),
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            participants: old.participants.filter(
+              (p: any) => p.user_id !== userId
+            ),
+          };
+        }
+      );
+
+      return { previousConversation };
+    },
+
+    // Rollback on error
+    onError: (_err, variables, context) => {
+      if (context?.previousConversation) {
+        queryClient.setQueryData(
+          chatKeys.conversation(variables.conversationId),
+          context.previousConversation
+        );
+      }
+    },
+
+    // Refetch to sync with server (including system message)
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.conversation(variables.conversationId)
+      });
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(variables.conversationId)
       });
       queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
