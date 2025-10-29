@@ -4,15 +4,9 @@ import useUrl from '@/hooks/useUrl';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '@/stores/user';
 import SearchBar from '@/components/SearchBar';
-import { Plus, MoreVertical, Users } from 'lucide-react';
+import { MoreVertical, Users } from 'lucide-react';
 import { useState } from 'react';
 import { CreateGroupModal } from '@/components/modal/CreateGroupModal';
-
-const classifyTags = [
-  { color: 'bg-[#ED4245]', label: 'Khóa luận cử nhân' }, // red Discord
-  { color: 'bg-[#5865F2]', label: 'Thực tập' },          // blurple Discord
-  { color: 'bg-[#B5BAC1]', label: 'Tin nhắn từ người lạ' } // gray muted Discord
-];
 
 const tabs = [
   { value: 'all', label: 'Tất cả' },
@@ -23,6 +17,7 @@ export default function ChatSidebar() {
   const { user } = useAuth();
   const userId = user?.id;
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   const { currentValue, handler } = useUrl({
     field: 'tab',
@@ -84,9 +79,12 @@ export default function ChatSidebar() {
             <MoreVertical className="w-4 h-4" />
           </button>
 
-          {/* Classify dropdown giữ nguyên chức năng */}
+          {/* Classify dropdown */}
           <div className="pl-1">
-            <ClassifyDropdown classifyTags={classifyTags} />
+            <ClassifyDropdown
+              selectedFilter={selectedFilter}
+              onFilterChange={setSelectedFilter}
+            />
           </div>
         </div>
       </div>
@@ -145,7 +143,10 @@ export default function ChatSidebar() {
         </div>
 
         <div className="h-full overflow-y-auto discord-scroll">
-          <ConversationsList userId={userId as string} />
+          <ConversationsList
+            userId={userId as string}
+            selectedFilter={selectedFilter}
+          />
         </div>
       </div>
 

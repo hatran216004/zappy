@@ -1,5 +1,4 @@
 import SelectableButton from '@/components/ContactBar/SelectableButton';
-import SearchBar from '@/components/SearchBar';
 import { BsPersonLinesFill } from 'react-icons/bs';
 import { HiMiniUserGroup } from 'react-icons/hi2';
 import { IoMdPersonAdd } from 'react-icons/io';
@@ -17,7 +16,6 @@ const sidebarButtons = [
 export default function FriendSidebar() {
   return (
     <div className="col-span-3 overflow-y-auto scrollbar-custom border-r">
-      <SearchBar />
       <div className="flex flex-col border-t">
         {sidebarButtons.map((link, index) => (
           <SelectableButton

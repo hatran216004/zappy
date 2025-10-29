@@ -639,6 +639,10 @@ export type Database = {
           reply_to_id: string | null
           sender_id: string
           type: Database["public"]["Enums"]["msg_type"]
+          location_latitude: number | null
+          location_longitude: number | null
+          location_address: string | null
+          location_display_mode: 'interactive' | 'static' | null
         }
         Insert: {
           content_text?: string | null
@@ -652,6 +656,10 @@ export type Database = {
           reply_to_id?: string | null
           sender_id: string
           type?: Database["public"]["Enums"]["msg_type"]
+          location_latitude?: number | null
+          location_longitude?: number | null
+          location_address?: string | null
+          location_display_mode?: 'interactive' | 'static' | null
         }
         Update: {
           content_text?: string | null
@@ -665,6 +673,10 @@ export type Database = {
           reply_to_id?: string | null
           sender_id?: string
           type?: Database["public"]["Enums"]["msg_type"]
+          location_latitude?: number | null
+          location_longitude?: number | null
+          location_address?: string | null
+          location_display_mode?: 'interactive' | 'static' | null
         }
         Relationships: [
           {

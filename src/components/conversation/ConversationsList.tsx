@@ -16,11 +16,13 @@ import { UserAvatar } from "../UserAvatar";
 interface ConversationsListProps {
   userId: string;
   selectedConversationId?: string;
+  selectedFilter?: string | null;
 }
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
   selectedConversationId,
+  selectedFilter = null,
 }) => {
   const navigate = useNavigate();
   const { data: conversations, isLoading } = useConversations(userId);
@@ -47,9 +49,30 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
     }
   };
 
+  // Filter friends based on label if selectedFilter is set
+  const filteredFriends = selectedFilter
+    ? friends?.filter((friend) => friend.label_id?.includes(selectedFilter))
+    : friends;
+
+  // Filter conversations based on label if selectedFilter is set
+  const filteredConversations = selectedFilter
+    ? conversations?.filter((conv) => {
+        // Only filter direct conversations (2 participants)
+        if (conv.participants.length !== 2) return true; // Keep group conversations
+        
+        // Find the other participant (not current user)
+        const otherParticipant = conv.participants.find((p) => p.user_id !== userId);
+        if (!otherParticipant) return false;
+        
+        // Check if that participant is a friend with the selected label
+        const friend = filteredFriends?.find((f) => f.id === otherParticipant.user_id);
+        return friend !== undefined;
+      })
+    : conversations;
+
   const friendsWithoutConversation =
-    friends?.filter((friend) => {
-      const hasConversation = conversations?.some((conv) => {
+    filteredFriends?.filter((friend) => {
+      const hasConversation = filteredConversations?.some((conv) => {
         if (conv.participants.length !== 2) return false;
         const hasFriend = conv.participants.some((p) => p.user_id === friend.id);
         const hasCurrentUser = conv.participants.some((p) => p.user_id === userId);
@@ -67,7 +90,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   }
 
   // Empty state: không có conversation và không có bạn bè
-  if (conversations?.length === 0 && friends?.length === 0) {
+  if (filteredConversations?.length === 0 && filteredFriends?.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]">
         <div className="mb-4 text-gray-400 dark:text-[#B5BAC1]">
@@ -85,9 +108,11 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
             />
           </svg>
         </div>
-        <p className="font-medium mb-2">Chưa có tin nhắn nào</p>
+        <p className="font-medium mb-2">
+          {selectedFilter ? 'Không có tin nhắn nào với nhãn này' : 'Chưa có tin nhắn nào'}
+        </p>
         <p className="text-sm text-gray-500 dark:text-[#B5BAC1]">
-          Hãy kết bạn để bắt đầu trò chuyện
+          {selectedFilter ? 'Hãy thử chọn nhãn khác' : 'Hãy kết bạn để bắt đầu trò chuyện'}
         </p>
       </div>
     );
@@ -96,9 +121,9 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   return (
     <div className="overflow-y-auto bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]">
       {/* Danh sách conversations */}
-      {conversations && conversations.length > 0 && (
+      {filteredConversations && filteredConversations.length > 0 && (
         <>
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <div
               key={conversation.id}
               className="
@@ -126,7 +151,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
       )}
 
       {/* Empty state cho conversations nếu chỉ có bạn bè */}
-      {conversations?.length === 0 && friendsWithoutConversation.length > 0 && (
+      {filteredConversations?.length === 0 && friendsWithoutConversation.length > 0 && (
         <div className="flex flex-col items-center justify-center p-6 text-center border-b border-gray-200 dark:border-[#2B2D31]">
           <div className="mb-3 text-gray-400 dark:text-[#B5BAC1]">
             <svg

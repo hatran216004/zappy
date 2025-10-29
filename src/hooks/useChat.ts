@@ -15,6 +15,7 @@ import {
   getOrCreateDirectConversation,
   sendTextMessage,
   sendFileMessage,
+  sendLocationMessage,
   editMessage,
   recallMessage,
   deleteMessageForMe,
@@ -287,6 +288,94 @@ export const useSendFileMessage = () => {
       type: 'image' | 'video' | 'file' | 'audio';
     }) => sendFileMessage(conversationId, senderId, file, type),
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(variables.conversationId)
+      });
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.conversations(variables.senderId)
+      });
+    }
+  });
+};
+
+// Hook send location message
+export const useSendLocationMessage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      senderId,
+      latitude,
+      longitude,
+      address,
+      displayMode
+    }: {
+      conversationId: string;
+      senderId: string;
+      latitude: number;
+      longitude: number;
+      address?: string;
+      displayMode?: 'interactive' | 'static';
+    }) => sendLocationMessage(conversationId, senderId, latitude, longitude, address, displayMode),
+    
+    // Optimistic update
+    onMutate: async ({ conversationId, senderId, latitude, longitude, address, displayMode }) => {
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.messages(conversationId)
+      });
+
+      const previousMessages = queryClient.getQueryData(
+        chatKeys.messages(conversationId)
+      );
+
+      queryClient.setQueryData(
+        chatKeys.messages(conversationId),
+        (old: any) => {
+          if (!old) return old;
+
+          const tempMessage = {
+            id: `temp-${Date.now()}`,
+            conversation_id: conversationId,
+            sender_id: senderId,
+            content_text: address || `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            type: 'text',
+            created_at: new Date().toISOString(),
+            location_latitude: latitude,
+            location_longitude: longitude,
+            location_address: address,
+            location_display_mode: displayMode || 'interactive',
+            recalled_at: null,
+            edited_at: null,
+            sender: { id: senderId, display_name: 'You', avatar_url: '' },
+            attachments: [],
+            reactions: [],
+            read_receipts: [],
+            reply_to: null
+          };
+
+          return {
+            ...old,
+            pages: old.pages.map((page: any[], index: number) =>
+              index === old.pages.length - 1 ? [...page, tempMessage] : page
+            )
+          };
+        }
+      );
+
+      return { previousMessages };
+    },
+
+    onError: (_err, variables, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          chatKeys.messages(variables.conversationId),
+          context.previousMessages
+        );
+      }
+    },
+
+    onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.messages(variables.conversationId)
       });

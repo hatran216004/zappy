@@ -1,14 +1,140 @@
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import AddFriendModal from './modal/AddFriendModal';
+import { useState, useRef, useEffect } from 'react';
+import { searchUsersByUsername, type SearchUserResult } from '@/services/friendServices';
+import useUser from '@/hooks/useUser';
+import { UserAvatar } from './UserAvatar';
+import { useNavigate } from 'react-router';
+import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
+import toast from 'react-hot-toast';
+import { useSendFriendRequest } from '@/hooks/useFriends';
 
 export default function SearchBar() {
+  const { user } = useUser();
+  const userId = user?.id as string;
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchUserResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  
+  const getOrCreateConversation = useGetOrCreateDirectConversation();
+  const sendFriendRequestMutation = useSendFriendRequest();
+
+  // Close results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Search with debounce
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    if (searchTerm.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    timeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchUsersByUsername(searchTerm.trim(), userId);
+        setSearchResults(results);
+        setShowResults(true);
+      } catch (error) {
+        console.error('Search error:', error);
+        toast.error('Lỗi khi tìm kiếm');
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [searchTerm, userId]);
+
+  const handleSendMessage = async (targetUserId: string) => {
+    try {
+      const conversationId = await getOrCreateConversation.mutateAsync({
+        currentUserId: userId,
+        otherUserId: targetUserId,
+      });
+      navigate(`/chat/${conversationId}`);
+      setSearchTerm('');
+      setShowResults(false);
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      toast.error('Không thể mở tin nhắn');
+    }
+  };
+
+  const handleAddFriend = async (targetUserId: string) => {
+    try {
+      await sendFriendRequestMutation.mutateAsync({ userId: targetUserId });
+      toast.success('Đã gửi lời mời kết bạn');
+      // Refresh search results
+      const results = await searchUsersByUsername(searchTerm.trim(), userId);
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+      toast.error('Không thể gửi lời mời kết bạn');
+    }
+  };
+
+  const getActionButton = (user: SearchUserResult) => {
+    if (user.isFriend) {
+      return (
+        <button
+          onClick={() => handleSendMessage(user.id)}
+          className="px-3 py-1.5 text-xs rounded-md bg-[#5865F2] text-white hover:bg-[#4752C4] transition"
+        >
+          Nhắn tin
+        </button>
+      );
+    }
+
+    if (user.friendRequestStatus === 'pending') {
+      return (
+        <span className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+          Đã gửi lời mời
+        </span>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => handleAddFriend(user.id)}
+        disabled={sendFriendRequestMutation.isPending}
+        className="px-3 py-1.5 text-xs rounded-md bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600 transition disabled:opacity-50"
+      >
+        Kết bạn
+      </button>
+    );
+  };
+
   return (
     <div
       className="
-        flex items-center gap-2 px-3 py-2
+        relative flex items-center gap-2 px-3 py-2
         bg-white text-gray-900
         dark:bg-[#2B2D31] dark:text-[#F2F3F5]
       "
+      ref={searchRef}
     >
       {/* Search input */}
       <div
@@ -23,10 +149,17 @@ export default function SearchBar() {
           transition-colors
         "
       >
-        <Search className="h-4 w-4 text-gray-400 dark:text-[#B5BAC1] shrink-0" />
+        {isSearching ? (
+          <Loader2 className="h-4 w-4 text-gray-400 dark:text-[#B5BAC1] shrink-0 animate-spin" />
+        ) : (
+          <Search className="h-4 w-4 text-gray-400 dark:text-[#B5BAC1] shrink-0" />
+        )}
         <input
           type="text"
-          placeholder="Tìm kiếm"
+          placeholder="Tìm kiếm người dùng..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onFocus={() => searchResults.length > 0 && setShowResults(true)}
           className="
             flex-1 bg-transparent text-sm leading-none
             placeholder:text-gray-500 dark:placeholder:text-[#B5BAC1]
@@ -39,6 +172,48 @@ export default function SearchBar() {
       <div className="flex items-center gap-2">
         <AddFriendModal />
       </div>
+
+      {/* Search Results Dropdown */}
+      {showResults && searchResults.length > 0 && (
+        <div className="absolute top-full left-3 right-3 mt-1 max-h-[400px] overflow-y-auto bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+          <div className="p-2 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+            Kết quả tìm kiếm ({searchResults.length})
+          </div>
+          {searchResults.map((result) => (
+            <div
+              key={result.id}
+              className="flex items-center gap-3 p-3 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            >
+              <UserAvatar
+                avatarUrl={result.avatar_url}
+                displayName={result.display_name}
+                status={result.status}
+                size="sm"
+                showStatus={true}
+                className="w-10 h-10"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {result.display_name}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  @{result.username}
+                </p>
+              </div>
+              {getActionButton(result)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* No results */}
+      {showResults && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching && (
+        <div className="absolute top-full left-3 right-3 mt-1 bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-6 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Không tìm thấy người dùng nào
+          </p>
+        </div>
+      )}
     </div>
   );
 }

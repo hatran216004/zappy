@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from '@/components/ui/button';
-import { Smile, Paperclip, Mic, Send, X } from 'lucide-react';
+import { Smile, Paperclip, Mic, Send, X, MapPin } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
@@ -14,6 +14,7 @@ type ChatFooterProps = {
   handleSendMessage: () => void;
   handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleEmojiSelect: (emoji: string) => void;
+  handleLocationClick: () => void;
   sendFileMutation: { isPending: boolean };
   sendTextMutation: { isPending: boolean };
 };
@@ -27,6 +28,7 @@ export default function ChatFooter({
   handleSendMessage,
   handleFileSelect,
   handleEmojiSelect,
+  handleLocationClick,
   sendFileMutation,
   sendTextMutation
 }: ChatFooterProps) {
@@ -163,6 +165,7 @@ export default function ChatFooter({
             <Button
               variant="ghost"
               size="sm"
+              type='button'
               onClick={cancelRecording}
               className="text-gray-600 dark:text-gray-300"
             >
@@ -245,6 +248,19 @@ export default function ChatFooter({
           disabled={sendTextMutation.isPending}
         >
           <Mic className="size-5 text-gray-500 dark:text-gray-300" />
+        </Button>
+
+        {/* ✅ Location Sharing */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+          type="button"
+          onClick={handleLocationClick}
+          disabled={sendTextMutation.isPending}
+          title="Chia sẻ vị trí"
+        >
+          <MapPin className="size-5 text-gray-500 dark:text-gray-300" />
         </Button>
 
         {/* Text input */}
