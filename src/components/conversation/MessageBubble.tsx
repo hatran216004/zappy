@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   useEditMessage,
   useRecallMessage,
+  useDeleteMessageForMe,
   useAddReaction,
   useRemoveReaction
 } from '@/hooks/useChat';
@@ -22,6 +23,7 @@ import { supabaseUrl } from '@/lib/supabase';
 import { ImageAttachment } from './ImageAttachment';
 import { AudioPlayer } from './AudioPlayer';
 import { useConfirm } from '../modal/ModalConfirm';
+import { EmojiPicker } from './EmojiPicker';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -77,6 +79,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
   const editMutation = useEditMessage();
   const recallMutation = useRecallMessage();
+  const deleteForMeMutation = useDeleteMessageForMe();
   const addReactionMutation = useAddReaction();
   const removeReactionMutation = useRemoveReaction();
 
@@ -127,6 +130,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
     }
   };
 
+  const handleDeleteForMe = async () => {
+    const confirmed = await confirm({
+      title: 'Xóa tin nhắn',
+      description: 'Xóa tin nhắn này chỉ ở phía bạn? Người khác vẫn có thể xem tin nhắn.',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+      destructive: true,
+      dismissible: true
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await deleteForMeMutation.mutateAsync({
+        messageId: message.id,
+        userId: currentUserId
+      });
+    } catch (error) {
+      console.error('Error deleting message for me:', error);
+    }
+  };
+
   const handleReaction = async (emoji: string) => {
     if (!message.reactions) return;
 
@@ -164,10 +189,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
       return acc;
     }, {} as Record<string, typeof message.reactions>) || {};
 
-  if (message.recalled_at) {
+  // Hiển thị "Tin nhắn đã được thu hồi" nếu tin nhắn bị recalled hoặc deleted_for_me
+  if (message.recalled_at || message.deleted_for_me) {
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-        <div className="max-w-[70%] px-4 py-2 rounded-lg bg-gray-100 text-gray-500 italic">
+        <div className="max-w-[70%] px-4 py-2 rounded-lg bg-gray-100 text-gray-500 italic dark:bg-[#2B2D31] dark:text-[#949BA4]">
           Tin nhắn đã được thu hồi
         </div>
       </div>
@@ -211,6 +237,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
               isOwn && 'flex-row-reverse'
             )}
           >
+            {/* Reaction picker button */}
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <EmojiPicker
+                onEmojiSelect={(emoji) => handleReaction(emoji)}
+                isOwn={isOwn}
+              />
+            </div>
+
             <div
               className={clsx(
                 'px-4 py-2 rounded-lg',
@@ -345,14 +379,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                     </DropdownMenuItem>
                   )}
 
-                  {isOwn && <DropdownMenuSeparator />}
+                  <DropdownMenuSeparator />
+
+                  {/* Delete options */}
+                  <DropdownMenuItem
+                    onClick={handleDeleteForMe}
+                    className="text-orange-600 focus:text-orange-700"
+                  >
+                    Xóa ở phía tôi
+                  </DropdownMenuItem>
 
                   {isOwn && (
                     <DropdownMenuItem
                       onClick={handleRecall}
                       className="text-red-600 focus:text-red-700"
                     >
-                      Thu hồi
+                      Thu hồi với mọi người
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>

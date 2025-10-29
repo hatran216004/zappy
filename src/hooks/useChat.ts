@@ -16,6 +16,7 @@ import {
   sendFileMessage,
   editMessage,
   recallMessage,
+  deleteMessageForMe,
   addReaction,
   removeReaction,
   markMessagesAsRead,
@@ -108,10 +109,10 @@ export const useConversationsRealtime = (userId: string) => {
 // ============================================
 
 // Hook lấy messages với infinite scroll
-export const useMessages = (conversationId: string) => {
+export const useMessages = (conversationId: string, currentUserId?: string) => {
   return useInfiniteQuery({
     queryKey: chatKeys.messages(conversationId),
-    queryFn: ({ pageParam }) => getMessages(conversationId, 50, pageParam),
+    queryFn: ({ pageParam }) => getMessages(conversationId, 50, pageParam, currentUserId),
     getNextPageParam: (lastPage) => {
       if (lastPage.length === 0) return undefined;
       return lastPage[0].created_at;
@@ -254,13 +255,78 @@ export const useEditMessage = () => {
   });
 };
 
-// Hook recall message
+// Hook recall message (delete for everyone)
 export const useRecallMessage = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (messageId: string) => recallMessage(messageId),
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.all
+      });
+    }
+  });
+};
+
+// Hook delete message for me only
+export const useDeleteMessageForMe = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ messageId, userId }: { messageId: string; userId: string }) =>
+      deleteMessageForMe(messageId, userId),
+    
+    // Optimistic update - update UI ngay lập tức
+    onMutate: async ({ messageId, userId }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.all
+      });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueriesData({
+        queryKey: chatKeys.all
+      });
+
+      // Optimistically update - thêm flag deleted_for_me
+      queryClient.setQueriesData(
+        { queryKey: chatKeys.all },
+        (old: any) => {
+          if (!old) return old;
+
+          // Nếu là messages query
+          if (old.pages) {
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) =>
+                  msg.id === messageId
+                    ? { ...msg, deleted_for_me: true }
+                    : msg
+                )
+              )
+            };
+          }
+
+          return old;
+        }
+      );
+
+      return { previousData };
+    },
+
+    // If mutation fails, rollback
+    onError: (_err, _variables, context) => {
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+
+    // Always refetch after error or success
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.all
       });

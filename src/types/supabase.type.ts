@@ -382,6 +382,39 @@ export type Database = {
           },
         ]
       }
+      deleted_messages: {
+        Row: {
+          message_id: string
+          user_id: string
+          deleted_at: string
+        }
+        Insert: {
+          message_id: string
+          user_id: string
+          deleted_at?: string
+        }
+        Update: {
+          message_id?: string
+          user_id?: string
+          deleted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deleted_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deleted_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string

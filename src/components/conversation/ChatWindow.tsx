@@ -49,7 +49,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
   const { data: conversation } = useConversation(conversationId);
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useMessages(conversationId);
+    useMessages(conversationId, userId);
   const sendTextMutation = useSendTextMessage();
   const sendFileMutation = useSendFileMessage();
   const editMessageMutation = useEditMessage();
