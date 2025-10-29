@@ -6,14 +6,23 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog';
 import { UserPlus } from 'lucide-react';
-import { TooltipBtn } from '../TooltipBtn';
 import { FriendSearch } from '../friends/FriendSearch';
 
 export default function AddFriendModal() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <TooltipBtn icon={UserPlus} label="Thêm bạn" tooltipSide="bottom" />
+        <button
+            type="button"
+            aria-label="Thêm bạn"
+            className="
+              discord-icon-btn
+              text-gray-600 hover:text-gray-900
+              dark:text-[#B5BAC1] dark:hover:text-white
+            "
+          >
+            <UserPlus className="w-5 h-5" />
+          </button>
       </DialogTrigger>
 
       <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">

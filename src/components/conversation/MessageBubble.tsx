@@ -24,6 +24,7 @@ import { ImageAttachment } from './ImageAttachment';
 import { AudioPlayer } from './AudioPlayer';
 import { useConfirm } from '../modal/ModalConfirm';
 import { EmojiPicker } from './EmojiPicker';
+import { UserAvatar } from '../UserAvatar';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -189,6 +190,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
       return acc;
     }, {} as Record<string, typeof message.reactions>) || {};
 
+  // Hiển thị system message (thành viên được thêm/xóa, rời nhóm, etc.)
+  if (message.type === 'system') {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="px-4 py-2 rounded-full bg-gray-100 text-gray-600 text-sm dark:bg-[#2B2D31] dark:text-[#949BA4]">
+          {message.content_text}
+        </div>
+      </div>
+    );
+  }
+
   // Hiển thị "Tin nhắn đã được thu hồi" nếu tin nhắn bị recalled hoặc deleted_for_me
   if (message.recalled_at || message.deleted_for_me) {
     return (
@@ -207,10 +219,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
       >
         {/* Avatar */}
         {showAvatar && !isOwn && message?.sender && (
-          <img
-            src={`${supabaseUrl}/${message.sender.avatar_url}`}
-            alt={message.sender.display_name}
-            className="w-8 h-8 rounded-full object-cover"
+          <UserAvatar
+            avatarUrl={message.sender.avatar_url}
+            displayName={message.sender.display_name}
+            size="sm"
+            showStatus={false}
           />
         )}
         {!showAvatar && !isOwn && <div className="w-8" />}
