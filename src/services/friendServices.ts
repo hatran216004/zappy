@@ -102,6 +102,33 @@ export const acceptFriendRequest = async (
   });
 
   if (error) throw error;
+
+  // Đảm bảo tạo bạn bè hai chiều A <-> B (phòng khi RPC chỉ tạo một chiều)
+  try {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    const me = currentUser?.id as string;
+    if (!me) return;
+
+    // Chèn hai chiều, bỏ qua nếu đã tồn tại
+    // Một số DB có unique constraint, ta chấp nhận lỗi duplicate và bỏ qua
+    const inserts = [
+      { user_id: me, friend_id: fromUserId },
+      { user_id: fromUserId, friend_id: me }
+    ];
+
+    for (const row of inserts) {
+      const { error: insErr } = await supabase
+        .from('friends')
+        .insert(row);
+      if (insErr && insErr.code !== '23505') {
+        // 23505 = unique_violation, coi như đã tồn tại -> bỏ qua
+        // Các lỗi khác mới log để theo dõi
+        console.warn('Ensure mutual friendship insert error:', insErr);
+      }
+    }
+  } catch (e) {
+    console.warn('Ensure mutual friendship failed:', e);
+  }
 };
 
 // Từ chối lời mời kết bạn

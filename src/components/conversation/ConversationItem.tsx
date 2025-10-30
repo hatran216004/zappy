@@ -8,6 +8,7 @@ import { ConversationWithDetails } from "@/services/chatService";
 import { Link, useParams } from "react-router";
 import { UserAvatar } from "../UserAvatar";
 import { supabaseUrl } from "@/lib/supabase";
+import { useUserStatus, useUserStatusRealtime } from "@/hooks/usePresence";
 
 interface ConversationItemProps {
   conversation: ConversationWithDetails;
@@ -30,6 +31,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const displayName = isGroupChat
     ? conversation.title
     : otherParticipant?.profile.display_name;
+
+  // Realtime status cho đối phương (chỉ relevant với direct chat)
+  const otherId = !isGroupChat ? otherParticipant?.user_id || "" : "";
+  const { data: otherStatus } = useUserStatus(otherId);
+  useUserStatusRealtime(otherId);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -55,14 +61,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (!conversation.last_message) return "Chưa có tin nhắn";
 
     const msg = conversation.last_message;
-    const senderName =
-      msg.sender_id === userId ? "Bạn" : otherParticipant?.profile.display_name;
+    const senderProfile = conversation.participants.find((p) => p.user_id === msg.sender_id)?.profile;
+    const senderName = msg.sender_id === userId ? "Bạn" : (senderProfile?.display_name || otherParticipant?.profile.display_name);
 
     if (msg.recalled_at) return `${senderName}: Tin nhắn đã thu hồi`;
 
     switch (msg.type) {
-      case "text":
-        return `${senderName}: ${msg.content_text}`;
+      case "text": {
+        const content = msg.content_text || '';
+        return `${senderName}: ${content}`;
+      }
       case "image":
         return `${senderName}: Đã gửi ảnh`;
       case "video":
@@ -109,7 +117,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         <UserAvatar
           avatarUrl={otherParticipant?.profile?.avatar_url}
           displayName={otherParticipant?.profile?.display_name}
-          status={otherParticipant?.profile?.status}
+          status={otherStatus?.status || otherParticipant?.profile?.status}
           showStatus={true}
         />
       )}

@@ -1,13 +1,8 @@
 import {
-  BellOff,
-  Pin,
-  UserPlus,
-  Settings,
   Users,
   Clock,
   FileText,
   AlertTriangle,
-  Trash2,
   LogOut,
   Sun,
   Moon
@@ -46,12 +41,27 @@ export default function ConversationListPane() {
     if (typeof document !== 'undefined') return document.documentElement.classList.contains('dark');
     return true;
   });
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem('pane_collapsed');
+      return v === '1';
+    } catch { return false; }
+  });
 
   // Theme toggle (UI-only, no app logic changed)
   const toggleTheme = () => {
     if (typeof document === 'undefined') return;
     document.documentElement.classList.toggle('dark');
     setIsDark(document.documentElement.classList.contains('dark'));
+  };
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('pane_collapsed', next ? '1' : '0'); } catch {}
+      try { window.dispatchEvent(new CustomEvent('pane-collapsed-changed', { detail: next })); } catch {}
+      return next;
+    });
   };
 
   // Fetch signed URLs for media (unchanged logic)
@@ -155,32 +165,46 @@ export default function ConversationListPane() {
 
   if (!conversationId) {
     return (
-      <div className="flex flex-col border-l border-gray-200 bg-white dark:border-[#2B2D31] dark:bg-[#2B2D31]">
+      <div className={twMerge("flex flex-col border-l border-gray-200 bg-white dark:border-[#2B2D31] dark:bg-[#2B2D31]", collapsed ? "w-[44px]" : "w-[320px]") }>
         <div className="p-4 border-b border-gray-200 dark:border-[#3F4246] sticky top-0 bg-white dark:bg-[#2B2D31] z-10 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800 dark:text-[#F2F3F5]">Thông tin cuộc trò chuyện</h2>
-          <button
-            onClick={toggleTheme}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm border border-gray-200 hover:bg-gray-50 active:scale-[.98] transition dark:border-[#3F4246] dark:hover:bg-[#313338] dark:text-[#DCDDDE]"
-            aria-label="Toggle theme"
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            <span className="hidden sm:inline">{isDark ? 'Light' : 'Dark'}</span>
-          </button>
+          {collapsed ? (
+            <button onClick={toggleCollapsed} className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-[#313338]" title="Mở bảng thông tin" type="button">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6l6 6-6 6"/></svg>
+            </button>
+          ) : (
+            <>
+              <h2 className="font-semibold text-gray-800 dark:text-[#F2F3F5]">Thông tin cuộc trò chuyện</h2>
+              <div className="flex items-center gap-2">
+                <button onClick={toggleCollapsed} className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-[#313338]" title="Thu gọn" type="button">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M14 18l-6-6 6-6"/></svg>
+                </button>
+                <button
+                  onClick={toggleTheme}
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm border border-gray-200 hover:bg-gray-50 active:scale-[.98] transition dark:border-[#3F4246] dark:hover:bg-[#313338] dark:text-[#DCDDDE]"
+                  aria-label="Toggle theme"
+                  type="button"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{isDark ? 'Light' : 'Dark'}</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
-        <div className="flex-1 flex items-center justify-center p-8 text-center">
-          <p className="text-gray-500 dark:text-[#B5BAC1]">Chọn một cuộc trò chuyện để xem thông tin</p>
-        </div>
+        {!collapsed && (
+          <div className="flex-1 flex items-center justify-center p-8 text-center">
+            <p className="text-gray-500 dark:text-[#B5BAC1]">Chọn một cuộc trò chuyện để xem thông tin</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div
-      className="
-        flex flex-col border-l border-gray-200 bg-white
-        dark:border-[#2B2D31] dark:bg-[#2B2D31]
-      "
-    >
+    <div className={twMerge(
+      "flex flex-col border-l border-gray-200 bg-white dark:border-[#2B2D31] dark:bg-[#2B2D31]",
+      collapsed ? "w-[44px]" : "w-[320px]"
+    )}>
       {/* Header sticky */}
       <div
         className="
@@ -190,17 +214,29 @@ export default function ConversationListPane() {
           flex items-center justify-between
         "
       >
-        <div className="min-w-0">
-          <h2 className="truncate font-semibold text-gray-800 dark:text-[#F2F3F5]">
-            {conversation?.type === 'direct' ? 'Thông tin cuộc trò chuyện' : 'Thông tin nhóm'}
-          </h2>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-[#B5BAC1] truncate">
-            {conversation?.type === 'direct' ? 'Direct message' : 'Group details'}
-          </p>
-        </div>
+        {collapsed ? (
+          <button onClick={toggleCollapsed} className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-[#313338]" title="Mở bảng thông tin" type="button">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6l6 6-6 6"/></svg>
+          </button>
+        ) : (
+          <>
+            <div className="min-w-0">
+              <h2 className="truncate font-semibold text-gray-800 dark:text-[#F2F3F5]">
+                {conversation?.type === 'direct' ? 'Thông tin cuộc trò chuyện' : 'Thông tin nhóm'}
+              </h2>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-[#B5BAC1] truncate">
+                {conversation?.type === 'direct' ? 'Direct message' : 'Group details'}
+              </p>
+            </div>
+            <button onClick={toggleCollapsed} className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-[#313338]" title="Thu gọn" type="button">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M14 18l-6-6 6-6"/></svg>
+            </button>
+          </>
+        )}
       </div>
 
-      <div className="h-[calc(100vh-59px)] overflow-y-auto discord-scroll">
+      {!collapsed && (
+        <div className="h-[calc(100vh-59px)] overflow-y-auto discord-scroll">
         {/* Avatar & quick actions */}
         <div
           className="
@@ -320,7 +356,8 @@ export default function ConversationListPane() {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

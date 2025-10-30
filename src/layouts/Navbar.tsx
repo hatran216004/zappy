@@ -35,6 +35,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { twMerge } from "tailwind-merge";
 import { avatarVariants } from "@/lib/variants";
+import { useUserStatusTracker } from "@/hooks/useUserStatusTracker";
+import { useUserStatus, useUserStatusRealtime } from "@/hooks/usePresence";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -48,6 +50,11 @@ export default function Navbar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { data: profile } = useProfile(userId as string);
+  const { data: statusProfile, isOnline } = useUserStatus(userId || "");
+  useUserStatusRealtime(userId || "");
+
+  // Tracker: set online khi mount, heartbeat định kỳ, set offline khi unload
+  useUserStatusTracker({ userId: userId || "" });
 
   // Debug: Log profile status
   useEffect(() => {
@@ -147,15 +154,15 @@ export default function Navbar() {
                   </AvatarFallback>
                 </Avatar>
                 {/* Status indicator (viền ăn theo màu rail) */}
-                {profile?.status && (
+                {(statusProfile?.status || profile?.status) && (
                   <span
                     className={twMerge(
                       "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#1E1F22]",
-                      profile.status === "online"
+                      (statusProfile?.status || profile?.status) === "online"
                         ? "bg-[#23A55A]"
                         : "bg-[#3F4246]"
                     )}
-                    title={profile.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                    title={(statusProfile?.status || profile?.status) === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
                   />
                 )}
               </button>
@@ -187,14 +194,9 @@ export default function Navbar() {
                       {user?.email}
                     </p>
                     <div className="flex items-center gap-2 pt-1">
-                      <span
-                        className={twMerge(
-                          "w-2 h-2 rounded-full",
-                          profile?.status === "online" ? "bg-[#23A55A]" : "bg-[#3F4246]"
-                        )}
-                      />
+                      <span className={twMerge("w-2 h-2 rounded-full", (statusProfile?.status || profile?.status) === "online" ? "bg-[#23A55A]" : "bg-[#3F4246]")}/>
                       <span className="text-xs text-[#B5BAC1]">
-                        {profile?.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                        {(statusProfile?.status || profile?.status) === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
                       </span>
                     </div>
                   </div>
@@ -319,7 +321,7 @@ export default function Navbar() {
             />
           </ItemWrap>
 
-          <ItemWrap active={false}>
+          {/* <ItemWrap active={false}>
             <TooltipBtn
               icon={Cloud}
               label="Cloud"
@@ -341,7 +343,7 @@ export default function Navbar() {
               label="Cài đặt"
               className="relative z-[1] text-[#B5BAC1] hover:text-white !rounded-2xl w-10 h-10 flex items-center justify-center"
             />
-          </ItemWrap>
+          </ItemWrap> */}
 
           {/* Khoảng cách đáy */}
           <div className="h-1" />

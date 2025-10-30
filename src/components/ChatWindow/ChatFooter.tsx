@@ -17,6 +17,8 @@ type ChatFooterProps = {
   handleLocationClick: () => void;
   sendFileMutation: { isPending: boolean };
   sendTextMutation: { isPending: boolean };
+  participants?: { id: string; name: string; avatar_url?: string }[];
+  onMentionSelected?: (userId: string) => void;
 };
 
 export default function ChatFooter({
@@ -30,16 +32,22 @@ export default function ChatFooter({
   handleEmojiSelect,
   handleLocationClick,
   sendFileMutation,
-  sendTextMutation
+  sendTextMutation,
+  participants,
+  onMentionSelected
 }: ChatFooterProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const mentionRef = useRef<HTMLDivElement>(null);
 
   const canSend = !!messageText&& !sendTextMutation.isPending;  
 
@@ -52,6 +60,12 @@ export default function ChatFooter({
       ) {
         setShowEmojiPicker(false);
       }
+      if (
+        mentionRef.current &&
+        !mentionRef.current.contains(event.target as Node)
+      ) {
+        setShowMentionList(false);
+      }
     };
 
     if (showEmojiPicker) {
@@ -62,6 +76,59 @@ export default function ChatFooter({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showEmojiPicker]);
+
+  // Detect @ mention typing
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const value = messageText;
+    const caret = el.selectionStart ?? value.length;
+    const slice = value.slice(0, caret);
+    const atIndex = slice.lastIndexOf('@');
+    if (atIndex >= 0) {
+      const afterAt = slice.slice(atIndex + 1);
+      const match = afterAt.match(/^[\w\s\p{L}.-]*$/u);
+      if (match) {
+        setMentionStart(atIndex);
+        setMentionQuery(afterAt.trim());
+        setShowMentionList(true);
+        return;
+      }
+    }
+    setShowMentionList(false);
+    setMentionStart(null);
+    setMentionQuery('');
+  }, [messageText, inputRef]);
+
+  const filteredParticipants = (participants || []).filter((p) =>
+    p.name.toLowerCase().includes(mentionQuery.toLowerCase())
+  );
+
+  const insertMention = (p: { id: string; name: string }) => {
+    const el = inputRef.current;
+    if (!el || mentionStart === null) return;
+    const before = messageText.slice(0, mentionStart);
+    const afterCaret = el.selectionStart ?? messageText.length;
+    const slice = messageText.slice(0, afterCaret);
+    const atIndex = slice.lastIndexOf('@');
+    const after = messageText.slice(afterCaret);
+    const inserted = `${before}@${p.name} ` + after;
+    // Manually set value using the provided handler
+    const event = { target: { value: inserted } } as unknown as React.ChangeEvent<HTMLTextAreaElement>;
+    handleInputChange(event);
+    setShowMentionList(false);
+    setMentionQuery('');
+    setMentionStart(null);
+    onMentionSelected && onMentionSelected(p.id);
+    // Restore focus and move caret to after inserted mention
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        const newPos = (before + `@${p.name} `).length;
+        inputRef.current.selectionStart = inputRef.current.selectionEnd = newPos;
+        inputRef.current.focus();
+      }
+    });
+  };
 
   // ✅ Voice Recording
   const startRecording = async () => {
@@ -274,6 +341,31 @@ export default function ChatFooter({
           className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32 resize-none"
           style={{ minHeight: '40px' }}
         />
+
+        {/* Mention list */}
+        {showMentionList && filteredParticipants.length > 0 && (
+          <div ref={mentionRef} className="absolute bottom-14 left-16 z-50 w-72 max-h-64 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+            {filteredParticipants.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                onClick={() => insertMention(p)}
+              >
+                <img
+                  src={p.avatar_url || '/default_user.jpg'}
+                  className="w-6 h-6 rounded-full object-cover"
+                  alt={p.name}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/default_user.jpg';
+                  }}
+                />
+                <span className="truncate">@{p.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Send button */}
         <Button

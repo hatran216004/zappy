@@ -194,16 +194,18 @@ export const useSendTextMessage = () => {
       conversationId,
       senderId,
       content,
-      replyToId
+      replyToId,
+      mentionedUserIds
     }: {
       conversationId: string;
       senderId: string;
       content: string;
       replyToId?: string;
-    }) => sendTextMessage(conversationId, senderId, content, replyToId),
+      mentionedUserIds?: string[];
+    }) => sendTextMessage(conversationId, senderId, content, replyToId, mentionedUserIds),
 
     // Optimistic update - thêm message ngay lập tức
-    onMutate: async ({ conversationId, senderId, content, replyToId }) => {
+    onMutate: async ({ conversationId, senderId, content, replyToId, mentionedUserIds }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({
         queryKey: chatKeys.messages(conversationId)
@@ -234,6 +236,7 @@ export const useSendTextMessage = () => {
             attachments: [],
             reactions: [],
             read_receipts: [],
+            mentions: (mentionedUserIds || []).map((uid) => ({ mentioned_user_id: uid })),
             reply_to: null
           };
 

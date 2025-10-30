@@ -38,6 +38,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [imageToSend, setImageToSend] = useState<File | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -259,10 +260,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           conversationId,
           senderId: userId,
           content: messageText.trim(),
-          replyToId: replyTo || undefined
+          replyToId: replyTo || undefined,
+          mentionedUserIds: mentionedUserIds.length ? mentionedUserIds : undefined
         });
         
         setReplyTo(null);
+        setMentionedUserIds([]);
       }
       
       inputRef.current?.focus();
@@ -645,6 +648,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         handleLocationClick={handleLocationClick}
         sendFileMutation={sendFileMutation}
         sendTextMutation={sendTextMutation}
+        participants={
+          conversation?.participants?.map((p) => ({
+            id: p.user_id,
+            name: p.profile.display_name,
+            avatar_url: p.profile.avatar_url
+          })) || []
+        }
+        onMentionSelected={(userId) => {
+          setMentionedUserIds((prev) =>
+            prev.includes(userId) ? prev : [...prev, userId]
+          );
+        }}
       />
 
       {/* Image Preview Modal */}
