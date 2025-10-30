@@ -1,4 +1,4 @@
-import { useUserStatus, useUserStatusRealtime } from "@/hooks/useUserStatus";
+import { useUserStatus, useUserStatusRealtime } from "@/hooks/usePresence";
 import { cn } from "@/lib/utils";
 
 interface UserStatusBadgeProps {

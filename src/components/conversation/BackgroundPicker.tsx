@@ -183,9 +183,9 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
                         <Check className="h-6 w-6 text-white drop-shadow-lg" />
                       </div>
                     )}
-                    <div className="absolute -bottom-6 left-0 right-0 text-center">
+                    {/* <div className="absolute -bottom-6 left-0 right-0 text-center">
                       <span className="text-xs text-gray-600">{color.name}</span>
-                    </div>
+                    </div> */}
                   </button>
                 ))}
               </div>
@@ -213,9 +213,9 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
                         <Check className="h-6 w-6 text-white drop-shadow-lg" />
                       </div>
                     )}
-                    <div className="absolute -bottom-6 left-0 right-0 text-center">
+                    {/* <div className="absolute -bottom-6 left-0 right-0 text-center">
                       <span className="text-xs text-gray-600">{gradient.name}</span>
-                    </div>
+                    </div> */}
                   </button>
                 ))}
               </div>

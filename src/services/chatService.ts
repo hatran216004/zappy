@@ -42,6 +42,10 @@ export interface MessageWithDetails extends Message {
   reply_to?: Message;
   read_receipts: ReadReceipt[];
   deleted_for_me?: boolean; // Flag để hiển thị tin nhắn đã xóa ở phía user
+  mentions?: {
+    mentioned_user_id: string;
+    user?: Database['public']['Tables']['profiles']['Row'];
+  }[];
 }
 
 // ============================================
@@ -291,6 +295,10 @@ export const getMessages = async (
       location_longitude,
       location_address,
       location_display_mode,
+      mentions:message_mentions(
+        mentioned_user_id,
+        user:profiles!message_mentions_mentioned_user_id_fkey(*)
+      ),
       sender:profiles!messages_sender_id_fkey(*),
       attachments(*)
     `
@@ -395,7 +403,8 @@ export const sendTextMessage = async (
   conversationId: string,
   senderId: string,
   content: string,
-  replyToId?: string
+  replyToId?: string,
+  mentionedUserIds?: string[]
 ): Promise<Message> => {
   const { data, error } = await supabase
     .from('messages')
@@ -410,6 +419,18 @@ export const sendTextMessage = async (
     .single();
 
   if (error) throw error;
+
+  // Insert mentions if any
+  if (mentionedUserIds && mentionedUserIds.length > 0) {
+    const rows = mentionedUserIds.map((uid) => ({
+      message_id: data.id,
+      mentioned_user_id: uid
+    }));
+    const { error: mentionErr } = await supabase
+      .from('message_mentions')
+      .insert(rows);
+    if (mentionErr) console.error('Insert mentions error:', mentionErr);
+  }
 
   // Update conversation's last_message_id and updated_at
   await supabase

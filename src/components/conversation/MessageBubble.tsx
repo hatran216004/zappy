@@ -37,8 +37,12 @@ interface MessageBubbleProps {
   currentUserId: string;
 }
 
-// Helper function to detect and linkify URLs
-const linkifyText = (text: string, isOwn: boolean) => {
+// Helper function to detect and linkify URLs and render mentions with avatar+name
+const linkifyText = (
+  text: string,
+  isOwn: boolean,
+  mentions?: { mentioned_user_id: string; user?: { display_name?: string; avatar_url?: string } }[]
+) => {
   // URL regex pattern
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
@@ -61,7 +65,42 @@ const linkifyText = (text: string, isOwn: boolean) => {
         </a>
       );
     }
-    return <span key={index}>{part}</span>;
+    // Render mentions by replacing @Display Name exactly as in mentions list
+    let nodes: React.ReactNode[] = [part];
+    (mentions || []).forEach((m, mi) => {
+      const name = m.user?.display_name;
+      if (!name) return;
+      const token = `@${name}`;
+      const nextNodes: React.ReactNode[] = [];
+      nodes.forEach((node, ni) => {
+        if (typeof node !== 'string') {
+          nextNodes.push(node);
+          return;
+        }
+        const segments = node.split(token);
+        segments.forEach((seg, si) => {
+          if (si > 0) {
+            nextNodes.push(
+              <span key={`m-${index}-${mi}-${ni}-${si}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-blue-700 align-middle">
+                <img
+                  src={m.user?.avatar_url || '/default_user.jpg'}
+                  className="w-4 h-4 rounded-full object-cover"
+                  alt={name}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/default_user.jpg';
+                  }}
+                />
+                <span className={clsx('text-xs font-medium', isOwn ? 'text-blue-100' : 'text-blue-700')}>@{name}</span>
+              </span>
+            );
+          }
+          if (seg) nextNodes.push(seg);
+        });
+      });
+      nodes = nextNodes;
+    });
+    return <span key={index}>{nodes}</span>;
   });
 };
 
@@ -261,7 +300,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
             <div
               className={clsx(
-                'px-4 py-2 rounded-lg',
+                'rounded-lg',
+                !(Boolean(message.location_latitude && message.location_longitude) || Boolean(message?.attachments?.some((a) => a.kind === 'image'))) && 'px-4 py-2',
                 isOwn ? 'bg-primary text-white' : 'bg-gray-200 text-gray-900'
               )}
             >
@@ -303,13 +343,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
                   {message.content_text && !message.location_latitude && (
                     <p className="break-words whitespace-pre-wrap">
-                      {linkifyText(message.content_text, isOwn)}
+                      {linkifyText(message.content_text, isOwn, message.mentions)}
                     </p>
                   )}
 
                   {/* Attachments */}
                   {message?.attachments?.map((attachment, index) => (
-                    <div key={attachment.id} className="mt-2">
+                    <div
+                      key={attachment.id}
+                      className={clsx(
+                        // Không thêm khoảng đệm/margin đối với ảnh
+                        attachment.kind === 'image' ? '' : 'mt-2'
+                      )}
+                    >
                       {attachment.kind === 'image' && attachmentUrls[index] && (
                         <ImageAttachment
                           src={attachmentUrls[index]}

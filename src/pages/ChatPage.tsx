@@ -10,9 +10,9 @@ function ChatPage() {
   const selectedConversationId = params.conversationId;
 
   return (
-    <div className="grid grid-cols-12 h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-[#313338]">
       {/* Main Chat Area */}
-      <div className="col-span-8 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {selectedConversationId ? (
           <ChatWindow userId={currentUserId} />
         ) : (
@@ -43,7 +43,7 @@ function ChatPage() {
           </div>
         )}
       </div>
-      <div className="col-span-4">
+      <div className="shrink-0">
         <ConversationListPane />
       </div>
     </div>

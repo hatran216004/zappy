@@ -41,7 +41,7 @@ export function TooltipBtn({
                 'p-2 rounded-full bg-transparent relative',
                 isActive
                   ? 'bg-gray-600/50 text-white hover:bg-blue-600'
-                  : 'text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700',
+                  : 'text-black dark:text-white hover:bg-primary/60 dark:hover:bg-gray-700',
                 className
               )
             )}

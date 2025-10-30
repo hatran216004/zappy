@@ -72,13 +72,19 @@ export const FriendSearch = () => {
 
     if (user.friendRequestStatus === 'pending') {
       return (
-        <button
-          onClick={() => handleCancelRequest(user.id)}
-          disabled={cancelRequestMutation.isPending}
-          className="px-3 py-1 text-sm text-blue-600 border border-blue-400 bg-white rounded-full hover:bg-blue-50 disabled:opacity-50"
-        >
-          Hủy lời mời
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full">
+            Đã gửi lời mời
+          </span>
+          <button
+            onClick={() => handleCancelRequest(user.id)}
+            disabled={cancelRequestMutation.isPending}
+            className="px-2 py-1 text-xs text-blue-600 border border-blue-400 bg-white rounded-full hover:bg-blue-50 disabled:opacity-50"
+            type="button"
+          >
+            Hủy
+          </button>
+        </div>
       );
     }
 
