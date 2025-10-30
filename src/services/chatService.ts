@@ -287,6 +287,10 @@ export const getMessages = async (
       edited_at,
       fts,
       location,
+      location_latitude,
+      location_longitude,
+      location_address,
+      location_display_mode,
       sender:profiles!messages_sender_id_fkey(*),
       attachments(*)
     `
