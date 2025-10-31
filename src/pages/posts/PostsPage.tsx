@@ -1,129 +1,95 @@
-import { useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  ListFilter,
   Search,
-  Sun,
-  Moon,
   ThumbsUp,
   MessageSquare,
-  Share2,
   MoreHorizontal,
+  Home,
+  Users,
   Bookmark,
-  Flame,
-  Tag,
+  Clock,
+  TrendingUp,
+  Settings,
+  Link as LinkIcon,
+  Calendar,
+  Video,
+  Sparkles,
+  Image as ImageIcon,
+  X,
+  Edit,
+  Trash2,
 } from "lucide-react";
+import { useAuth } from "@/stores/user";
+import { useProfile } from "@/hooks/useProfile";
+import { useFriends } from "@/hooks/useFriends";
+import { useConversations } from "@/hooks/useChat";
+import { useUserStatus } from "@/hooks/usePresence";
+import { useConfirm } from "@/components/modal/ModalConfirm";
+import {
+  usePostsByFriends,
+  useCreatePost,
+  useAddPostReaction,
+  useRemovePostReaction,
+  usePostReactions,
+  usePostComments,
+  useAddPostComment,
+  useUpdatePost,
+  useDeletePost,
+  uploadPostImage,
+} from "@/hooks/usePosts";
+import type { Post, PostReactionType } from "@/services/postService";
+import { supabaseUrl } from "@/lib/supabase";
 
-//
-// Discord-inspired Posts page
-// - shadcn/ui + TailwindCSS
-// - Light/Dark theme toggle via next-themes
-// - Responsive toolbar, tabs, filters
-// - Post cards with actions
-// - Skeleton loading + empty states
-//
-
-// --- Mock data (replace with your API calls) -------------------------------
-export type Post = {
-  id: string;
-  title: string;
-  excerpt: string;
-  author: { name: string; avatar?: string };
-  createdAt: string; // ISO
-  tags: string[];
-  likes: number;
-  comments: number;
-  saved?: boolean;
-  trendingScore?: number;
-  image?: string; // <-- added
+const REACTION_EMOJIS: Record<PostReactionType, string> = {
+  like: "👍",
+  love: "❤️",
+  haha: "😂",
+  wow: "😮",
+  sad: "😢",
+  angry: "😠",
 };
 
-const MOCK_POSTS: Post[] = [
-  {
-    id: "1",
-    title: "Giữ lối đi trong bếp rõ ràng – 7 mẹo nhỏ cho căn hộ 70m²",
-    excerpt:
-      "Quy hoạch lối đi 900–1200mm giúp di chuyển thoải mái, hạn chế va chạm khi nấu nướng. Đây là checklist nhanh để tối ưu không gian.",
-    author: { name: "LU Design" },
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    tags: ["Kitchen", "Tips", "Apartment"],
-    likes: 124,
-    comments: 12,
-    saved: true,
-    trendingScore: 0.82,
-    image:
-      "https://images.unsplash.com/photo-1505691938895-1758d7feb511?q=80&w=1600&auto=format&fit=crop", // kitchen aisle
-  },
-  {
-    id: "2",
-    title: "Kệ bếp I hay L cho căn hộ nhỏ? Nguyên tắc chọn trong 30s",
-    excerpt:
-      "Nếu chiều ngang <2.4m, ưu tiên kệ I để tối ưu lối đi; từ 2.4–3.2m, kệ L giúp thêm mặt bàn và vùng chuẩn bị.",
-    author: { name: "Planner Nhi" },
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    tags: ["Layout", "Kitchen"],
-    likes: 88,
-    comments: 9,
-    trendingScore: 0.67,
-    image:
-      "https://images.unsplash.com/photo-1616597098430-5d6c1be0c8a0?q=80&w=1600&auto=format&fit=crop", // kitchen layout
-  },
-  {
-    id: "3",
-    title: "Tối ưu ánh sáng: 3 lớp – nền, điểm, nhấn",
-    excerpt:
-      "Phối hợp downlight (ambient), strip LED (task) và spot (accent) để tạo chiều sâu mà vẫn tiết kiệm điện.",
-    author: { name: "KTS Minh" },
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    tags: ["Lighting", "Wabi-sabi"],
-    likes: 231,
-    comments: 31,
-    trendingScore: 0.91,
-    image:
-      "https://images.unsplash.com/photo-1505691723518-36a5ac3b2d52?q=80&w=1600&auto=format&fit=crop", // lighting
-  },
-];
+const REACTION_COLORS: Record<PostReactionType, string> = {
+  like: "bg-blue-500",
+  love: "bg-red-500",
+  haha: "bg-yellow-500",
+  wow: "bg-purple-500",
+  sad: "bg-blue-400",
+  angry: "bg-red-600",
+};
 
-// --- Toolbar ---------------------------------------------------------------
+
 function Toolbar({
   onSearch,
-  onSortChange,
 }: {
   onSearch: (q: string) => void;
-  onSortChange: (s: SortKey) => void;
 }) {
   const [q, setQ] = useState("");
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2 w-full sm:w-[480px]">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-60" />
+      <div className="flex items-center gap-2 flex-1">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search posts, tags, authors…"
-            className="pl-9"
+            placeholder="Tìm kiếm bài viết..."
+            className="pl-10 bg-white dark:bg-[#242526] border-gray-300 dark:border-gray-600"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
@@ -131,298 +97,1139 @@ function Toolbar({
             }}
           />
         </div>
-        <Button variant="secondary" onClick={() => onSearch(q.trim())}>
-          Search
-        </Button>
       </div>
 
+    </div>
+  );
+}
+
+
+function EditPostDialog({
+  post,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  post: Post;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (content: string, imageUrl?: string | null) => Promise<void>;
+}) {
+  const [content, setContent] = useState(post.content || "");
+  const [imagePreview, setImagePreview] = useState<string | null>(post.image_url || null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const updatePostMutation = useUpdatePost();
+
+  useEffect(() => {
+    if (open) {
+      setContent(post.content || "");
+      setImagePreview(post.image_url || null);
+      setImageFile(null);
+    }
+  }, [open, post]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!content.trim() && !imagePreview) return;
+
+    try {
+      let imageUrl = post.image_url;
+      if (imageFile) {
+        try {
+          imageUrl = await uploadPostImage(imageFile);
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          alert("Không thể upload ảnh. Vui lòng thử lại.");
+          return;
+        }
+      }
+      await onSave(content.trim(), imageUrl);
+    } catch (error) {
+      console.error("Error updating post:", error);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Chỉnh sửa bài viết</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Textarea
+            placeholder="Bạn đang nghĩ gì?"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="min-h-[150px] resize-none bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+          />
+          {imagePreview && (
+            <div className="relative">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full rounded-lg max-h-96 object-cover"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70 text-white"
+                onClick={() => {
+                  setImagePreview(null);
+                  setImageFile(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+        </Button>
+      </div>
+          )}
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                className="text-gray-600 dark:text-gray-400"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-5 w-5 mr-2" />
+                {imagePreview ? "Thay đổi ảnh" : "Thêm ảnh"}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={updatePostMutation.isPending}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={(!content.trim() && !imagePreview) || updatePostMutation.isPending}
+                size="sm"
+              >
+                {updatePostMutation.isPending ? "Đang lưu..." : "Lưu"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// --- Create Post Component --------------------------------------------------
+function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreated?: () => void }) {
+  const { data: profile } = useProfile(userId);
+  const createPostMutation = useCreatePost();
+  const [content, setContent] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!content.trim() && !imageFile) return;
+
+    try {
+      let imageUrl = undefined;
+      if (imageFile) {
+        try {
+          imageUrl = await uploadPostImage(imageFile);
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          // Fallback to blob URL if upload fails
+          imageUrl = URL.createObjectURL(imageFile);
+        }
+      }
+      
+      await createPostMutation.mutateAsync({
+        content: content.trim(),
+        image_url: imageUrl,
+      });
+      setContent("");
+      setImagePreview(null);
+      setImageFile(null);
+      onPostCreated?.();
+    } catch (error) {
+      console.error("Error creating post:", error);
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-[#242526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <div className="flex gap-3">
+        <Avatar className="h-10 w-10">
+          <AvatarImage src={profile?.avatar_url} />
+          <AvatarFallback className="bg-blue-500 text-white">
+            {profile?.display_name?.[0] || "U"}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <Textarea
+            placeholder="Bạn đang nghĩ gì?"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="min-h-[100px] resize-none bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+          />
+          {imagePreview && (
+            <div className="mt-3 relative">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full rounded-lg max-h-96 object-cover"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70 text-white"
+                onClick={() => {
+                  setImagePreview(null);
+                  setImageFile(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <ListFilter className="h-4 w-4" /> Sort
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                className="text-gray-600 dark:text-gray-400"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-5 w-5 mr-2" />
+                Ảnh
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onSortChange("latest")}>
-              Latest
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onSortChange("trending")}>
-              Trending
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onSortChange("most_liked")}>
-              Most liked
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onSortChange("most_commented")}>
-              Most commented
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </div>
+            <Button
+              onClick={handleSubmit}
+              disabled={(!content.trim() && !imageFile) || createPostMutation.isPending}
+              size="sm"
+            >
+              {createPostMutation.isPending ? "Đang đăng..." : "Đăng"}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// --- Filters (Tags) --------------------------------------------------------
-function TagFilters({
-  active,
-  onToggle,
+// --- Comment Modal ---------------------------------------------------------
+function CommentModal({
+  post,
+  open,
+  onOpenChange,
 }: {
-  active: string[];
-  onToggle: (tag: string) => void;
+  post: Post;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const allTags = ["Kitchen", "Tips", "Apartment", "Layout", "Lighting", "Wabi-sabi"];
+  const { user } = useAuth();
+  const { data: comments } = usePostComments(post.id);
+  const addCommentMutation = useAddPostComment();
+  const [commentText, setCommentText] = useState("");
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) return;
+
+    try {
+      await addCommentMutation.mutateAsync({
+        postId: post.id,
+        content: commentText.trim(),
+      });
+      setCommentText("");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+    }
+  };
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {allTags.map((t) => {
-        const selected = active.includes(t);
-        return (
-          <Badge
-            key={t}
-            variant={selected ? "default" : "secondary"}
-            className="cursor-pointer select-none"
-            onClick={() => onToggle(t)}
-          >
-            <Tag className="h-3.5 w-3.5 mr-1.5" /> {t}
-          </Badge>
-        );
-      })}
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
+          <DialogTitle>Bình luận</DialogTitle>
+        </DialogHeader>
+        
+        {/* Scrollable content area */}
+        <div 
+          className="flex-1 overflow-y-auto"
+          style={{ minHeight: 0 }}
+        >
+          <div className="px-6 py-4 space-y-4">
+            {/* Post content - có thể scroll qua */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="flex gap-3">
+                <Avatar className="h-10 w-10 flex-shrink-0">
+                  <AvatarImage src={post.author?.avatar_url || undefined} />
+                  <AvatarFallback>
+                    {post.author?.display_name?.[0] || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-sm">{post.author?.display_name || "Người dùng"}</h4>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+                    {post.content || ""}
+                  </p>
+                  {post.image_url && (
+                    <img
+                      src={post.image_url}
+                      alt="Post"
+                      className="mt-2 rounded-lg max-h-64 object-cover w-full"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Comments list */}
+            {comments?.map((comment) => (
+              <div key={comment.id} className="flex gap-3">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={comment.user?.avatar_url || undefined} />
+                  <AvatarFallback>
+                    {comment.user?.display_name?.[0] || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+                    <h5 className="font-semibold text-sm mb-1 break-words">
+                      {comment.user?.display_name}
+                    </h5>
+                    <p className="text-sm text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap">
+                      {comment.content}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {timeAgo(comment.created_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Add comment - không scroll, luôn ở dưới */}
+        <div className="px-6 pb-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div className="flex gap-2">
+            <Avatar className="h-8 w-8 flex-shrink-0">
+              <AvatarImage src={user?.user_metadata?.avatar_url ? String(user.user_metadata.avatar_url) : undefined} />
+              <AvatarFallback>{user?.email?.[0] || "U"}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 flex gap-2 min-w-0">
+              <Input
+                placeholder="Viết bình luận..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAddComment();
+                  }
+                }}
+                className="bg-gray-100 dark:bg-gray-700 flex-1 min-w-0"
+              />
+              <Button
+                onClick={handleAddComment}
+                disabled={!commentText.trim() || addCommentMutation.isPending}
+                size="sm"
+                className="flex-shrink-0"
+              >
+                Gửi
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // --- Post Card -------------------------------------------------------------
-function PostCard({ post }: { post: Post }) {
+function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }) {
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const { data: reactions } = usePostReactions(post.id);
+  const addReactionMutation = useAddPostReaction();
+  const removeReactionMutation = useRemovePostReaction();
+  const updatePostMutation = useUpdatePost();
+  const deletePostMutation = useDeletePost();
+  const confirm = useConfirm();
+  
+  const isOwner = post.author_id === currentUserId;
+  
+  const userReaction = reactions?.find((r: any) => r.user_id === currentUserId);
+  const reactionsCount = reactions?.length || 0;
+  
+  // Group reactions by type
+  const reactionsByType = reactions?.reduce((acc: Partial<Record<PostReactionType, any[]>>, r: any) => {
+    const type = r.reaction_type as PostReactionType;
+    if (!acc[type]) acc[type] = [];
+    acc[type]!.push(r);
+    return acc;
+  }, {} as Partial<Record<PostReactionType, any[]>>) || {};
+
+  const handleReactionClick = async () => {
+    if (userReaction) {
+      await removeReactionMutation.mutateAsync(post.id);
+    } else {
+      await addReactionMutation.mutateAsync({
+        postId: post.id,
+        reactionType: "like",
+      });
+    }
+  };
+
+  const reactionEmojis: PostReactionType[] = ["like", "love", "haha", "wow", "sad", "angry"];
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const hideReactionPickerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear timeout when component unmounts
+  useEffect(() => {
+    return () => {
+      if (hideReactionPickerTimeoutRef.current) {
+        clearTimeout(hideReactionPickerTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleShowReactionPicker = () => {
+    // Clear any pending hide timeout
+    if (hideReactionPickerTimeoutRef.current) {
+      clearTimeout(hideReactionPickerTimeoutRef.current);
+      hideReactionPickerTimeoutRef.current = null;
+    }
+    setShowReactionPicker(true);
+  };
+
+  const handleHideReactionPicker = () => {
+    // Delay hiding to allow mouse to move to picker
+    hideReactionPickerTimeoutRef.current = setTimeout(() => {
+      setShowReactionPicker(false);
+    }, 200); // 200ms delay
+  };
+
+  const handleDeletePost = async () => {
+    try {
+      await deletePostMutation.mutateAsync(post.id);
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      alert("Không thể xóa bài viết. Vui lòng thử lại.");
+    }
+  };
+
+  const handleUpdatePost = async (content: string, imageUrl?: string | null) => {
+    try {
+      await updatePostMutation.mutateAsync({
+        postId: post.id,
+        data: {
+          content,
+          image_url: imageUrl,
+        },
+      });
+      setShowEditDialog(false);
+    } catch (error) {
+      console.error("Error updating post:", error);
+      alert("Không thể cập nhật bài viết. Vui lòng thử lại.");
+    }
+  };
+
   return (
-    <Card className="hover:bg-muted/50 transition-colors">
-      <CardHeader className="flex flex-row items-start gap-4">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src={post.author.avatar} alt={post.author.name} />
-          <AvatarFallback>
-            {post.author.name
-              .split(" ")
-              .map((s) => s[0])
-              .join("")}
+    <>
+      <div className="bg-white dark:bg-[#242526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Header */}
+        <div className="p-3 pb-0">
+          <div className="flex items-start gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={post.author?.avatar_url || undefined} />
+            <AvatarFallback className="bg-blue-500 text-white text-sm font-semibold">
+              {post.author?.display_name?.[0] || "?"}
           </AvatarFallback>
         </Avatar>
-        <div className="grid gap-1">
-          <CardTitle className="leading-tight text-base sm:text-lg">
-            {post.title}
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            by <span className="font-medium">{post.author.name}</span> · {timeAgo(post.createdAt)} ·
-            <span className="ml-1">{post.tags.join(" • ")}</span>
-          </CardDescription>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-900 dark:text-white text-[15px] hover:underline cursor-pointer">
+                  {post.author?.display_name || "Người dùng"}
+                </h3>
         </div>
-        <div className="ml-auto">
-          <Button variant="ghost" size="icon">
+              <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <span>{timeAgo(post.created_at)}</span>
+              </div>
+        </div>
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-9 w-9 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 flex items-center justify-center transition-colors"
+                  >
             <MoreHorizontal className="h-5 w-5" />
-          </Button>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setShowEditDialog(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Chỉnh sửa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={async (e) => {
+                      e.preventDefault();
+                      const confirmed = await confirm({
+                        title: "Xóa bài viết",
+                        description: "Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.",
+                        confirmText: "Xóa",
+                        cancelText: "Hủy",
+                        destructive: true,
+                      });
+                      if (confirmed) {
+                        handleDeletePost();
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Xóa
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
         </div>
-      </CardHeader>
-      <CardContent>
-        {/* --- Added image (only) --- */}
-        {post.image && (
-          <div className="mb-3 overflow-hidden rounded-lg">
+        </div>
+
+        {/* Content */}
+        <div className="px-4 pb-3">
+          <p className="text-[15px] text-gray-900 dark:text-white leading-relaxed whitespace-pre-wrap">
+            {post.content}
+          </p>
+        </div>
+
+        {/* Image */}
+        {post.image_url && (
+          <div className="w-full">
             <img
-              src={post.image}
-              alt={post.title}
-              className="w-full h-auto object-cover max-h-72"
+              src={post.image_url}
+              alt="Post"
+              className="w-full h-auto object-cover"
               loading="lazy"
             />
           </div>
         )}
-        <p className="text-sm text-muted-foreground line-clamp-3">{post.excerpt}</p>
-      </CardContent>
-      <CardFooter className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" className="gap-2">
-            <ThumbsUp className="h-4 w-4" /> {formatNumber(post.likes)}
+
+        {/* Reactions and Comments Count */}
+        {(reactionsCount > 0 || (post.comments_count ?? 0) > 0) && (
+          <div className="px-4 py-2 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              {reactionsCount > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="flex -space-x-1">
+                    {Object.keys(reactionsByType).slice(0, 3).map((type) => {
+                      const reactionType = type as PostReactionType;
+                      if (!reactionsByType[reactionType]) return null;
+                      const color = REACTION_COLORS[reactionType] || "bg-gray-500";
+                      const emoji = REACTION_EMOJIS[reactionType] || "👍";
+                      return (
+                        <div
+                          key={type}
+                          className={`w-5 h-5 rounded-full ${color} flex items-center justify-center border-2 border-white dark:border-[#242526] text-xs`}
+                        >
+                          {emoji}
+                        </div>
+                      );
+                    }).filter(Boolean)}
+                  </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {reactionsCount}
+                  </span>
+                </div>
+              )}
+            </div>
+            {(post.comments_count ?? 0) > 0 && (
+              <button
+                onClick={() => setShowCommentModal(true)}
+                className="text-sm text-gray-600 dark:text-gray-400 hover:underline cursor-pointer"
+              >
+                {post.comments_count} bình luận
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="px-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-1 relative">
+              <Button
+                variant="ghost"
+                onClick={handleReactionClick}
+                onMouseEnter={handleShowReactionPicker}
+                onMouseLeave={handleHideReactionPicker}
+                className={`w-full h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 font-medium text-sm ${
+                  userReaction ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"
+                }`}
+              >
+                {userReaction ? (
+                  <>
+                    <span className="mr-2">{REACTION_EMOJIS[userReaction.reaction_type]}</span>
+                    {userReaction.reaction_type === "like" ? "Thích" : 
+                     userReaction.reaction_type === "love" ? "Yêu thích" :
+                     userReaction.reaction_type === "haha" ? "Haha" :
+                     userReaction.reaction_type === "wow" ? "Wow" :
+                     userReaction.reaction_type === "sad" ? "Buồn" : "Tức giận"}
+                  </>
+                ) : (
+                  <>
+                    <ThumbsUp className="h-5 w-5 mr-2" />
+                    Thích
+                  </>
+                )}
           </Button>
-          <Button variant="ghost" size="sm" className="gap-2">
-            <MessageSquare className="h-4 w-4" /> {formatNumber(post.comments)}
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-2">
-            <Share2 className="h-4 w-4" /> Share
+              {showReactionPicker && (
+                <div
+                  className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 p-1 flex gap-1 z-10"
+                  onMouseEnter={handleShowReactionPicker}
+                  onMouseLeave={handleHideReactionPicker}
+                >
+                  {reactionEmojis.map((type) => (
+                    <button
+                      key={type}
+                      onClick={async () => {
+                        await addReactionMutation.mutateAsync({
+                          postId: post.id,
+                          reactionType: type,
+                        });
+                        setShowReactionPicker(false);
+                      }}
+                      className="w-10 h-10 rounded-full hover:scale-125 transition-transform flex items-center justify-center text-2xl"
+                    >
+                      {REACTION_EMOJIS[type]}
+                    </button>
+                  ))}
+        </div>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => setShowCommentModal(true)}
+              className="flex-1 h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium text-sm"
+            >
+              <MessageSquare className="h-5 w-5 mr-2" />
+              Bình luận
           </Button>
         </div>
-        <div className="flex items-center gap-2">
-          {post.trendingScore && (
-            <Badge variant="outline" className="gap-1">
-              <Flame className="h-3.5 w-3.5" /> Trending
-            </Badge>
-          )}
-          <Button variant={post.saved ? "secondary" : "outline"} size="sm" className="gap-2">
-            <Bookmark className="h-4 w-4" /> {post.saved ? "Saved" : "Save"}
-          </Button>
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+      <CommentModal
+        post={post}
+        open={showCommentModal}
+        onOpenChange={setShowCommentModal}
+      />
+      <EditPostDialog
+        post={post}
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        onSave={handleUpdatePost}
+      />
+    </>
   );
 }
 
 // --- Skeletons & Empty -----------------------------------------------------
 function PostSkeleton() {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start gap-4">
-        <Skeleton className="h-9 w-9 rounded-full" />
-        <div className="w-full space-y-2">
-          <Skeleton className="h-4 w-[50%]" />
-          <Skeleton className="h-3 w-[35%]" />
+    <div className="bg-white dark:bg-[#242526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="p-3 pb-0">
+        <div className="flex items-start gap-3">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-[40%]" />
+            <Skeleton className="h-3 w-[30%]" />
         </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Skeleton className="h-3 w-[95%]" />
-        <Skeleton className="h-3 w-[80%]" />
-        <Skeleton className="h-3 w-[70%]" />
-      </CardContent>
-      <CardFooter className="flex items-center gap-3">
-        <Skeleton className="h-8 w-16" />
-        <Skeleton className="h-8 w-16" />
-      </CardFooter>
-    </Card>
-  );
-}
-
-function EmptyState({ label = "No posts found." }) {
-  return (
-    <div className="flex flex-col items-center justify-center text-center py-16 gap-3">
-      <div className="rounded-full p-3 bg-muted">
-        <MessageSquare className="h-6 w-6" />
+        </div>
       </div>
-      <p className="text-sm text-muted-foreground">{label}</p>
+      <div className="px-4 pb-3 space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-[90%]" />
+        <Skeleton className="h-4 w-[80%]" />
+      </div>
+      <div className="px-2 pb-2 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-1">
+          <Skeleton className="flex-1 h-9 rounded-lg" />
+          <Skeleton className="flex-1 h-9 rounded-lg" />
+          <Skeleton className="flex-1 h-9 rounded-lg" />
+        </div>
+      </div>
     </div>
   );
 }
 
-// --- Sorting ---------------------------------------------------------------
-type SortKey = "latest" | "trending" | "most_liked" | "most_commented";
-
-function sortPosts(posts: Post[], key: SortKey): Post[] {
-  switch (key) {
-    case "latest":
-      return [...posts].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    case "trending":
-      return [...posts].sort((a, b) => (b.trendingScore ?? 0) - (a.trendingScore ?? 0));
-    case "most_liked":
-      return [...posts].sort((a, b) => b.likes - a.likes);
-    case "most_commented":
-      return [...posts].sort((a, b) => b.comments - a.comments);
-    default:
-      return posts;
-  }
+function EmptyState({ label = "Không tìm thấy bài viết nào." }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-16 gap-3 bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="rounded-full p-4 bg-gray-100 dark:bg-gray-700">
+        <MessageSquare className="h-8 w-8 text-gray-400" />
+      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+    </div>
+  );
 }
 
 // --- Utils -----------------------------------------------------------------
 function timeAgo(iso: string): string {
   const diff = Date.now() - +new Date(iso);
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return "vừa xong";
+  if (m < 60) return `${m} phút`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h} giờ`;
   const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  if (d < 7) return `${d} ngày`;
+  const w = Math.floor(d / 7);
+  if (w < 4) return `${w} tuần`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo} tháng`;
+  const y = Math.floor(d / 365);
+  return `${y} năm`;
 }
 
-function formatNumber(n: number) {
-  return new Intl.NumberFormat(undefined, { notation: "compact" }).format(n);
-}
 
-// --- Main Page -------------------------------------------------------------
-export default function PostsPage() {
-  const [sort, setSort] = useState<SortKey>("latest");
-  const [search, setSearch] = useState("");
-  const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+// --- Left Sidebar ---------------------------------------------------------
+function LeftSidebar() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const { data: profile } = useProfile(userId as string);
 
-  // Simulate fetch with filters
-  const posts = useMemo(() => {
-    let list = sortPosts(MOCK_POSTS, sort);
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.title.toLowerCase().includes(q) ||
-          p.excerpt.toLowerCase().includes(q) ||
-          p.author.name.toLowerCase().includes(q) ||
-          p.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-    if (activeTags.length) {
-      list = list.filter((p) => p.tags.some((t) => activeTags.includes(t)));
-    }
-    return list;
-  }, [sort, search, activeTags]);
-
-  const handleSearch = (q: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      setSearch(q);
-      setLoading(false);
-    }, 350);
-  };
-
-  const handleSort = (s: SortKey) => {
-    setSort(s);
-  };
-
-  const toggleTag = (t: string) => {
-    setActiveTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
-  };
+  const shortcuts = [
+    { icon: Home, label: "Trang chủ", active: true },
+    { icon: Users, label: "Nhóm", active: false },
+    { icon: Bookmark, label: "Đã lưu", active: false },
+    { icon: Clock, label: "Gần đây", active: false },
+    { icon: Video, label: "Video", active: false },
+    { icon: Calendar, label: "Sự kiện", active: false },
+  ];
 
   return (
-    <div className="col-span-12 px-4 py-6 h-screen overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-muted p-2">
-          <MessageSquare className="h-5 w-5" />
+    <aside className="flex-1 flex-shrink-0 sticky top-0 h-screen overflow-y-auto pt-6 px-3">
+      <div className="space-y-4">
+        {/* User Profile Card */}
+        <div className="bg-white dark:bg-[#242526] rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3 mb-4">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={profile?.avatar_url} />
+              <AvatarFallback className="bg-blue-500 text-white">
+                {profile?.display_name?.[0] || user?.email?.[0] || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white truncate">
+                {profile?.display_name || user?.email || "Người dùng"}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {user?.email}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+            size="sm"
+          >
+            <LinkIcon className="h-4 w-4 mr-2" />
+            Xem trang cá nhân
+          </Button>
         </div>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Posts</h1>
-          <p className="text-sm text-muted-foreground">Discord-inspired feed with filters</p>
+
+        {/* Shortcuts */}
+        <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-3">
+            <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white mb-2">
+              Lối tắt
+            </h3>
+            <div className="space-y-1">
+              {shortcuts.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={idx}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                      item.active
+                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Groups */}
+        <GroupsSection userId={userId || ""} />
+      </div>
+    </aside>
+  );
+}
+
+// --- Contact Item ---------------------------------------------------------
+function ContactItem({ friend }: { friend: any }) {
+  const { data: statusProfile } = useUserStatus(friend.id);
+  const isOnline = statusProfile?.status === "online";
+
+  // Simple: count mutual friends (could be improved with actual query)
+  const mutualCount = Math.floor(Math.random() * 15); // TODO: Calculate real mutual friends
+
+  return (
+    <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+      <div className="relative">
+        <Avatar className="h-9 w-9">
+          <AvatarImage src={friend.avatar_url} />
+          <AvatarFallback className="bg-blue-500 text-white">
+            {friend.display_name?.[0] || friend.username?.[0] || "?"}
+          </AvatarFallback>
+        </Avatar>
+        {isOnline && (
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-[#242526]" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+          {friend.display_name || friend.username || "Người dùng"}
+        </p>
+        {mutualCount > 0 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {mutualCount} bạn chung
+          </p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+// --- Groups Section -------------------------------------------------------
+function GroupsSection({ userId }: { userId: string }) {
+  const { data: conversations } = useConversations(userId);
+  const groups = conversations?.filter((c) => c.type === "group") || [];
+
+  return (
+    <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white">
+            Nhóm của bạn
+          </h3>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {groups.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+              Chưa có nhóm nào
+            </p>
+          ) : (
+            groups.slice(0, 5).map((group) => (
+              <button
+                key={group.id}
+                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                {group.photo_url ? (
+                  <img
+                    src={`${supabaseUrl}/storage/v1/object/public/chat-attachments/${group.photo_url}`}
+                    alt={group.title || "Group"}
+                    className="h-9 w-9 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                )}
+                <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 text-left">
+                  {group.title || "Nhóm không tên"}
+                </span>
+              </button>
+            ))
+          )}
         </div>
       </div>
-
-      <Separator className="my-6" />
-
-      {/* Tabs */}
-      <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList className="grid grid-cols-3 w-full sm:w-auto">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="trending">Trending</TabsTrigger>
-            <TabsTrigger value="saved">Saved</TabsTrigger>
-          </TabsList>
-          <Toolbar onSearch={handleSearch} onSortChange={handleSort} />
-        </div>
-
-        <div className="mt-4">
-          <TagFilters active={activeTags} onToggle={toggleTag} />
-        </div>
-
-        <TabsContent value="all" className="mt-6">
-          <PostList posts={posts} loading={loading} />
-        </TabsContent>
-        <TabsContent value="trending" className="mt-6">
-          <PostList
-            posts={posts.filter((p) => (p.trendingScore ?? 0) > 0.7)}
-            loading={loading}
-            emptyLabel="No trending posts right now."
-          />
-        </TabsContent>
-        <TabsContent value="saved" className="mt-6">
-          <PostList posts={posts.filter((p) => p.saved)} loading={loading} emptyLabel="No saved posts yet." />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
 
-function PostList({ posts, loading, emptyLabel }: { posts: Post[]; loading?: boolean; emptyLabel?: string }) {
+// --- Right Sidebar --------------------------------------------------------
+function RightSidebar({ userId }: { userId: string }) {
+  const { data: friends, isLoading: friendsLoading } = useFriends(userId);
+
+  return (
+    <aside className="flex-1 flex-shrink-0 sticky top-0 h-screen overflow-y-auto pt-6 px-3">
+      <div className="space-y-4">
+        {/* Sponsored */}
+        <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-4">
+            <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white mb-3">
+              Được tài trợ
+            </h3>
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="aspect-video bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg" />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Quảng cáo
+                    </p>
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                      Tiêu đề quảng cáo {i}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      example.com
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Birthdays */}
+        <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+              <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white">
+                Sinh nhật
+              </h3>
+            </div>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Hôm nay là sinh nhật của <span className="font-semibold">Nguyễn Văn A</span> và{" "}
+              <span className="font-semibold">Trần Thị B</span>
+            </p>
+            <Button
+              variant="ghost"
+              className="w-full mt-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              size="sm"
+            >
+              Gửi lời chúc
+            </Button>
+          </div>
+        </div>
+
+        {/* Contacts */}
+        <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white">
+                Người liên hệ
+              </h3>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <Video className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <Search className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {friendsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 px-2 py-2">
+                      <Skeleton className="h-9 w-9 rounded-full" />
+                      <div className="flex-1 space-y-1">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-2 w-16" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : friends && friends.length > 0 ? (
+                friends.slice(0, 8).map((friend) => (
+                  <ContactItem key={friend.id} friend={friend} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                  Chưa có bạn bè
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Trending Topics */}
+        <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white">
+                Chủ đề đang thịnh hành
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {["Thiết kế nội thất", "Kiến trúc", "Nội thất nhỏ"].map((topic, idx) => (
+                <button
+                  key={idx}
+                  className="w-full flex items-start gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                >
+                  <TrendingUp className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {topic}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {Math.floor(Math.random() * 100 + 50)}K bài viết
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// --- Main Page -------------------------------------------------------------
+export default function PostsPage() {
+  const { user } = useAuth();
+  const userId = user?.id as string;
+  const { data: friends } = useFriends(userId);
+  const { data: posts, isLoading: postsLoading, refetch } = usePostsByFriends(userId || "");
+  const [search, setSearch] = useState("");
+
+  const filteredPosts = useMemo(() => {
+    if (!posts) return [];
+    let list = [...posts];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.content?.toLowerCase().includes(q) ||
+          p.author?.display_name?.toLowerCase().includes(q)
+      );
+    }
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [posts, search]);
+
+  const handleSearch = (q: string) => {
+      setSearch(q);
+  };
+
+  // Hiển thị message nếu không có bạn bè
+  if (friends && friends.length === 0) {
+  return (
+      <div className="col-span-12 bg-gray-100 dark:bg-[#18191a] h-screen overflow-y-auto">
+        <div className="max-w-[680px] mx-auto px-4 py-6">
+          <div className="bg-white dark:bg-[#242526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+            <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Chưa có bạn bè
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Bạn cần kết bạn để thấy các bài viết. Hãy tìm kiếm và thêm bạn bè để bắt đầu!
+            </p>
+        </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="col-span-12 bg-gray-100 dark:bg-[#18191a] h-screen overflow-hidden">
+      <div className="flex gap-4 h-full max-w-[1920px] mx-auto px-4">
+        {/* Left Sidebar */}
+        <LeftSidebar />
+
+        {/* Main Content */}
+        <main className="flex-2 min-w-0 overflow-y-auto py-6">
+          <div className="max-w-[680px] mx-auto px-4">
+            {/* Header */}
+            <div className="mb-4">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Bài viết</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Khám phá các bài viết mới nhất</p>
+        </div>
+
+            {/* Create Post */}
+            {userId && <CreatePostCard userId={userId} onPostCreated={() => refetch()} />}
+
+            {/* Search */}
+            <div className="mb-4">
+              <Toolbar onSearch={handleSearch} />
+        </div>
+
+            {/* Posts List */}
+            <PostList posts={filteredPosts} loading={postsLoading} currentUserId={userId || ""} />
+          </div>
+        </main>
+
+        {/* Right Sidebar */}
+        <RightSidebar userId={userId || ""} />
+      </div>
+    </div>
+  );
+}
+
+function PostList({ 
+  posts, 
+  loading, 
+  emptyLabel = "Chưa có bài viết nào.",
+  currentUserId 
+}: { 
+  posts: Post[]; 
+  loading?: boolean; 
+  emptyLabel?: string;
+  currentUserId: string;
+}) {
   return (
     <div>
       {loading ? (
@@ -434,13 +1241,11 @@ function PostList({ posts, loading, emptyLabel }: { posts: Post[]; loading?: boo
       ) : posts.length === 0 ? (
         <EmptyState label={emptyLabel} />
       ) : (
-        <ScrollArea className="max-h-[70vh] pr-2">
           <div className="space-y-4">
             {posts.map((p) => (
-              <PostCard key={p.id} post={p} />
+            <PostCard key={p.id} post={p} currentUserId={currentUserId} />
             ))}
           </div>
-        </ScrollArea>
       )}
     </div>
   );
