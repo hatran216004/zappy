@@ -35,8 +35,8 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: friends = [] } = useFriends();
-  const navigate = useNavigate();
+  const { data: friends = [] } = useFriends(userId);
+  const navigate = useNavigate();   
 
   const filteredFriends = friends.filter(
     (friend) =>
