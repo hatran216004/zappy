@@ -424,14 +424,48 @@ The `send_friend_request` RPC likely checks for existing friendships and blocks 
 - RPC would fail with "already friends" error
 - User couldn't send friend requests to previously removed friends
 
+## Additional Fix: Friend Request Cleanup on Removal
+
+When removing a friend, we also delete any pending friend requests between the two users to prevent orphaned data:
+
+```typescript
+// Step 3 in removeFriend: Delete any pending friend requests
+try {
+  const { error: deleteRequestError } = await supabase
+    .from('friend_requests')
+    .delete()
+    .or(
+      `and(from_user_id.eq.${currentUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${currentUserId})`
+    );
+
+  if (deleteRequestError) {
+    console.warn('Could not delete friend requests:', deleteRequestError);
+    // Don't throw - friendship deletion succeeded
+  } else {
+    console.log('Cleaned up friend requests after friendship removal');
+  }
+} catch (e) {
+  console.warn('Friend request cleanup failed:', e);
+  // Don't throw - main operation succeeded
+}
+```
+
+### Why This Was Needed
+
+- **Orphaned Data Prevention**: Without this cleanup, friend requests could remain in the database after friendship removal
+- **Data Consistency**: Ensures database state matches user expectations
+- **UI Accuracy**: Prevents confusion where friend requests appear but users are no longer friends
+
 ## Summary
 
 ✅ Fixed missing user_id filter in `removeFriend`  
+✅ Added friend request cleanup in `removeFriend`  
 ✅ Added orphaned row cleanup in `sendFriendRequest`  
 ✅ Added orphaned row cleanup in `acceptFriendRequest`  
 ✅ Used `maybeSingle()` to avoid errors  
 ✅ Improved UI error handling with toast notifications  
 ✅ Result: Users can now send requests and re-become friends after removal  
+✅ Result: No orphaned friend requests remain after removal  
 
 The solution works within RLS constraints and handles all edge cases gracefully.
 
