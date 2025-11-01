@@ -13,6 +13,7 @@ import {
   useEditMessage,
   useReactionsRealtime
 } from '../../hooks/useChat';
+import { useStartCall } from '../../hooks/useStartCall';
 import ChatHeader from './ChatHeader';
 import { useParams } from 'react-router';
 import ChatFooter from '../ChatWindow/ChatFooter';
@@ -61,6 +62,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const sendLocationMutation = useSendLocationMessage();
   const editMessageMutation = useEditMessage();
   const markAsReadMutation = useMarkMessagesAsRead();
+  const startCallMutation = useStartCall();
   const { typingUsers, sendTyping } = useTypingIndicator(
     conversationId,
     userId
@@ -432,6 +434,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     setShowLocationPicker(true);
   }, []);
 
+  const handleCall = useCallback(async (userId: string, isVideo: boolean) => {
+    try {
+      await startCallMutation.mutateAsync({
+        userId,
+        isVideoEnabled: isVideo
+      });
+    } catch (error) {
+      console.error('Error starting call:', error);
+    }
+  }, [startCallMutation]);
+
   const handleLocationSelect = useCallback(async (location: { 
     latitude: number; 
     longitude: number; 
@@ -499,6 +512,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         onCloseSearch={handleCloseSearch}
         conversation={conversation}
         currentUserId={userId}
+        onCall={handleCall}
       />
 
       <div

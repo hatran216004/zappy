@@ -67,7 +67,7 @@ export default function ChatSidebar() {
           </button>
 
           {/* More / context (decorative – UI only) */}
-          <button
+          {/* <button
             type="button"
             aria-label="Tùy chọn"
             className="
@@ -77,7 +77,7 @@ export default function ChatSidebar() {
             "
           >
             <MoreVertical className="w-4 h-4" />
-          </button>
+          </button> */}
 
           {/* Classify dropdown */}
           <div className="pl-1">

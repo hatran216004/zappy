@@ -382,41 +382,10 @@ export type Database = {
           },
         ]
       }
-      deleted_messages: {
-        Row: {
-          message_id: string
-          user_id: string
-          deleted_at: string
-        }
-        Insert: {
-          message_id: string
-          user_id: string
-          deleted_at?: string
-        }
-        Update: {
-          message_id?: string
-          user_id?: string
-          deleted_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deleted_messages_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "deleted_messages_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       conversations: {
         Row: {
+          background_type: string | null
+          background_value: string | null
           created_at: string
           created_by: string
           id: string
@@ -425,10 +394,10 @@ export type Database = {
           title: string | null
           type: Database["public"]["Enums"]["convo_type"]
           updated_at: string | null
-          background_type: string
-          background_value: string
         }
         Insert: {
+          background_type?: string | null
+          background_value?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -437,10 +406,10 @@ export type Database = {
           title?: string | null
           type: Database["public"]["Enums"]["convo_type"]
           updated_at?: string | null
-          background_type?: string
-          background_value?: string
         }
         Update: {
+          background_type?: string | null
+          background_value?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -449,8 +418,6 @@ export type Database = {
           title?: string | null
           type?: Database["public"]["Enums"]["convo_type"]
           updated_at?: string | null
-          background_type?: string
-          background_value?: string
         }
         Relationships: [
           {
@@ -465,6 +432,39 @@ export type Database = {
             columns: ["last_message_id"]
             isOneToOne: false
             referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deleted_messages: {
+        Row: {
+          deleted_at: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          deleted_at?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deleted_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deleted_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -590,6 +590,93 @@ export type Database = {
           },
         ]
       }
+      group_invites: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          invite_code: string
+          is_active: boolean
+          max_uses: number | null
+          used_count: number
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          invite_code: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          invite_code?: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invites_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_mentions: {
+        Row: {
+          created_at: string
+          id: string
+          mentioned_user_id: string
+          message_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentioned_user_id: string
+          message_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentioned_user_id?: string
+          message_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_mentions_mentioned_user_id_fkey"
+            columns: ["mentioned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_mentions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -635,14 +722,14 @@ export type Database = {
           fts: unknown
           id: string
           location: unknown
+          location_address: string | null
+          location_display_mode: string | null
+          location_latitude: number | null
+          location_longitude: number | null
           recalled_at: string | null
           reply_to_id: string | null
           sender_id: string
           type: Database["public"]["Enums"]["msg_type"]
-          location_latitude: number | null
-          location_longitude: number | null
-          location_address: string | null
-          location_display_mode: 'interactive' | 'static' | null
         }
         Insert: {
           content_text?: string | null
@@ -652,14 +739,14 @@ export type Database = {
           fts?: unknown
           id?: string
           location?: unknown
+          location_address?: string | null
+          location_display_mode?: string | null
+          location_latitude?: number | null
+          location_longitude?: number | null
           recalled_at?: string | null
           reply_to_id?: string | null
           sender_id: string
           type?: Database["public"]["Enums"]["msg_type"]
-          location_latitude?: number | null
-          location_longitude?: number | null
-          location_address?: string | null
-          location_display_mode?: 'interactive' | 'static' | null
         }
         Update: {
           content_text?: string | null
@@ -669,14 +756,14 @@ export type Database = {
           fts?: unknown
           id?: string
           location?: unknown
+          location_address?: string | null
+          location_display_mode?: string | null
+          location_latitude?: number | null
+          location_longitude?: number | null
           recalled_at?: string | null
           reply_to_id?: string | null
           sender_id?: string
           type?: Database["public"]["Enums"]["msg_type"]
-          location_latitude?: number | null
-          location_longitude?: number | null
-          location_address?: string | null
-          location_display_mode?: 'interactive' | 'static' | null
         }
         Relationships: [
           {
@@ -696,6 +783,157 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          read_at: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          read_at?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          read_at?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_reactions: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          reaction_type: Database["public"]["Enums"]["post_reaction_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          reaction_type?: Database["public"]["Enums"]["post_reaction_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          reaction_type?: Database["public"]["Enums"]["post_reaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_author_id_fkey"
+            columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -843,24 +1081,28 @@ export type Database = {
           name: string
         }[]
       }
+      get_conversations: {
+        Args: never
+        Returns: {
+          content_text: string
+          display_name: string
+          group_type: string
+          id: string
+          message_type: string
+          photo_url: string
+          sender_id: string
+          title: string
+          updated_at: string
+        }[]
+      }
       get_direct_conversation: {
         Args: { _user_id: string }
         Returns: {
-          created_at: string
-          created_by: string
+          group_type: string
           id: string
-          last_message_id: string | null
           photo_url: string
-          title: string | null
-          type: Database["public"]["Enums"]["convo_type"]
-          updated_at: string | null
+          title: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "conversations"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       get_friends: {
         Args: never
@@ -869,8 +1111,28 @@ export type Database = {
           display_name: string
           id: string
           label_id: string[]
+          last_seen_at: string
           status: string
           username: string
+        }[]
+      }
+      get_friends_mobile: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          label_id: string[]
+          status: string
+          username: string
+        }[]
+      }
+      get_friends_status: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          status: string
+          user_id: string
         }[]
       }
       get_requests: {
@@ -884,6 +1146,19 @@ export type Database = {
           status: string
           username: string
         }[]
+      }
+      join_group_via_invite: { Args: { _invite_code: string }; Returns: string }
+      livekit_event_participant_joined: {
+        Args: { _room_id: string; _user_id: string }
+        Returns: undefined
+      }
+      livekit_event_participant_left: {
+        Args: { _room_id: string; _user_id: string }
+        Returns: undefined
+      }
+      livekit_event_room_finished: {
+        Args: { _room_id: string }
+        Returns: undefined
       }
       modify_contact_label: {
         Args: { _color: number; _label_id: string; _name: string }
@@ -925,6 +1200,7 @@ export type Database = {
         | "location"
         | "system"
       notif_level: "all" | "mentions" | "none"
+      post_reaction_type: "like" | "love" | "haha" | "wow" | "sad" | "angry"
       role_type: "admin" | "member"
       user_status: "online" | "offline"
     }
@@ -1073,6 +1349,7 @@ export const Constants = {
         "system",
       ],
       notif_level: ["all", "mentions", "none"],
+      post_reaction_type: ["like", "love", "haha", "wow", "sad", "angry"],
       role_type: ["admin", "member"],
       user_status: ["online", "offline"],
     },
