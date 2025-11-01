@@ -335,6 +335,27 @@ export const removeFriend = async (friendId: string): Promise<void> => {
     console.warn('This is not critical as get_friends() only queries user_id = current_user.');
     // Don't throw - main deletion succeeded and UI will update correctly
   }
+
+  // Step 3: Delete any pending friend requests between the two users
+  // This prevents orphaned friend requests from remaining after friendship removal
+  try {
+    const { error: deleteRequestError } = await supabase
+      .from('friend_requests')
+      .delete()
+      .or(
+        `and(from_user_id.eq.${currentUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${currentUserId})`
+      );
+
+    if (deleteRequestError) {
+      console.warn('Could not delete friend requests:', deleteRequestError);
+      // Don't throw - friendship deletion succeeded
+    } else {
+      console.log('Cleaned up friend requests after friendship removal');
+    }
+  } catch (e) {
+    console.warn('Friend request cleanup failed:', e);
+    // Don't throw - main operation succeeded
+  }
 };
 
 // Subscribe to friend requests realtime
