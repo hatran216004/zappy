@@ -9,6 +9,7 @@ import { useGetOrCreateDirectConversation } from "@/hooks/useChat";
 import useUser from "@/hooks/useUser";
 import FriendItem from "./FriendItem";
 import { useNavigate } from "react-router";
+import toast from "react-hot-toast";
 
 interface FriendsListProps {
   searchTerm?: string;
@@ -34,8 +35,12 @@ export const FriendsList = ({ searchTerm = '', selectedFilter = null, sortBy = '
     try {
       await removeFriendMutation.mutateAsync(friendId);
       setSelectedFriend(null);
-    } catch (err) {
+      // Success - UI will update via query invalidation
+    } catch (err: any) {
       console.error("Error removing friend:", err);
+      // Show user-friendly error message
+      const errorMessage = err?.message || "Không thể xóa bạn bè. Vui lòng thử lại.";
+      toast.error(errorMessage);
     }
   };
 

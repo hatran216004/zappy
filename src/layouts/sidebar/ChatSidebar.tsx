@@ -146,6 +146,7 @@ export default function ChatSidebar() {
           <ConversationsList
             userId={userId as string}
             selectedFilter={selectedFilter}
+            tab={currentValue}
           />
         </div>
       </div>

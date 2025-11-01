@@ -17,12 +17,14 @@ interface ConversationsListProps {
   userId: string;
   selectedConversationId?: string;
   selectedFilter?: string | null;
+  tab?: string;
 }
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
   selectedConversationId,
   selectedFilter = null,
+  tab = 'all',
 }) => {
   const navigate = useNavigate();
   const { data: conversations, isLoading } = useConversations(userId);
@@ -55,7 +57,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
     : friends;
 
   // Filter conversations based on label if selectedFilter is set
-  const filteredConversations = selectedFilter
+  let filteredConversations = selectedFilter
     ? conversations?.filter((conv) => {
         // Only filter direct conversations (2 participants)
         if (conv.participants.length !== 2) return true; // Keep group conversations
@@ -69,6 +71,14 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
         return friend !== undefined;
       })
     : conversations;
+
+  // Apply tab filter (all/unread)
+  if (tab === 'unread') {
+    filteredConversations = filteredConversations?.filter((conv) => {
+      // Show conversations with unread messages
+      return (conv.unread_count ?? 0) > 0;
+    });
+  }
 
   const friendsWithoutConversation =
     filteredFriends?.filter((friend) => {

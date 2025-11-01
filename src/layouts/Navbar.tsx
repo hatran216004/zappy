@@ -274,6 +274,7 @@ export default function Navbar() {
               {hasFriendRequest && (
                 <span className="
                   absolute -top-1 -right-1 min-w-4 h-4 px-1
+                  z-10
                   rounded-full bg-[#ED4245]
                   text-[10px] text-white font-semibold
                   flex items-center justify-center
