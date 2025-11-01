@@ -10,7 +10,8 @@ import {
   useMarkMessagesAsRead,
   useConversation,
   useSearchMessages,
-  useEditMessage
+  useEditMessage,
+  useReactionsRealtime
 } from '../../hooks/useChat';
 import ChatHeader from './ChatHeader';
 import { useParams } from 'react-router';
@@ -71,6 +72,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
   useMessagesRealtime(conversationId, userId);
   useConversationRealtime(conversationId); // ⭐ Subscribe to conversation updates (background, etc.)
+  useReactionsRealtime(conversationId); // ⭐ Subscribe to reactions updates
 
   // Reset typing state khi chuyển conversation
   useEffect(() => {
