@@ -1010,18 +1010,77 @@ export const subscribeMessages = (
 // Subscribe to reactions
 export const subscribeReactions = (
   conversationId: string,
-  onUpdate: () => void
+  onInsert: (reaction: { message_id: string; reaction: MessageReaction & { user: any } }) => void,
+  onDelete: (reaction: { message_id: string; user_id: string; emoji: string }) => void
 ) => {
   const channel = supabase
     .channel(`reactions:${conversationId}`)
     .on(
       'postgres_changes',
       {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'message_reactions'
       },
-      () => onUpdate()
+      async (payload) => {
+        const reaction = payload.new as MessageReaction;
+        
+        // Fetch message to check if it belongs to this conversation
+        const { data: message } = await supabase
+          .from('messages')
+          .select('conversation_id')
+          .eq('id', reaction.message_id)
+          .single();
+
+        // Only process if message belongs to this conversation
+        if (!message || message.conversation_id !== conversationId) {
+          return;
+        }
+        
+        // Fetch user details
+        const { data: user } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', reaction.user_id)
+          .single();
+
+        onInsert({
+          message_id: reaction.message_id,
+          reaction: {
+            ...reaction,
+            user: user || null
+          }
+        });
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'message_reactions'
+      },
+      async (payload) => {
+        const reaction = payload.old as MessageReaction;
+        
+        // Fetch message to check if it belongs to this conversation
+        const { data: message } = await supabase
+          .from('messages')
+          .select('conversation_id')
+          .eq('id', reaction.message_id)
+          .single();
+
+        // Only process if message belongs to this conversation
+        if (!message || message.conversation_id !== conversationId) {
+          return;
+        }
+        
+        onDelete({
+          message_id: reaction.message_id,
+          user_id: reaction.user_id,
+          emoji: reaction.emoji
+        });
+      }
     )
     .subscribe();
 

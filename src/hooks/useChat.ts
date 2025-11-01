@@ -631,11 +631,57 @@ export const useReactionsRealtime = (conversationId: string) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const unsubscribe = subscribeReactions(conversationId, () => {
-      queryClient.invalidateQueries({
-        queryKey: chatKeys.messages(conversationId)
-      });
-    });
+    const unsubscribe = subscribeReactions(
+      conversationId,
+      // On Insert
+      ({ message_id, reaction }) => {
+        queryClient.setQueryData(
+          chatKeys.messages(conversationId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) =>
+                  msg.id === message_id
+                    ? {
+                        ...msg,
+                        reactions: [...(msg.reactions || []), reaction]
+                      }
+                    : msg
+                )
+              )
+            };
+          }
+        );
+      },
+      // On Delete
+      ({ message_id, user_id, emoji }) => {
+        queryClient.setQueryData(
+          chatKeys.messages(conversationId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) =>
+                  msg.id === message_id
+                    ? {
+                        ...msg,
+                        reactions: (msg.reactions || []).filter(
+                          (r: any) => !(r.user_id === user_id && r.emoji === emoji)
+                        )
+                      }
+                    : msg
+                )
+              )
+            };
+          }
+        );
+      }
+    );
 
     return () => {
       unsubscribe();
