@@ -175,7 +175,7 @@ const RegisterPage = () => {
               </span>
             </Button>
 
-            <Button
+            {/* <Button
               primary={false}
               outline
               rounded
@@ -185,7 +185,7 @@ const RegisterPage = () => {
               <span className="text-gray-700 font-medium">
                 Tiếp tục với Facebook
               </span>
-            </Button>
+            </Button> */}
           </div>
 
           {/* Login Link */}
