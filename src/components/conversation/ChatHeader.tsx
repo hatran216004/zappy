@@ -24,6 +24,7 @@ import { useUpdateConversationBackground } from "@/hooks/useChat";
 interface ChatHeaderProps {
   otherParticipant:
     | {
+        user_id: string;
         profile: {
           display_name: string;
           avatar_url?: string;
@@ -37,6 +38,7 @@ interface ChatHeaderProps {
   onCloseSearch?: () => void;
   conversation?: ConversationWithDetails;
   currentUserId?: string;
+  onCall?: (userId: string, isVideo: boolean) => void;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -47,6 +49,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onCloseSearch,
   conversation,
   currentUserId,
+  onCall,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,8 +173,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             </Button>
           )}
           
-          {!isGroupChat && <TooltipBtn icon={Phone} label="Gọi thoại" />}
-          {!isGroupChat && <TooltipBtn icon={Video} label="Gọi video" />}
+          {!isGroupChat && otherParticipant && (
+              <TooltipBtn 
+                icon={Phone} 
+                label="Gọi thoại"
+                onClick={() => onCall?.(otherParticipant.user_id, false)}
+              />
+          )}
           
           {/* Group Info Button */}
           {isGroupChat ? (
