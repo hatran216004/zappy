@@ -5,12 +5,14 @@ type SelectableButtonProps = {
   label: string;
   url: string;
   icon: React.ElementType;
+  badgeCount?: number;
 };
 
 export default function SelectableButton({
   label,
   icon: Icon,
-  url
+  url,
+  badgeCount
 }: SelectableButtonProps) {
   const { pathname } = useLocation();
   const isActive = pathname.endsWith(url);
@@ -25,7 +27,12 @@ export default function SelectableButton({
       )}
     >
       <Icon className="size-5" /> {/* 👈 icon auto size */}
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-medium flex-1">{label}</span>
+      {badgeCount !== undefined && badgeCount > 0 && (
+        <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px] text-center">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      )}
     </Link>
   );
 }
