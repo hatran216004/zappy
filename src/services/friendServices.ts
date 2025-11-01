@@ -85,6 +85,36 @@ export const sendFriendRequest = async (
   toUserId: string,
   message: string = ''
 ): Promise<void> => {
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  const me = currentUser?.id;
+
+  // STEP 1: Clean up any orphaned friendships BEFORE calling RPC
+  // This prevents RPC from failing due to existing orphaned rows
+  if (me) {
+    try {
+      // Delete any orphaned rows in both directions
+      const deleteOps = [
+        supabase
+          .from('friends')
+          .delete()
+          .eq('user_id', me)
+          .eq('friend_id', toUserId),
+        supabase
+          .from('friends')
+          .delete()
+          .eq('user_id', toUserId)
+          .eq('friend_id', me)
+      ];
+
+      await Promise.all(deleteOps);
+      console.log('Cleaned up any orphaned friendships before sending request');
+    } catch (cleanupError) {
+      // Don't throw - continue with RPC even if cleanup fails
+      console.warn('Cleanup warning (continuing anyway):', cleanupError);
+    }
+  }
+
+  // STEP 2: Call database RPC to send the request
   const { error } = await supabase.rpc('send_friend_request', {
     _user_id: toUserId,
     _message: message
@@ -97,37 +127,85 @@ export const sendFriendRequest = async (
 export const acceptFriendRequest = async (
   fromUserId: string
 ): Promise<void> => {
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  const me = currentUser?.id;
+
+  // STEP 1: Clean up any orphaned friendships BEFORE calling RPC
+  // This prevents RPC from failing due to existing orphaned rows
+  if (me) {
+    try {
+      // Delete any orphaned rows in both directions
+      const deleteOps = [
+        supabase
+          .from('friends')
+          .delete()
+          .eq('user_id', me)
+          .eq('friend_id', fromUserId),
+        supabase
+          .from('friends')
+          .delete()
+          .eq('user_id', fromUserId)
+          .eq('friend_id', me)
+      ];
+
+      await Promise.all(deleteOps);
+      console.log('Cleaned up any orphaned friendships before acceptance');
+    } catch (cleanupError) {
+      // Don't throw - continue with RPC even if cleanup fails
+      console.warn('Cleanup warning (continuing anyway):', cleanupError);
+    }
+  }
+
+  // STEP 2: Call database RPC to accept the request
   const { error } = await supabase.rpc('accept_friend_request', {
     _user_id: fromUserId
   });
 
   if (error) throw error;
 
-  // Đảm bảo tạo bạn bè hai chiều A <-> B (phòng khi RPC chỉ tạo một chiều)
-  try {
-    const currentUser = (await supabase.auth.getUser()).data.user;
-    const me = currentUser?.id as string;
-    if (!me) return;
+  // STEP 3: Ensure both directions exist (insurance in case RPC only created one)
+  if (me) {
+    try {
+      // Check if each direction exists
+      const [meToFriend, friendToMe] = await Promise.all([
+        supabase
+          .from('friends')
+          .select('*')
+          .eq('user_id', me)
+          .eq('friend_id', fromUserId)
+          .maybeSingle(),
+        supabase
+          .from('friends')
+          .select('*')
+          .eq('user_id', fromUserId)
+          .eq('friend_id', me)
+          .maybeSingle()
+      ]);
 
-    // Chèn hai chiều, bỏ qua nếu đã tồn tại
-    // Một số DB có unique constraint, ta chấp nhận lỗi duplicate và bỏ qua
-    const inserts = [
-      { user_id: me, friend_id: fromUserId },
-      { user_id: fromUserId, friend_id: me }
-    ];
-
-    for (const row of inserts) {
-      const { error: insErr } = await supabase
-        .from('friends')
-        .insert(row);
-      if (insErr && insErr.code !== '23505') {
-        // 23505 = unique_violation, coi như đã tồn tại -> bỏ qua
-        // Các lỗi khác mới log để theo dõi
-        console.warn('Ensure mutual friendship insert error:', insErr);
+      // Insert me -> friend if doesn't exist
+      if (!meToFriend.data) {
+        const { error: insertError1 } = await supabase
+          .from('friends')
+          .insert({ user_id: me, friend_id: fromUserId });
+        
+        if (insertError1 && insertError1.code !== '23505') {
+          console.warn('Error inserting me -> friend:', insertError1);
+        }
       }
+
+      // Insert friend -> me if doesn't exist  
+      if (!friendToMe.data) {
+        const { error: insertError2 } = await supabase
+          .from('friends')
+          .insert({ user_id: fromUserId, friend_id: me });
+        
+        if (insertError2 && insertError2.code !== '23505') {
+          console.warn('Error inserting friend -> me:', insertError2);
+        }
+      }
+    } catch (e) {
+      console.warn('Ensure mutual friendship failed:', e);
     }
-  } catch (e) {
-    console.warn('Ensure mutual friendship failed:', e);
   }
 };
 

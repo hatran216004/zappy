@@ -100,7 +100,7 @@ const LoginPage = () => {
               </span>
             </Button>
 
-            <Button
+            {/* <Button
               onClick={(e) => e.preventDefault()}
               primary={false}
               outline
@@ -111,7 +111,7 @@ const LoginPage = () => {
               <span className="text-gray-700 font-medium">
                 Tiếp tục với Facebook
               </span>
-            </Button>
+            </Button> */}
           </div>
 
           <div className="mt-8 text-center">

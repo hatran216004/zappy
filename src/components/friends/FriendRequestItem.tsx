@@ -5,6 +5,7 @@ import {
   useRejectFriendRequest
 } from '@/hooks/useFriends';
 import { Button } from '../ui/button';
+import toast from 'react-hot-toast';
 
 export default function FriendRequestItem({
   request
@@ -17,8 +18,11 @@ export default function FriendRequestItem({
   const handleAccept = async (fromUserId: string) => {
     try {
       await acceptMutation.mutateAsync(fromUserId);
-    } catch (err) {
+      toast.success('Đã chấp nhận lời mời kết bạn');
+    } catch (err: any) {
       console.error('Error accepting friend request:', err);
+      const errorMessage = err?.message || 'Không thể chấp nhận lời mời. Vui lòng thử lại.';
+      toast.error(errorMessage);
     }
   };
 
