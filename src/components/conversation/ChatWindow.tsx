@@ -22,6 +22,8 @@ import { TypingIndicator } from './TypingIndicator';
 import { ImagePreview } from './ImagePreview';
 import { LocationPicker } from './LocationPicker';
 import { twMerge } from 'tailwind-merge';
+import { PinnedMessage, getPinnedMessages, pinMessage, subscribePinnedMessages, unpinMessage } from '@/services/chatService';
+import toast from 'react-hot-toast';
 
 interface ChatWindowProps {
   userId: string;
@@ -71,6 +73,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     conversationId,
     debouncedSearchQuery
   );
+
+  // Pinned messages state
+  const [pinned, setPinned] = useState<PinnedMessage[]>([]);
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const pins = await getPinnedMessages(conversationId);
+        if (isMounted) setPinned(pins);
+      } catch (e) {
+        console.warn('Load pinned messages failed:', e);
+      }
+    })();
+    const unsubscribe = subscribePinnedMessages(conversationId, async () => {
+      const pins = await getPinnedMessages(conversationId);
+      setPinned(pins);
+    });
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [conversationId]);
 
   useMessagesRealtime(conversationId, userId);
   useConversationRealtime(conversationId); // ⭐ Subscribe to conversation updates (background, etc.)
@@ -260,12 +284,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         setEditingMessageId(null);
       } else {
         // Send new message
+        // Resolve @all -> all participant IDs (except current user)
+        const resolvedMentionedIds = (() => {
+          if (!mentionedUserIds || mentionedUserIds.length === 0) return undefined;
+          const hasAll = mentionedUserIds.includes('ALL');
+          let ids = hasAll
+            ? (conversation?.participants || []).map((p) => p.user_id).filter((id) => id !== userId)
+            : mentionedUserIds;
+          // unique
+          ids = Array.from(new Set(ids));
+          return ids.length ? ids : undefined;
+        })();
         await sendTextMutation.mutateAsync({
           conversationId,
           senderId: userId,
           content: messageText.trim(),
           replyToId: replyTo || undefined,
-          mentionedUserIds: mentionedUserIds.length ? mentionedUserIds : undefined
+          mentionedUserIds: resolvedMentionedIds
         });
         
         setReplyTo(null);
@@ -346,6 +381,60 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const handleCancelImage = useCallback(() => {
     setImageToSend(null);
   }, []);
+
+  // Pin / Unpin handlers
+  const handlePin = useCallback(async (messageId: string) => {
+    // Optimistic update
+    setPinned((prev) => {
+      if (prev.some((p) => p.message_id === messageId)) return prev;
+      if (prev.length >= 3) {
+        toast.error('Tối đa 3 tin nhắn được ghim');
+        return prev;
+      }
+      const target = messages.find((m) => m.id === messageId);
+      const optimistic: PinnedMessage = {
+        id: `optimistic-${messageId}`,
+        conversation_id: conversationId,
+        message_id: messageId,
+        pinned_by: userId,
+        created_at: new Date().toISOString(),
+        message: target
+          ? {
+              id: target.id,
+              content_text: target.content_text || '',
+              created_at: target.created_at,
+              type: target.type,
+              sender: target.sender as any
+            }
+          : undefined
+      };
+      return [optimistic, ...prev].slice(0, 3);
+    });
+
+    try {
+      await pinMessage(conversationId, messageId, userId);
+      toast.success('Đã ghim tin nhắn');
+    } catch (e: any) {
+      // rollback
+      setPinned((prev) => prev.filter((p) => p.message_id !== messageId && !p.id.startsWith('optimistic-')));
+      const msg = e?.message || String(e);
+      toast.error(msg.includes('Maximum 3') ? 'Tối đa 3 tin nhắn được ghim' : 'Không thể ghim tin nhắn');
+    }
+  }, [conversationId, userId, messages]);
+
+  const handleUnpin = useCallback(async (messageId: string) => {
+    // Optimistic update
+    setPinned((prev) => prev.filter((p) => p.message_id !== messageId));
+    try {
+      await unpinMessage(conversationId, messageId);
+      toast.success('Đã bỏ ghim');
+    } catch (e) {
+      // In case of failure, refetch server state
+      const pins = await getPinnedMessages(conversationId);
+      setPinned(pins);
+      toast.error('Không thể bỏ ghim');
+    }
+  }, [conversationId]);
 
   const searchResults = useMemo(() => {
     return searchData?.map((msg) => msg.id) || [];
@@ -513,6 +602,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         conversation={conversation}
         currentUserId={userId}
         onCall={handleCall}
+        pinned={pinned}
+        onUnpin={handleUnpin}
+        onJumpTo={(messageId) => {
+          const el = messageRefs.current[messageId];
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          else {
+            // best effort: try to fetch older pages then scroll (simplified)
+            console.log('Pinned message not loaded yet');
+          }
+        }}
       />
 
       <div
@@ -578,6 +677,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
                 onReply={() => setReplyTo(message.id)}
                 onEdit={(content) => handleEditMessage(message.id, content)}
                 currentUserId={userId}
+                isPinned={pinned.some((p) => p.message_id === message.id)}
+                onPin={() => handlePin(message.id)}
+                onUnpin={() => handleUnpin(message.id)}
               />
             </div>
           );

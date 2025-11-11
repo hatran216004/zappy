@@ -35,6 +35,9 @@ interface MessageBubbleProps {
   onReply: () => void;
   onEdit: (content: string) => void;
   currentUserId: string;
+  isPinned?: boolean;
+  onPin?: () => void;
+  onUnpin?: () => void;
 }
 
 // Helper function to detect and linkify URLs and render mentions with avatar+name
@@ -111,7 +114,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   showTimestamp,
   onReply,
   onEdit,
-  currentUserId
+  currentUserId,
+  isPinned,
+  onPin,
+  onUnpin
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.content_text || '');
@@ -437,6 +443,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                 >
                   <DropdownMenuItem onClick={onReply}>Trả lời</DropdownMenuItem>
 
+                  {/* Pin / Unpin */}
+                  {!isPinned ? (
+                    <DropdownMenuItem onClick={onPin}>
+                      Ghim tin nhắn
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={onUnpin}>
+                      Bỏ ghim
+                    </DropdownMenuItem>
+                  )}
+
                   {isOwn && message.type === 'text' && (
                     <DropdownMenuItem
                       onClick={() => {
@@ -495,6 +512,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                 isOwn ? 'justify-end' : ''
               }`}
             >
+              {isPinned && (
+                <span className="text-xs text-amber-600">Đã ghim</span>
+              )}
               <span className="text-xs text-gray-500">
                 {formatTime(message.created_at)}
               </span>

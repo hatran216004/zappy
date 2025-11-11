@@ -100,9 +100,16 @@ export default function ChatFooter({
     setMentionQuery('');
   }, [messageText, inputRef]);
 
-  const filteredParticipants = (participants || []).filter((p) =>
-    p.name.toLowerCase().includes(mentionQuery.toLowerCase())
-  );
+  const filteredParticipants = (() => {
+    const base = (participants || []).filter((p) =>
+      p.name.toLowerCase().includes(mentionQuery.toLowerCase())
+    );
+    // Tag all option for group chats
+    const includeAll =
+      (participants || []).length > 1 &&
+      ('all'.startsWith(mentionQuery.toLowerCase()) || mentionQuery.length === 0);
+    return includeAll ? [{ id: 'ALL', name: 'all' }, ...base] : base;
+  })();
 
   const insertMention = (p: { id: string; name: string }) => {
     const el = inputRef.current;

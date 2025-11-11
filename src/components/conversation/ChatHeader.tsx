@@ -15,11 +15,13 @@ import { TooltipBtn } from "../TooltipBtn";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ConversationWithDetails } from "@/services/chatService";
+import type { PinnedMessage } from "@/services/chatService";
 import { InviteLinkModal } from "../modal/InviteLinkModal";
 import { GroupInfoModal } from "../modal/GroupInfoModal";
 import { supabaseUrl } from "@/lib/supabase";
 import { BackgroundPicker } from "./BackgroundPicker";
 import { useUpdateConversationBackground } from "@/hooks/useChat";
+import { PinnedMessagesModal } from "../modal/PinnedMessagesModal";
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -39,6 +41,9 @@ interface ChatHeaderProps {
   conversation?: ConversationWithDetails;
   currentUserId?: string;
   onCall?: (userId: string, isVideo: boolean) => void;
+  pinned?: PinnedMessage[];
+  onUnpin?: (messageId: string) => void;
+  onJumpTo?: (messageId: string) => void;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -50,11 +55,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   conversation,
   currentUserId,
   onCall,
+  pinned,
+  onUnpin,
+  onJumpTo,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [showPinsModal, setShowPinsModal] = useState(false);
 
   const updateBackgroundMutation = useUpdateConversationBackground();
 
@@ -195,8 +204,47 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           ) : (
             <TooltipBtn icon={Info} label="Thông tin" />
           )}
+
+          {/* Pinned messages button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs px-2"
+            onClick={() => setShowPinsModal(true)}
+            title="Xem tin nhắn đã ghim"
+          >
+            Ghim ({pinned?.length || 0})
+          </Button>
         </div>
       </div>
+
+      {/* Pinned messages bar */}
+      {pinned && pinned.length > 0 && (
+        <div className="px-4 py-1.5 bg-gray-50 dark:bg-gray-900 border-t dark:border-gray-700">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {pinned.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-full shadow-sm"
+              >
+                <button
+                  className="text-xs font-medium text-gray-700 dark:text-gray-200 max-w-[200px] truncate"
+                  title={p.message?.content_text || 'Tin nhắn'}
+                  onClick={() => onJumpTo?.(p.message_id)}
+                >
+                  {p.message?.content_text || '(Tin nhắn)'}
+                </button>
+                <button
+                  className="text-xs text-red-600 hover:text-red-700"
+                  onClick={() => onUnpin?.(p.message_id)}
+                >
+                  Bỏ ghim
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search bar */}
       {showSearch && (
@@ -279,6 +327,17 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onOpenChange={setShowGroupInfoModal}
           conversation={conversation}
           currentUserId={currentUserId}
+        />
+      )}
+
+      {/* Pinned Messages Modal */}
+      {conversation && (
+        <PinnedMessagesModal
+          open={showPinsModal}
+          onOpenChange={setShowPinsModal}
+          conversationId={conversation.id}
+          onUnpin={(id) => onUnpin?.(id)}
+          onJumpTo={(id) => onJumpTo?.(id)}
         />
       )}
     </div>
