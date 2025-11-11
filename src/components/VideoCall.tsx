@@ -1,5 +1,5 @@
 // components/VideoCall.tsx
-import { X, Phone, Video, PhoneOff } from 'lucide-react';
+import { X, Phone, Video, PhoneOff, PhoneIncoming, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/user';
 import { CallInfo, CallParticipant } from '@/services/callService';
@@ -9,9 +9,15 @@ interface VideoCallProps {
   callInfo: CallInfo;
   participant: CallParticipant;
   onEndCall: () => void;
+  status?: 'incoming' | 'connected';
+  onAcceptCall?: () => void;
+  onToggleMic?: () => void;
+  onToggleCamera?: () => void;
+  micEnabled?: boolean;
+  cameraEnabled?: boolean;
 }
 
-export default function VideoCall({ callInfo, participant, onEndCall }: VideoCallProps) {
+export default function VideoCall({ callInfo, participant, onEndCall, status = 'connected', onAcceptCall, onToggleMic, onToggleCamera, micEnabled, cameraEnabled }: VideoCallProps) {
   const { user } = useAuth();
   const isVideoCall = callInfo.is_video_enabled;
 
@@ -30,7 +36,7 @@ export default function VideoCall({ callInfo, participant, onEndCall }: VideoCal
             <div>
               <h3 className="text-white font-semibold">{callInfo.display_name}</h3>
               <p className="text-gray-400 text-sm">
-                {isVideoCall ? 'Cuộc gọi video' : 'Cuộc gọi thoại'}
+                {status === 'incoming' ? 'Cuộc gọi đến' : isVideoCall ? 'Cuộc gọi video' : 'Cuộc gọi thoại'}
               </p>
             </div>
           </div>
@@ -89,20 +95,36 @@ export default function VideoCall({ callInfo, participant, onEndCall }: VideoCal
         {/* Controls */}
         <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-center">
           <div className="flex items-center gap-4">
-            {/* Mute/Unmute */}
-            <Button
-              variant="secondary"
-              size="icon"
-              className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600"
-            >
-              <Phone className="h-6 w-6" />
-            </Button>
-
-            {/* Camera Toggle (video call only) */}
-            {isVideoCall && (
+            {/* Accept (incoming) */}
+            {status === 'incoming' && (
               <Button
                 variant="secondary"
                 size="icon"
+                onClick={onAcceptCall}
+                className="w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white"
+              >
+                <PhoneIncoming className="h-6 w-6" />
+              </Button>
+            )}
+
+            {/* Mute/Unmute */}
+            {status === 'connected' && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={onToggleMic}
+                className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600"
+              >
+                {micEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+              </Button>
+            )}
+
+            {/* Camera Toggle (video call only) */}
+            {isVideoCall && status === 'connected' && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={onToggleCamera}
                 className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600"
               >
                 <Video className="h-6 w-6" />

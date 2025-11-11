@@ -42,7 +42,7 @@ export function UserAvatar({
   };
 
   return (
-    <div className={cn("relative inline-block", className)}>
+    <div className={cn("relative flex justify-center items-center", className)}>
       <Avatar className={sizeClasses[size]}>
         <AvatarImage src={avatarUrl || undefined} />
         <AvatarFallback className="bg-zinc-300">
