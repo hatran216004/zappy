@@ -9,10 +9,18 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent
 } from "@/components/ui/dropdown-menu";
-import { useContactLabels, useAssignLabelToFriend, useRemoveLabelFromFriend } from "@/hooks/useFriends";
+import { 
+  useContactLabels, 
+  useAssignLabelToFriend, 
+  useRemoveLabelFromFriend,
+  useBlockUser,
+  useUnblockUser,
+  useIsBlockedByMe
+} from "@/hooks/useFriends";
 import useUser from "@/hooks/useUser";
-import { Check, Tag } from "lucide-react";
+import { Check, Tag, Ban, Unlock } from "lucide-react";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/modal/ModalConfirm";
 
 interface FriendItemProps {
   friend: {
@@ -48,6 +56,10 @@ export default function FriendItem({
   const { data: labels } = useContactLabels(userId || ''); // Pass empty string if undefined
   const assignLabelMutation = useAssignLabelToFriend();
   const removeLabelMutation = useRemoveLabelFromFriend();
+  const blockUserMutation = useBlockUser();
+  const unblockUserMutation = useUnblockUser();
+  const { data: isBlocked } = useIsBlockedByMe(friend.id);
+  const confirm = useConfirm();
 
   const handleMessage = () => {
     if (onMessage) {
@@ -75,6 +87,41 @@ export default function FriendItem({
     } catch (error) {
       console.error('Error toggling label:', error);
       toast.error('Lỗi khi cập nhật nhãn');
+    }
+  };
+
+  const handleBlock = async () => {
+    const confirmed = await confirm({
+      title: 'Chặn người dùng',
+      description: `Bạn có chắc muốn chặn ${friend.display_name}? Bạn sẽ không thể nhắn tin với nhau và không thấy bài viết của nhau.`,
+      confirmText: 'Chặn',
+      cancelText: 'Hủy',
+      destructive: true
+    });
+
+    if (confirmed) {
+      try {
+        console.log('🔄 Calling blockUserMutation for:', friend.id);
+        await blockUserMutation.mutateAsync(friend.id);
+        console.log('✅ Block mutation completed');
+        toast.success(`Đã chặn ${friend.display_name}`);
+        // Don't remove from friends list - keep showing but with blocked status
+      } catch (error: any) {
+        console.error('❌ Error in handleBlock:', error);
+        console.error('   Error details:', error?.details);
+        console.error('   Error code:', error?.code);
+        toast.error(error?.message || 'Lỗi khi chặn người dùng');
+      }
+    }
+  };
+
+  const handleUnblock = async () => {
+    try {
+      await unblockUserMutation.mutateAsync(friend.id);
+      toast.success(`Đã bỏ chặn ${friend.display_name}`);
+    } catch (error: any) {
+      console.error('Error unblocking user:', error);
+      toast.error(error?.message || 'Lỗi khi bỏ chặn người dùng');
     }
   };
 
@@ -112,6 +159,11 @@ export default function FriendItem({
             <p className="text-sm sm:text-[15px] font-medium text-foreground truncate">
               {friend.display_name}
             </p>
+            {isBlocked && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                Đã chặn
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             <p className="text-xs text-muted-foreground truncate">
@@ -148,11 +200,12 @@ export default function FriendItem({
         <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleMessage}
-            className="h-8 px-3 text-sm rounded-full bg-primary text-primary-foreground hover:opacity-90"
-            title="Nhắn tin"
+            disabled={isBlocked}
+            className="h-8 px-3 text-sm rounded-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isBlocked ? "Đã bị chặn - Không thể nhắn tin" : "Nhắn tin"}
             type="button"
           >
-            Nhắn tin
+            {isBlocked ? "Đã chặn" : "Nhắn tin"}
           </button>
         </div>
 
@@ -169,8 +222,12 @@ export default function FriendItem({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleMessage}>
-              Nhắn tin
+            <DropdownMenuItem 
+              onClick={handleMessage}
+              disabled={isBlocked}
+              className={isBlocked ? "opacity-50 cursor-not-allowed" : ""}
+            >
+              {isBlocked ? "Đã chặn - Không thể nhắn tin" : "Nhắn tin"}
             </DropdownMenuItem>
             <DropdownMenuItem>
               Trang cá nhân
@@ -211,6 +268,23 @@ export default function FriendItem({
             </DropdownMenuSub>
 
             <DropdownMenuSeparator />
+            {isBlocked ? (
+              <DropdownMenuItem
+                onClick={handleUnblock}
+                className="text-blue-600 dark:text-blue-400"
+              >
+                <Unlock className="size-4 mr-2" />
+                Bỏ chặn
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={handleBlock}
+                className="text-destructive focus:text-destructive"
+              >
+                <Ban className="size-4 mr-2" />
+                Chặn
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={onRemove}
               className="text-destructive focus:text-destructive"

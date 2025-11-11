@@ -18,7 +18,13 @@ import {
   updateContactLabel,
   deleteContactLabel,
   assignLabelToFriend,
-  removeLabelFromFriend
+  removeLabelFromFriend,
+  blockUser,
+  unblockUser,
+  isBlockedByMe,
+  isBlockedByUser,
+  isMutuallyBlocked,
+  getBlockedUsers
 } from '@/services/friendServices';
 
 // Keys cho query cache
@@ -288,5 +294,83 @@ export const useRemoveLabelFromFriend = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: friendKeys.all });
     }
+  });
+};
+
+// ============================================
+// BLOCK/UNBLOCK HOOKS
+// ============================================
+
+// Hook block user
+export const useBlockUser = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => blockUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['blocks'] });
+    }
+  });
+};
+
+// Hook unblock user
+export const useUnblockUser = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => unblockUser(userId),
+    onSuccess: (_, userId) => {
+      // Invalidate tất cả queries liên quan
+      queryClient.invalidateQueries({ queryKey: friendKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      
+      // Invalidate specific block status queries
+      queryClient.invalidateQueries({ queryKey: ['blocks', 'by-me', userId] });
+      queryClient.invalidateQueries({ queryKey: ['blocks', 'by-user', userId] });
+      queryClient.invalidateQueries({ queryKey: ['blocks', 'mutual', userId] });
+      
+      // Force refetch friends list
+      queryClient.refetchQueries({ queryKey: friendKeys.all });
+    }
+  });
+};
+
+// Hook check if user is blocked by me
+export const useIsBlockedByMe = (userId: string) => {
+  return useQuery({
+    queryKey: ['blocks', 'by-me', userId],
+    queryFn: () => isBlockedByMe(userId),
+    enabled: !!userId,
+    staleTime: 30000
+  });
+};
+
+// Hook check if user has blocked me
+export const useIsBlockedByUser = (userId: string) => {
+  return useQuery({
+    queryKey: ['blocks', 'by-user', userId],
+    queryFn: () => isBlockedByUser(userId),
+    enabled: !!userId,
+    staleTime: 30000
+  });
+};
+
+// Hook check if mutually blocked
+export const useIsMutuallyBlocked = (userId: string) => {
+  return useQuery({
+    queryKey: ['blocks', 'mutual', userId],
+    queryFn: () => isMutuallyBlocked(userId),
+    enabled: !!userId,
+    staleTime: 30000
+  });
+};
+
+// Hook get blocked users list
+export const useBlockedUsers = () => {
+  return useQuery({
+    queryKey: ['blocks', 'list'],
+    queryFn: () => getBlockedUsers(),
+    staleTime: 60000
   });
 };

@@ -46,6 +46,9 @@ export interface MessageWithDetails extends Message {
     mentioned_user_id: string;
     user?: Database['public']['Tables']['profiles']['Row'];
   }[];
+  is_forwarded?: boolean; // Flag to indicate forwarded message
+  forwarded_from_user_id?: string; // Original sender ID
+  forwarded_from_user?: Database['public']['Tables']['profiles']['Row']; // Original sender profile
 }
 
 // ============================================
@@ -273,7 +276,6 @@ export const getMessages = async (
   before?: string,
   currentUserId?: string
 ): Promise<MessageWithDetails[]> => {
-  console.log('Conversation ID:', conversationId);
 
   // --- STEP 1: lấy messages cơ bản ---
   let query = supabase
@@ -295,6 +297,9 @@ export const getMessages = async (
       location_longitude,
       location_address,
       location_display_mode,
+      is_forwarded,
+      forwarded_from_user_id,
+      forwarded_from_user:profiles!messages_forwarded_from_user_id_fkey(*),
       mentions:message_mentions(
         mentioned_user_id,
         user:profiles!message_mentions_mentioned_user_id_fkey(*)
@@ -399,6 +404,82 @@ export const getMessages = async (
 };
 
 // Gửi text message
+// Helper: Check if message can be sent (block strangers check)
+const checkCanSendMessage = async (
+  conversationId: string,
+  senderId: string
+): Promise<void> => {
+  // Get conversation info
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('type, id')
+    .eq('id', conversationId)
+    .single();
+
+  if (convError || !conversation) {
+    throw new Error('Conversation not found');
+  }
+
+  // For direct conversations, check if recipient blocks strangers
+  if (conversation.type === 'direct') {
+    // Get direct pair to find recipient
+    const { data: pair } = await supabase
+      .from('direct_pairs')
+      .select('user_a, user_b')
+      .eq('conversation_id', conversationId)
+      .single();
+
+    if (pair) {
+      const recipientId = pair.user_a === senderId ? pair.user_b : pair.user_a;
+
+      // Get recipient profile to check setting
+      const { data: recipientProfile } = await supabase
+        .from('profiles')
+        .select('block_messages_from_strangers')
+        .eq('id', recipientId)
+        .single();
+
+      // Check if blocked (either direction)
+      const { data: blockData } = await supabase
+        .from('blocks')
+        .select('id')
+        .or(
+          `and(blocker_id.eq.${senderId},blocked_id.eq.${recipientId}),and(blocker_id.eq.${recipientId},blocked_id.eq.${senderId})`
+        )
+        .maybeSingle();
+
+      if (blockData) {
+        throw new Error('Bạn không thể nhắn tin với người dùng này do đã bị chặn');
+      }
+
+      // If recipient blocks strangers, check if sender is a friend
+      if (recipientProfile?.block_messages_from_strangers) {
+        // Check if they are friends (friends table: user_id -> friend_id)
+        const { data: friendship1 } = await supabase
+          .from('friends')
+          .select('id')
+          .eq('user_id', senderId)
+          .eq('friend_id', recipientId)
+          .maybeSingle();
+
+        const { data: friendship2 } = await supabase
+          .from('friends')
+          .select('id')
+          .eq('user_id', recipientId)
+          .eq('friend_id', senderId)
+          .maybeSingle();
+
+        if (!friendship1 && !friendship2) {
+          throw new Error(
+            'Người nhận đã bật chế độ chặn tin nhắn từ người lạ. Bạn cần kết bạn trước.'
+          );
+        }
+      }
+    }
+  }
+  // For group conversations, allow (group admins can manage)
+};
+
 export const sendTextMessage = async (
   conversationId: string,
   senderId: string,
@@ -406,6 +487,9 @@ export const sendTextMessage = async (
   replyToId?: string,
   mentionedUserIds?: string[]
 ): Promise<Message> => {
+  // Check if message can be sent (block strangers check)
+  await checkCanSendMessage(conversationId, senderId);
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -451,6 +535,9 @@ export const sendFileMessage = async (
   file: File,
   type: 'image' | 'video' | 'file' | 'audio'
 ): Promise<Message> => {
+  // Check if message can be sent (block strangers check)
+  await checkCanSendMessage(conversationId, senderId);
+
   // Upload file to storage
   const fileExt = file.name.split('.').pop();
   const fileName = `${conversationId}/${Date.now()}_${Math.random()
@@ -624,6 +711,51 @@ export const recallMessage = async (messageId: string): Promise<void> => {
   if (error) throw error;
 };
 
+// Admin delete message (xóa tin nhắn của thành viên khác trong nhóm)
+export const deleteMessageAsAdmin = async (
+  messageId: string,
+  adminId: string,
+  conversationId: string
+): Promise<void> => {
+  // Check if user is admin
+  const { data: participant, error: participantError } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', adminId)
+    .is('left_at', null)
+    .single();
+
+  if (participantError || !participant) {
+    throw new Error('Không tìm thấy thông tin thành viên');
+  }
+
+  if (participant.role !== 'admin') {
+    throw new Error('Chỉ admin mới có quyền xóa tin nhắn của thành viên khác');
+  }
+
+  // Check if conversation is group
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('type')
+    .eq('id', conversationId)
+    .single();
+
+  if (convError || !conversation || conversation.type !== 'group') {
+    throw new Error('Chỉ có thể xóa tin nhắn trong nhóm');
+  }
+
+  // Delete message (set recalled_at)
+  const { error } = await supabase
+    .from('messages')
+    .update({
+      recalled_at: new Date().toISOString()
+    })
+    .eq('id', messageId);
+
+  if (error) throw error;
+};
+
 // Delete message for current user only
 export const deleteMessageForMe = async (
   messageId: string,
@@ -637,6 +769,79 @@ export const deleteMessageForMe = async (
   if (error) throw error;
 };
 
+// Forward message to another conversation
+export const forwardMessage = async ({
+  messageId,
+  targetConversationId,
+  senderId,
+}: {
+  messageId: string;
+  targetConversationId: string;
+  senderId: string;
+}) => {
+  // Get original message
+  const { data: originalMessage, error: fetchError } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('id', messageId)
+    .single();
+
+  if (fetchError || !originalMessage) {
+    throw new Error('Message not found');
+  }
+
+  // Create new message in target conversation with forwarded flag
+  const { data: newMessage, error: insertError } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: targetConversationId,
+      sender_id: senderId,
+      type: originalMessage.type,
+      content_text: originalMessage.content_text,
+      is_forwarded: true,
+      forwarded_from_user_id: originalMessage.sender_id,
+    })
+    .select()
+    .single();
+
+  if (insertError) throw insertError;
+
+  // Copy attachments if any
+  if (originalMessage.type !== 'text' && originalMessage.type !== 'system') {
+    const { data: attachments } = await supabase
+      .from('attachments')
+      .select('*')
+      .eq('message_id', messageId);
+
+    if (attachments && attachments.length > 0) {
+      const newAttachments = attachments.map((att) => ({
+        message_id: newMessage.id,
+        kind: att.kind,
+        storage_path: att.storage_path,
+        mime_type: att.mime_type,
+        byte_size: att.byte_size,
+        width: att.width,
+        height: att.height,
+        duration_ms: att.duration_ms,
+        uploader_id: senderId,
+      }));
+
+      await supabase.from('attachments').insert(newAttachments);
+    }
+  }
+
+  // Update last_message_id
+  await supabase
+    .from('conversations')
+    .update({
+      last_message_id: newMessage.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', targetConversationId);
+
+  return newMessage;
+};
+
 // Send location message
 export const sendLocationMessage = async (
   conversationId: string,
@@ -646,6 +851,9 @@ export const sendLocationMessage = async (
   address?: string,
   displayMode: 'interactive' | 'static' = 'interactive'
 ): Promise<Message> => {
+  // Check if message can be sent (block strangers check)
+  await checkCanSendMessage(conversationId, senderId);
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -680,18 +888,59 @@ export const sendLocationMessage = async (
 // ============================================
 
 // Add reaction
+// Logic:
+// - 1 user chỉ được react 1 emoji per message
+// - Nếu chọn emoji khác → thay thế emoji cũ
+// - Nếu click lại emoji đã có → giữ nguyên (count không đổi)
+// - Nhiều user cùng react → count tự động tăng (database tự xử lý)
 export const addReaction = async (
   messageId: string,
   userId: string,
   emoji: string
 ): Promise<void> => {
-  const { error } = await supabase.from('message_reactions').insert({
+  // Check if user already has a reaction on this message
+  const { data: existingReactions, error: checkError } = await supabase
+    .from('message_reactions')
+    .select('emoji')
+    .eq('message_id', messageId)
+    .eq('user_id', userId);
+
+  if (checkError) throw checkError;
+
+  // Check if user has reactions with different emoji
+  const hasDifferentEmoji = existingReactions?.some(r => r.emoji !== emoji);
+  
+  // Case 1: User có emoji khác → Xóa tất cả reactions cũ, thêm emoji mới (thay thế)
+  // 1 user chỉ được react 1 loại emoji (nhưng có thể click nhiều lần để tăng count)
+  if (hasDifferentEmoji) {
+    // Remove all existing reactions from this user
+    const { error: deleteError } = await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId);
+    
+    if (deleteError) throw deleteError;
+  }
+
+  // Case 2: User đã có emoji này hoặc chưa có → Thêm reaction mới (tăng count)
+  // Nếu click lại emoji đã có → thêm duplicate → count tăng
+  // Nếu chưa có → thêm mới
+  const { error: insertError } = await supabase.from('message_reactions').insert({
     message_id: messageId,
     user_id: userId,
     emoji
   });
 
-  if (error) throw error;
+  if (insertError) {
+    // If duplicate constraint exists, try to handle gracefully
+    if (insertError.code === '23505') {
+      // Unique constraint violation - might have unique constraint on (message_id, user_id, emoji)
+      // In this case, user can't add duplicate, but we should still allow if they have different emoji
+      throw new Error('Không thể thêm reaction trùng lặp');
+    }
+    throw insertError;
+  }
 };
 
 // Remove reaction
@@ -1447,11 +1696,108 @@ export const removeGroupMember = async (
   });
 };
 
+// Transfer admin role to another member
+export const transferAdminRole = async (
+  conversationId: string,
+  currentAdminId: string,
+  newAdminId: string
+): Promise<void> => {
+  // Check if current user is admin
+  const { data: currentAdmin, error: adminError } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', currentAdminId)
+    .is('left_at', null)
+    .single();
+
+  if (adminError || !currentAdmin || currentAdmin.role !== 'admin') {
+    throw new Error('Chỉ admin mới có quyền chuyển quyền admin');
+  }
+
+  // Check if new admin is a member
+  const { data: newAdmin, error: memberError } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', newAdminId)
+    .is('left_at', null)
+    .single();
+
+  if (memberError || !newAdmin) {
+    throw new Error('Thành viên không tồn tại trong nhóm');
+  }
+
+  // Transfer admin role
+  const { error: updateError1 } = await supabase
+    .from('conversation_participants')
+    .update({ role: 'member' })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', currentAdminId);
+
+  if (updateError1) throw updateError1;
+
+  const { error: updateError2 } = await supabase
+    .from('conversation_participants')
+    .update({ role: 'admin' })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', newAdminId);
+
+  if (updateError2) throw updateError2;
+
+  // Create system message
+  const [currentAdminProfile, newAdminProfile] = await Promise.all([
+    supabase.from('profiles').select('display_name').eq('id', currentAdminId).single(),
+    supabase.from('profiles').select('display_name').eq('id', newAdminId).single()
+  ]);
+
+  const currentName = currentAdminProfile.data?.display_name || 'Admin';
+  const newName = newAdminProfile.data?.display_name || 'Thành viên';
+
+  await supabase.from('messages').insert({
+    conversation_id: conversationId,
+    sender_id: currentAdminId,
+    type: 'system',
+    content_text: `${currentName} đã chuyển quyền admin cho ${newName}`
+  });
+};
+
 // Leave group
 export const leaveGroup = async (
   conversationId: string,
   userId: string
-): Promise<void> => {
+): Promise<{ isLastAdmin: boolean; adminCount: number }> => {
+  // Check if user is admin and count remaining admins
+  const { data: userParticipant } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .is('left_at', null)
+    .single();
+
+  const isAdmin = userParticipant?.role === 'admin';
+
+  if (isAdmin) {
+    // Count remaining admins (excluding current user)
+    const { data: admins, error: adminError } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', conversationId)
+      .eq('role', 'admin')
+      .is('left_at', null);
+
+    if (adminError) throw adminError;
+
+    const adminCount = admins?.filter(a => a.user_id !== userId).length || 0;
+
+    if (adminCount === 0) {
+      // This is the last admin
+      return { isLastAdmin: true, adminCount: 0 };
+    }
+  }
+
+  // Proceed with leaving
   const { error } = await supabase
     .from('conversation_participants')
     .update({ left_at: new Date().toISOString() })
@@ -1475,6 +1821,8 @@ export const leaveGroup = async (
       content_text: `${profile.display_name} đã rời khỏi nhóm`
     });
   }
+
+  return { isLastAdmin: false, adminCount: 0 };
 };
 
 // Promote member to admin
@@ -1924,4 +2272,81 @@ export const searchConversations = async (
 
   // Optional: limit results
   return results.slice(0, 20);
+};
+
+// Start chat with any user (allows messaging strangers)
+// Uses RPC function to get or create direct conversation
+export const startChatWithUser = async (
+  userId: string
+): Promise<Conversation> => {
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  if (!currentUserId) {
+    throw new Error('User not authenticated');
+  }
+
+  // Check if blocked (either direction)
+  const { data: blockData } = await supabase
+    .from('blocks')
+    .select('id')
+    .or(
+      `and(blocker_id.eq.${currentUserId},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${currentUserId})`
+    )
+    .maybeSingle();
+
+  if (blockData) {
+    throw new Error('Bạn không thể nhắn tin với người dùng này do đã bị chặn');
+  }
+
+  const { data, error } = await supabase.rpc('get_or_create_direct_conversation', {
+    _user_id: userId,
+  });
+
+  if (error) {
+    console.error('Error starting chat with user:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to start chat');
+  }
+
+  return data[0];
+};
+
+// Search users by username or display name
+export const searchUsers = async (
+  query: string,
+  currentUserId: string
+): Promise<
+  Array<{
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_url: string;
+    status: string;
+  }>
+> => {
+  if (query.length < 2) {
+    return [];
+  }
+
+  const searchTerm = `%${query}%`;
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, status')
+    .or(`username.ilike.${searchTerm},display_name.ilike.${searchTerm}`)
+    .neq('id', currentUserId)
+    .limit(20);
+
+  if (error) {
+    console.error('Error searching users:', error);
+    throw error;
+  }
+
+  return data || [];
 };

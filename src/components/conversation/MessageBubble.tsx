@@ -4,6 +4,7 @@ import {
   useEditMessage,
   useRecallMessage,
   useDeleteMessageForMe,
+  useDeleteMessageAsAdmin,
   useAddReaction,
   useRemoveReaction
 } from '@/hooks/useChat';
@@ -26,6 +27,7 @@ import { EmojiPicker } from './EmojiPicker';
 import { UserAvatar } from '../UserAvatar';
 import { LocationMessage } from './LocationMessage';
 import { PollMessage } from './PollMessage';
+import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -39,6 +41,10 @@ interface MessageBubbleProps {
   onPin?: () => void;
   onUnpin?: () => void;
   onJumpToMessage?: (messageId: string) => void;
+  onForward?: () => void;
+  isAdmin?: boolean; // Current user is admin
+  conversationType?: string; // 'direct' | 'group'
+  conversationId?: string; // For admin delete
 }
 
 // Helper function to detect and linkify URLs and render mentions with avatar+name
@@ -133,7 +139,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     isPinned,
     onPin,
     onUnpin,
-    onJumpToMessage
+    onJumpToMessage,
+    onForward,
+    isAdmin = false,
+    conversationType,
+    conversationId
   }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.content_text || '');
@@ -143,6 +153,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     const editMutation = useEditMessage();
     const recallMutation = useRecallMessage();
     const deleteForMeMutation = useDeleteMessageForMe();
+    const deleteAsAdminMutation = useDeleteMessageAsAdmin();
     const addReactionMutation = useAddReaction();
     const removeReactionMutation = useRemoveReaction();
 
@@ -217,29 +228,56 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
       }
     };
 
-    const handleReaction = async (emoji: string) => {
-      if (!message.reactions) return;
+    const handleDeleteAsAdmin = async () => {
+      if (!conversationId) return;
 
-      const existingReaction = message.reactions.find(
-        (r) => r.user_id === currentUserId && r.emoji === emoji
-      );
+      const confirmed = await confirm({
+        title: 'Xóa tin nhắn (Admin)',
+        description:
+          'Bạn có chắc muốn xóa tin nhắn này? Tin nhắn sẽ bị xóa cho tất cả mọi người trong nhóm.',
+        confirmText: 'Xóa',
+        cancelText: 'Hủy',
+        destructive: true,
+        dismissible: true
+      });
+
+      if (!confirmed) return;
 
       try {
-        if (existingReaction) {
-          await removeReactionMutation.mutateAsync({
-            messageId: message.id,
-            userId: currentUserId,
-            emoji
-          });
-        } else {
-          await addReactionMutation.mutateAsync({
-            messageId: message.id,
-            userId: currentUserId,
-            emoji
-          });
-        }
+        await deleteAsAdminMutation.mutateAsync({
+          messageId: message.id,
+          adminId: currentUserId,
+          conversationId
+        });
+        toast.success('Đã xóa tin nhắn');
+      } catch (error) {
+        console.error('Error deleting message as admin:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Không thể xóa tin nhắn';
+        toast.error(errorMessage);
+      }
+    };
+
+    const handleReaction = async (emoji: string) => {
+      if (!conversationId) return;
+
+      try {
+        // Optimistic update will happen immediately in the hook
+        // addReaction will handle:
+        // - If user already has this emoji → keep it (no change)
+        // - If user has different emoji → replace with new one
+        // - If user has no reaction → add new one
+        await addReactionMutation.mutateAsync({
+          messageId: message.id,
+          userId: currentUserId,
+          emoji,
+          conversationId
+        });
       } catch (error) {
         console.error('Error handling reaction:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Không thể thêm reaction';
+        toast.error(errorMessage);
       }
     };
 
@@ -317,6 +355,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
               >
                 Trả lời: {message.reply_to.content_text || 'Tin nhắn'}
               </button>
+            )}
+
+            {/* Forwarded badge */}
+            {message.is_forwarded && (
+              <div
+                className={clsx(
+                  'flex items-center gap-1 px-3 py-1 mb-1 text-xs font-medium',
+                  isOwn ? 'text-blue-100' : 'text-blue-600'
+                )}
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
+                </svg>
+                <span>Đã chuyển tiếp</span>
+                {message.forwarded_from_user && (
+                  <span
+                    className={clsx(
+                      'ml-1',
+                      isOwn ? 'text-blue-200' : 'text-gray-500'
+                    )}
+                  >
+                    từ {message.forwarded_from_user.display_name}
+                  </span>
+                )}
+              </div>
             )}
 
             {/* Message content */}
@@ -513,6 +586,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                       Trả lời
                     </DropdownMenuItem>
 
+                    {/* Forward */}
+                    {onForward && (
+                      <DropdownMenuItem onClick={onForward}>
+                        Chuyển tiếp
+                      </DropdownMenuItem>
+                    )}
+
                     {/* Pin / Unpin */}
                     {!isPinned ? (
                       <DropdownMenuItem onClick={onPin}>
@@ -554,6 +634,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                         Thu hồi với mọi người
                       </DropdownMenuItem>
                     )}
+
+                    {/* Admin delete option - for group messages from other members */}
+                    {isAdmin &&
+                      conversationType === 'group' &&
+                      !isOwn &&
+                      conversationId && (
+                        <DropdownMenuItem
+                          onClick={handleDeleteAsAdmin}
+                          className="text-orange-600 focus:text-orange-700"
+                        >
+                          Xóa tin nhắn (Admin)
+                        </DropdownMenuItem>
+                      )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -569,7 +662,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                     className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-xs"
                   >
                     <span>{emoji}</span>
-                    <span>{reactions?.length || 0}</span>
                   </button>
                 ))}
               </div>

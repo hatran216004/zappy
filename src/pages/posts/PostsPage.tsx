@@ -29,12 +29,13 @@ import {
   Settings,
   Link as LinkIcon,
   Calendar,
-  Video,
+  Video as VideoIcon,
   Sparkles,
   Image as ImageIcon,
   X,
   Edit,
   Trash2,
+  Video,
 } from "lucide-react";
 import { useAuth } from "@/stores/user";
 import { useProfile } from "@/hooks/useProfile";
@@ -42,6 +43,7 @@ import { useFriends } from "@/hooks/useFriends";
 import { useConversations } from "@/hooks/useChat";
 import { useUserStatus } from "@/hooks/usePresence";
 import { useConfirm } from "@/components/modal/ModalConfirm";
+import toast from "react-hot-toast";
 import {
   usePostsByFriends,
   useCreatePost,
@@ -54,6 +56,7 @@ import {
   useDeletePost,
   uploadPostImage,
 } from "@/hooks/usePosts";
+import { uploadPostImages, uploadPostVideo } from "@/services/postService";
 import type { Post, PostReactionType } from "@/services/postService";
 import { supabaseUrl } from "@/lib/supabase";
 
@@ -242,44 +245,135 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
   const { data: profile } = useProfile(userId);
   const createPostMutation = useCreatePost();
   const [content, setContent] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      setImageFile(file);
+  const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+  const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Validate file size
+    const invalidFiles = files.filter(file => file.size > MAX_IMAGE_SIZE);
+    if (invalidFiles.length > 0) {
+      toast.error(`Một số ảnh vượt quá 2MB. Vui lòng chọn ảnh nhỏ hơn.`);
+      return;
+    }
+
+    // Validate file type
+    const invalidTypes = files.filter(file => !file.type.startsWith("image/"));
+    if (invalidTypes.length > 0) {
+      toast.error("Chỉ được chọn file ảnh");
+      return;
+    }
+
+    // Nếu đã có video, không cho chọn ảnh
+    if (videoFile) {
+      toast.error("Chỉ được chọn ảnh hoặc video, không thể chọn cả hai");
+      return;
+    }
+
+    const newFiles = [...imageFiles, ...files];
+    setImageFiles(newFiles);
+
+    // Create previews
+    const newPreviews: string[] = [];
+    files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === files.length) {
+          setImagePreviews([...imagePreviews, ...newPreviews]);
+        }
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size
+    if (file.size > MAX_VIDEO_SIZE) {
+      toast.error("Kích thước video không được vượt quá 20MB");
+      return;
     }
+
+    // Validate file type
+    if (!file.type.startsWith("video/")) {
+      toast.error("Chỉ được chọn file video");
+      return;
+    }
+
+    // Nếu đã có ảnh, không cho chọn video
+    if (imageFiles.length > 0) {
+      toast.error("Chỉ được chọn ảnh hoặc video, không thể chọn cả hai");
+      return;
+    }
+
+    setVideoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setVideoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = (index: number) => {
+    const newFiles = imageFiles.filter((_, i) => i !== index);
+    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+    setImageFiles(newFiles);
+    setImagePreviews(newPreviews);
+  };
+
+  const removeVideo = () => {
+    setVideoFile(null);
+    setVideoPreview(null);
   };
 
   const handleSubmit = async () => {
-    if (!content.trim() && !imageFile) return;
+    if (!content.trim() && imageFiles.length === 0 && !videoFile) return;
 
     try {
-      let imageUrl = undefined;
-      if (imageFile) {
+      let imageUrls: string[] | undefined = undefined;
+      let videoUrl: string | undefined = undefined;
+
+      if (imageFiles.length > 0) {
         try {
-          imageUrl = await uploadPostImage(imageFile);
-        } catch (error) {
-          console.error("Error uploading image:", error);
-          // Fallback to blob URL if upload fails
-          imageUrl = URL.createObjectURL(imageFile);
+          imageUrls = await uploadPostImages(imageFiles);
+        } catch (error: any) {
+          console.error("Error uploading images:", error);
+          toast.error(error?.message || "Lỗi khi upload ảnh");
+          return;
+        }
+      }
+
+      if (videoFile) {
+        try {
+          videoUrl = await uploadPostVideo(videoFile);
+        } catch (error: any) {
+          console.error("Error uploading video:", error);
+          toast.error(error?.message || "Lỗi khi upload video");
+          return;
         }
       }
       
       await createPostMutation.mutateAsync({
         content: content.trim(),
-        image_url: imageUrl,
+        image_urls: imageUrls,
+        video_url: videoUrl,
       });
       setContent("");
-      setImagePreview(null);
-      setImageFile(null);
+      setImagePreviews([]);
+      setImageFiles([]);
+      setVideoPreview(null);
+      setVideoFile(null);
       onPostCreated?.();
     } catch (error) {
       console.error("Error creating post:", error);
@@ -302,49 +396,92 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[100px] resize-none bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
           />
-          {imagePreview && (
+          
+          {/* Multiple Images Preview */}
+          {imagePreviews.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {imagePreviews.map((preview, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={preview}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full rounded-lg h-48 object-cover"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70 text-white"
+                    onClick={() => removeImage(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Video Preview */}
+          {videoPreview && (
             <div className="mt-3 relative">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="w-full rounded-lg max-h-96 object-cover"
+              <video
+                src={videoPreview}
+                controls
+                className="w-full rounded-lg max-h-96"
               />
               <Button
                 variant="ghost"
                 size="icon"
                 className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70 text-white"
-                onClick={() => {
-                  setImagePreview(null);
-                  setImageFile(null);
-                }}
+                onClick={removeVideo}
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
           )}
+
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <input
-                ref={fileInputRef}
+                ref={imageInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
-                onChange={handleFileSelect}
+                onChange={handleImageSelect}
               />
               <Button
                 variant="ghost"
                 size="sm"
                 type="button"
                 className="text-gray-600 dark:text-gray-400"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => imageInputRef.current?.click()}
+                disabled={!!videoFile}
               >
                 <ImageIcon className="h-5 w-5 mr-2" />
                 Ảnh
-            </Button>
+              </Button>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleVideoSelect}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                className="text-gray-600 dark:text-gray-400"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={imageFiles.length > 0}
+              >
+                <Video className="h-5 w-5 mr-2" />
+                Video
+              </Button>
             </div>
             <Button
               onClick={handleSubmit}
-              disabled={(!content.trim() && !imageFile) || createPostMutation.isPending}
+              disabled={(!content.trim() && imageFiles.length === 0 && !videoFile) || createPostMutation.isPending}
               size="sm"
             >
               {createPostMutation.isPending ? "Đang đăng..." : "Đăng"}
@@ -380,8 +517,11 @@ function CommentModal({
         content: commentText.trim(),
       });
       setCommentText("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding comment:", error);
+      // Hiển thị toast thông báo lỗi
+      const errorMessage = error?.message || "Không thể thêm bình luận. Vui lòng thử lại.";
+      toast.error(errorMessage);
     }
   };
 
@@ -412,11 +552,30 @@ function CommentModal({
                   <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
                     {post.content || ""}
                   </p>
-                  {post.image_url && (
+                  {post.image_urls && post.image_urls.length > 0 && (
+                    <div className="mt-2 grid grid-cols-2 gap-1">
+                      {post.image_urls.slice(0, 4).map((url, index) => (
+                        <img
+                          key={index}
+                          src={url}
+                          alt={`Post ${index + 1}`}
+                          className="rounded-lg h-32 object-cover w-full"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {(!post.image_urls || post.image_urls.length === 0) && post.image_url && (
                     <img
                       src={post.image_url}
                       alt="Post"
                       className="mt-2 rounded-lg max-h-64 object-cover w-full"
+                    />
+                  )}
+                  {post.video_url && (
+                    <video
+                      src={post.video_url}
+                      controls
+                      className="mt-2 rounded-lg max-h-64 w-full"
                     />
                   )}
                 </div>
@@ -442,6 +601,12 @@ function CommentModal({
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {timeAgo(comment.created_at)}
+                      {comment.updated_at && comment.updated_at !== comment.created_at && (
+                        <>
+                          <span className="mx-1">•</span>
+                          <span className="italic">Đã chỉnh sửa</span>
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -595,6 +760,12 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
         </div>
               <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                 <span>{timeAgo(post.created_at)}</span>
+                {post.updated_at && post.updated_at !== post.created_at && (
+                  <>
+                    <span>•</span>
+                    <span className="italic">Đã chỉnh sửa</span>
+                  </>
+                )}
               </div>
         </div>
             {isOwner && (
@@ -649,14 +820,66 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
           </p>
         </div>
 
-        {/* Image */}
-        {post.image_url && (
+        {/* Multiple Images */}
+        {post.image_urls && post.image_urls.length > 0 && (
+          <div className="w-full">
+            {post.image_urls.length === 1 ? (
+              <img
+                src={post.image_urls[0]}
+                alt="Post"
+                className="w-full h-auto object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className={`grid gap-1 ${
+                post.image_urls.length === 2 ? 'grid-cols-2' :
+                post.image_urls.length === 3 ? 'grid-cols-2' :
+                post.image_urls.length === 4 ? 'grid-cols-2' :
+                'grid-cols-3'
+              }`}>
+                {post.image_urls.slice(0, 4).map((url, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={url}
+                      alt={`Post ${index + 1}`}
+                      className={`w-full h-64 object-cover ${
+                        post.image_urls.length === 3 && index === 0 ? 'row-span-2' : ''
+                      }`}
+                      loading="lazy"
+                    />
+                    {post.image_urls.length > 4 && index === 3 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white text-2xl font-bold">
+                          +{post.image_urls.length - 4}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Fallback to old image_url for backward compatibility */}
+        {(!post.image_urls || post.image_urls.length === 0) && post.image_url && (
           <div className="w-full">
             <img
               src={post.image_url}
               alt="Post"
               className="w-full h-auto object-cover"
               loading="lazy"
+            />
+          </div>
+        )}
+
+        {/* Video */}
+        {post.video_url && (
+          <div className="w-full">
+            <video
+              src={post.video_url}
+              controls
+              className="w-full h-auto max-h-96"
             />
           </div>
         )}

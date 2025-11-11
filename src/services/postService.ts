@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/supabase.type";
+import { validateCommentContent } from "@/utils/contentFilter";
 
 export type PostReactionType = "like" | "love" | "haha" | "wow" | "sad" | "angry";
 
@@ -7,7 +8,9 @@ export interface Post {
   id: string;
   author_id: string;
   content: string;
-  image_url?: string | null;
+  image_url?: string | null; // Deprecated, use image_urls instead
+  image_urls?: string[] | null; // Array of image URLs
+  video_url?: string | null;
   created_at: string;
   updated_at?: string | null;
   author?: {
@@ -51,7 +54,9 @@ export interface PostComment {
 
 export interface CreatePostData {
   content: string;
-  image_url?: string;
+  image_url?: string; // Deprecated
+  image_urls?: string[]; // Array of image URLs
+  video_url?: string;
 }
 
 // Tạo post mới
@@ -67,7 +72,9 @@ export const createPost = async (data: CreatePostData): Promise<Post> => {
     .insert({
       author_id: user.id,
       content: data.content,
-      image_url: data.image_url || null,
+      image_url: data.image_url || null, // Keep for backward compatibility
+      image_urls: data.image_urls || null,
+      video_url: data.video_url || null,
     })
     .select(
       `
@@ -94,8 +101,27 @@ export const getPostsByFriends = async (userId: string): Promise<Post[]> => {
   const friendIds = friends?.map((f) => f.friend_id) || [];
   if (friendIds.length === 0) return [];
 
-  // Lấy posts của bạn bè + posts của chính user
-  const allUserIds = [userId, ...friendIds];
+  // Lấy danh sách user bị block (cả 2 chiều)
+  const { data: blocksData } = await supabase
+    .from("blocks")
+    .select("blocker_id, blocked_id")
+    .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+
+  const blockedIds = new Set<string>();
+  blocksData?.forEach((block) => {
+    if (block.blocker_id === userId) {
+      blockedIds.add(block.blocked_id);
+    } else if (block.blocked_id === userId) {
+      blockedIds.add(block.blocker_id);
+    }
+  });
+
+  // Lọc bỏ các bạn bè bị block
+  const validFriendIds = friendIds.filter((id) => !blockedIds.has(id));
+  if (validFriendIds.length === 0 && blockedIds.size > 0) return [];
+
+  // Lấy posts của bạn bè + posts của chính user (loại bỏ posts của user bị block)
+  const allUserIds = [userId, ...validFriendIds];
 
   const { data: posts, error: postsError } = await supabase
     .from("posts")
@@ -258,6 +284,12 @@ export const addPostComment = async (
 
   if (!user) throw new Error("Không tìm thấy người dùng");
 
+  // Validate nội dung comment (async)
+  const validation = await validateCommentContent(content);
+  if (!validation.isValid) {
+    throw new Error(validation.errorMessage || "Nội dung comment không hợp lệ");
+  }
+
   const { data, error } = await supabase
     .from("post_comments")
     .insert({
@@ -285,6 +317,17 @@ export const uploadPostImage = async (file: File): Promise<string> => {
 
   if (!user) throw new Error("Không tìm thấy người dùng");
 
+  // Validate file size (2MB = 2 * 1024 * 1024 bytes)
+  const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+  if (file.size > MAX_IMAGE_SIZE) {
+    throw new Error("Kích thước ảnh không được vượt quá 2MB");
+  }
+
+  // Validate file type
+  if (!file.type.startsWith("image/")) {
+    throw new Error("File phải là ảnh");
+  }
+
   const fileExt = file.name.split(".").pop();
   const fileName = `${user.id}-${Date.now()}.${fileExt}`;
   const filePath = `posts/${fileName}`;
@@ -300,6 +343,48 @@ export const uploadPostImage = async (file: File): Promise<string> => {
   } = supabase.storage.from("post-images").getPublicUrl(filePath);
 
   return publicUrl;
+};
+
+// Upload video cho post
+export const uploadPostVideo = async (file: File): Promise<string> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Không tìm thấy người dùng");
+
+  // Validate file size (20MB = 20 * 1024 * 1024 bytes)
+  const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
+  if (file.size > MAX_VIDEO_SIZE) {
+    throw new Error("Kích thước video không được vượt quá 20MB");
+  }
+
+  // Validate file type
+  if (!file.type.startsWith("video/")) {
+    throw new Error("File phải là video");
+  }
+
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+  const filePath = `posts/videos/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("post-images") // Có thể tạo bucket riêng cho videos nếu cần
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("post-images").getPublicUrl(filePath);
+
+  return publicUrl;
+};
+
+// Upload multiple images
+export const uploadPostImages = async (files: File[]): Promise<string[]> => {
+  const uploadPromises = files.map((file) => uploadPostImage(file));
+  return Promise.all(uploadPromises);
 };
 
 // Cập nhật post

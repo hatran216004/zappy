@@ -1,29 +1,33 @@
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Search,
   Phone,
   Video,
-  Users,
   Info,
   X,
   ChevronDown,
   ChevronUp,
   Link as LinkIcon,
   Palette,
-} from "lucide-react";
-import { TooltipBtn } from "../TooltipBtn";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import type { ConversationWithDetails } from "@/services/chatService";
-import type { PinnedMessage } from "@/services/chatService";
-import { InviteLinkModal } from "../modal/InviteLinkModal";
-import { GroupInfoModal } from "../modal/GroupInfoModal";
-import { supabaseUrl } from "@/lib/supabase";
-import { BackgroundPicker } from "./BackgroundPicker";
-import { useUpdateConversationBackground } from "@/hooks/useChat";
-import { PinnedMessagesModal } from "../modal/PinnedMessagesModal";
-import { CreatePollModal } from "../modal/CreatePollModal";
-import useUser from "@/hooks/useUser";
+  Ban,
+  Unlock
+} from 'lucide-react';
+import { TooltipBtn } from '../TooltipBtn';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import type { ConversationWithDetails } from '@/services/chatService';
+import type { PinnedMessage } from '@/services/chatService';
+import { InviteLinkModal } from '../modal/InviteLinkModal';
+import { GroupInfoModal } from '../modal/GroupInfoModal';
+import { supabaseUrl } from '@/lib/supabase';
+import { BackgroundPicker } from './BackgroundPicker';
+import { useUpdateConversationBackground } from '@/hooks/useChat';
+import { PinnedMessagesModal } from '../modal/PinnedMessagesModal';
+import { CreatePollModal } from '../modal/CreatePollModal';
+import useUser from '@/hooks/useUser';
+import { useBlockUser, useUnblockUser, useIsBlockedByMe, useIsBlockedByUser } from '@/hooks/useFriends';
+import { useConfirm } from '@/components/modal/ModalConfirm';
+import toast from 'react-hot-toast';
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -37,12 +41,13 @@ interface ChatHeaderProps {
       }
     | undefined;
   typingUsers: string[];
-  onSearch?: (query: string, direction: "next" | "prev") => void;
+  onSearch?: (query: string, direction: 'next' | 'prev') => void;
   searchResults?: { current: number; total: number };
   onCloseSearch?: () => void;
   conversation?: ConversationWithDetails;
   currentUserId?: string;
   onCall?: (userId: string, isVideo: boolean) => void;
+  onGroupCall?: (conversationId: string, isVideo: boolean) => void;
   pinned?: PinnedMessage[];
   onUnpin?: (messageId: string) => void;
   onJumpTo?: (messageId: string) => void;
@@ -57,51 +62,99 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   conversation,
   currentUserId,
   onCall,
+  onGroupCall,
   pinned,
   onUnpin,
-  onJumpTo,
+  onJumpTo
 }) => {
   const { user } = useUser();
   const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
 
   const updateBackgroundMutation = useUpdateConversationBackground();
-
+  
+  // Check if group chat first (needed for block hooks)
   const isGroupChat = conversation?.type === 'group';
-  const displayName = isGroupChat 
-    ? (conversation?.title || "Nhóm")
-    : (otherParticipant?.profile.display_name || "Người dùng");
+  
+  // Block/unblock hooks (only for direct chat)
+  const otherUserId = !isGroupChat ? otherParticipant?.user_id : undefined;
+  const { data: isBlockedByMe } = useIsBlockedByMe(otherUserId || '');
+  const { data: isBlockedByUser } = useIsBlockedByUser(otherUserId || '');
+  const blockUserMutation = useBlockUser();
+  const unblockUserMutation = useUnblockUser();
+  const confirm = useConfirm();
+  const displayName = isGroupChat
+    ? conversation?.title || 'Nhóm'
+    : otherParticipant?.profile.display_name || 'Người dùng';
 
   const avatarUrl = isGroupChat
     ? `${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation?.photo_url}`
-    : (otherParticipant?.profile.avatar_url || "/default-avatar.png");
-    
+    : otherParticipant?.profile.avatar_url || '/default-avatar.png';
+
   const statusText = isGroupChat
     ? `${conversation?.participants?.length || 0} thành viên`
-    : (typingUsers.length > 0
-        ? "Đang nhập..."
-        : otherParticipant?.profile.status === "online"
-        ? "Đang hoạt động"
-        : "Không hoạt động");
+    : isBlockedByUser
+    ? 'Đã bị chặn'
+    : typingUsers.length > 0
+    ? 'Đang nhập...'
+    : otherParticipant?.profile.status === 'online'
+    ? 'Đang hoạt động'
+    : 'Không hoạt động';
+
+  const handleBlock = async () => {
+    if (!otherUserId) return;
+    
+    const confirmed = await confirm({
+      title: 'Chặn người dùng',
+      description: `Bạn có chắc muốn chặn ${displayName}? Bạn sẽ không thể nhắn tin với nhau và không thấy bài viết của nhau.`,
+      confirmText: 'Chặn',
+      cancelText: 'Hủy',
+      destructive: true
+    });
+
+    if (confirmed) {
+      try {
+        await blockUserMutation.mutateAsync(otherUserId);
+        toast.success(`Đã chặn ${displayName}`);
+      } catch (error: any) {
+        console.error('Error blocking user:', error);
+        toast.error(error?.message || 'Lỗi khi chặn người dùng');
+      }
+    }
+  };
+
+  const handleUnblock = async () => {
+    if (!otherUserId) return;
+    
+    try {
+      await unblockUserMutation.mutateAsync(otherUserId);
+      toast.success(`Đã bỏ chặn ${displayName}`);
+    } catch (error: any) {
+      console.error('Error unblocking user:', error);
+      toast.error(error?.message || 'Lỗi khi bỏ chặn người dùng');
+    }
+  };
 
   // Check if current user is admin
-  const isAdmin = isGroupChat && conversation?.participants?.some(
-    (p) => p.user_id === currentUserId && p.role === 'admin'
-  );
+  const isAdmin =
+    isGroupChat &&
+    conversation?.participants?.some(
+      (p) => p.user_id === currentUserId && p.role === 'admin'
+    );
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     if (onSearch && e.target.value) {
-      onSearch(e.target.value, "next");
+      onSearch(e.target.value, 'next');
     }
   };
 
   const handleCloseSearch = () => {
     setShowSearch(false);
-    setSearchQuery("");
+    setSearchQuery('');
     onCloseSearch?.();
   };
 
@@ -110,11 +163,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     value: string
   ) => {
     if (!conversation) return;
-    
+
     updateBackgroundMutation.mutate({
       conversationId: conversation.id,
       backgroundType: type,
-      backgroundValue: value,
+      backgroundValue: value
     });
   };
 
@@ -146,8 +199,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           {conversation && (
             <BackgroundPicker
               currentBackground={{
-                type: (conversation.background_type || 'color') as 'color' | 'gradient' | 'image',
-                value: conversation.background_value || '#FFFFFF',
+                type: (conversation.background_type || 'color') as
+                  | 'color'
+                  | 'gradient'
+                  | 'image',
+                value: conversation.background_value || '#FFFFFF'
               }}
               onSelect={handleBackgroundChange}
               trigger={
@@ -171,7 +227,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           >
             <Search className="size-5" />
           </Button>
-          
+
           {/* Show invite button for group admins */}
           {isGroupChat && isAdmin && conversation && (
             <Button
@@ -184,15 +240,39 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               <LinkIcon className="size-5" />
             </Button>
           )}
-          
+
+          {/* Call buttons for direct chat */}
           {!isGroupChat && otherParticipant && (
-              <TooltipBtn 
-                icon={Phone} 
+            <>
+              <TooltipBtn
+                icon={Phone}
                 label="Gọi thoại"
                 onClick={() => onCall?.(otherParticipant.user_id, false)}
               />
+              <TooltipBtn
+                icon={Video}
+                label="Gọi video"
+                onClick={() => onCall?.(otherParticipant.user_id, true)}
+              />
+            </>
           )}
-          
+
+          {/* Call buttons for group chat */}
+          {isGroupChat && conversation && (
+            <>
+              <TooltipBtn
+                icon={Phone}
+                label="Gọi thoại nhóm"
+                onClick={() => onGroupCall?.(conversation.id, false)}
+              />
+              <TooltipBtn
+                icon={Video}
+                label="Gọi video nhóm"
+                onClick={() => onGroupCall?.(conversation.id, true)}
+              />
+            </>
+          )}
+
           {/* Group Info Button */}
           {isGroupChat ? (
             <Button
@@ -205,7 +285,25 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               <Info className="size-5" />
             </Button>
           ) : (
-            <TooltipBtn icon={Info} label="Thông tin" />
+            <>
+              <TooltipBtn icon={Info} label="Thông tin" />
+              {/* Block/Unblock button for direct chat */}
+              {otherUserId && (
+                isBlockedByMe ? (
+                  <TooltipBtn
+                    icon={Unlock}
+                    label="Bỏ chặn"
+                    onClick={handleUnblock}
+                  />
+                ) : (
+                  <TooltipBtn
+                    icon={Ban}
+                    label="Chặn"
+                    onClick={handleBlock}
+                  />
+                )
+              )}
+            </>
           )}
 
           {/* Create Poll (only for groups) */}
@@ -283,7 +381,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               {searchQuery && (
                 <button
                   onClick={() => {
-                    setSearchQuery("");
+                    setSearchQuery('');
                     onCloseSearch?.();
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -302,7 +400,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  onClick={() => onSearch?.(searchQuery, "prev")}
+                  onClick={() => onSearch?.(searchQuery, 'prev')}
                   disabled={searchResults.current <= 1}
                 >
                   <ChevronUp className="size-4" />
@@ -311,7 +409,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  onClick={() => onSearch?.(searchQuery, "next")}
+                  onClick={() => onSearch?.(searchQuery, 'next')}
                   disabled={searchResults.current >= searchResults.total}
                 >
                   <ChevronDown className="size-4" />

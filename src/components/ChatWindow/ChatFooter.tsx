@@ -19,6 +19,7 @@ type ChatFooterProps = {
   sendTextMutation: { isPending: boolean };
   participants?: { id: string; name: string; avatar_url?: string }[];
   onMentionSelected?: (userId: string) => void;
+  disabled?: boolean;
 };
 
 export default function ChatFooter({
@@ -34,7 +35,8 @@ export default function ChatFooter({
   sendFileMutation,
   sendTextMutation,
   participants,
-  onMentionSelected
+  onMentionSelected,
+  disabled = false
 }: ChatFooterProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -307,7 +309,7 @@ export default function ChatFooter({
           className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
           type="button"
           onClick={() => fileInputRef?.current?.click()}
-          disabled={sendFileMutation.isPending}
+          disabled={disabled || sendFileMutation.isPending}
         >
           <Paperclip className="size-5 text-gray-500 dark:text-gray-300" />
         </Button>
@@ -319,7 +321,7 @@ export default function ChatFooter({
           className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
           type="button"
           onClick={startRecording}
-          disabled={sendTextMutation.isPending}
+          disabled={disabled || sendTextMutation.isPending}
         >
           <Mic className="size-5 text-gray-500 dark:text-gray-300" />
         </Button>
@@ -331,7 +333,7 @@ export default function ChatFooter({
           className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
           type="button"
           onClick={handleLocationClick}
-          disabled={sendTextMutation.isPending}
+          disabled={disabled || sendTextMutation.isPending}
           title="Chia sẻ vị trí"
         >
           <MapPin className="size-5 text-gray-500 dark:text-gray-300" />
@@ -343,9 +345,10 @@ export default function ChatFooter({
           value={messageText}
           onChange={handleInputChange}
           onKeyPress={handleKeyPress}
-          placeholder="Nhập @, tin nhắn tới ..."
+          placeholder={disabled ? "Bạn không thể nhắn tin với người dùng này" : "Nhập @, tin nhắn tới ..."}
           rows={1}
-          className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32 resize-none"
+          disabled={disabled}
+          className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ minHeight: '40px' }}
         />
 
@@ -381,10 +384,10 @@ export default function ChatFooter({
           className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
           type="button"
           onClick={handleSendMessage}
-          disabled={!canSend}
+          disabled={disabled || !canSend}
         >
           <Send
-            className={`size-5 ${canSend ? 'text-blue-500' : 'text-gray-400'}`}
+            className={`size-5 ${canSend && !disabled ? 'text-blue-500' : 'text-gray-400'}`}
           />
         </Button>
       </div>
