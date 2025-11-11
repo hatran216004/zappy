@@ -10,33 +10,36 @@ import {
   Settings,
   Moon,
   Sun,
-  User, 
+  User,
   Globe,
   LogOut,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+  Search
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useProfile } from "@/hooks/useProfile";
-import ProfileModal from "@/components/profile/ProfileModal";
-import useLogout from "@/hooks/useLogout";
-import { useAuth } from "@/stores/user";
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { useProfile } from '@/hooks/useProfile';
+import ProfileModal from '@/components/profile/ProfileModal';
+import { SearchUsersModal } from '@/components/modal/SearchUsersModal';
+import { SettingsModal } from '@/components/modal/SettingsModal';
+import useLogout from '@/hooks/useLogout';
+import { useAuth } from '@/stores/user';
 import {
   useFriendRequestsRealtime,
-  usePendingFriendRequests,
-} from "@/hooks/useFriends";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { twMerge } from "tailwind-merge";
-import { avatarVariants } from "@/lib/variants";
-import { useUserStatusTracker } from "@/hooks/useUserStatusTracker";
-import { useUserStatus, useUserStatusRealtime } from "@/hooks/usePresence";
+  usePendingFriendRequests
+} from '@/hooks/useFriends';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { twMerge } from 'tailwind-merge';
+import { avatarVariants } from '@/lib/variants';
+import { useUserStatusTracker } from '@/hooks/useUserStatusTracker';
+import { useUserStatus, useUserStatusRealtime } from '@/hooks/usePresence';
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -50,39 +53,30 @@ export default function Navbar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { data: profile } = useProfile(userId as string);
-  const { data: statusProfile, isOnline } = useUserStatus(userId || "");
-  useUserStatusRealtime(userId || "");
+  const { data: statusProfile, isOnline } = useUserStatus(userId || '');
+  useUserStatusRealtime(userId || '');
 
   // Tracker: set online khi mount, heartbeat định kỳ, set offline khi unload
-  useUserStatusTracker({ userId: userId || "" });
-
-  // Debug: Log profile status
-  useEffect(() => {
-    if (profile) {
-      console.log('👤 Profile Status:', {
-        status: profile.status,
-        display_name: profile.display_name,
-        isOnline: profile.status === 'online'
-      });
-    }
-  }, [profile?.status]);
+  useUserStatusTracker({ userId: userId || '' });
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [searchUsersModalOpen, setSearchUsersModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem("theme");
+    const saved = localStorage.getItem('theme');
     if (saved) return saved;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
   });
 
   useEffect(() => {
-    if (theme === "dark") {
-      document.body.classList.remove("light");
-      document.body.classList.add("dark");
+    if (theme === 'dark') {
+      document.body.classList.remove('light');
+      document.body.classList.add('dark');
     } else {
-      document.body.classList.remove("dark");
-      document.body.classList.add("light");
+      document.body.classList.remove('dark');
+      document.body.classList.add('light');
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
@@ -92,7 +86,7 @@ export default function Navbar() {
   // Helper để render nút kiểu Discord + active pill
   const ItemWrap = ({
     active,
-    children,
+    children
   }: {
     active: boolean;
     children: React.ReactNode;
@@ -101,26 +95,24 @@ export default function Navbar() {
       {/* Active pill (trái) */}
       <div
         className={twMerge(
-          "absolute left-0 w-1 rounded-r-full transition-all",
-          active ? "h-8 bg-[#5865F2]" : "h-0 bg-transparent"
+          'absolute left-0 w-1 rounded-r-full transition-all',
+          active ? 'h-8 bg-[#5865F2]' : 'h-0 bg-transparent'
         )}
       />
       {/* Hover “blob” nhẹ sau icon */}
       <div
         className={twMerge(
-          "absolute inset-0 mx-auto w-10 h-10 rounded-2xl transition-colors",
-          active
-            ? "bg-[#5865F2]/20"
-            : "hover:bg-white/5"
+          'absolute inset-0 mx-auto w-10 h-10 rounded-2xl transition-colors',
+          active ? 'bg-[#5865F2]/20' : 'hover:bg-white/5'
         )}
       />
       <div className="relative">{children}</div>
     </div>
   );
 
-  const isChat = pathname.includes("chat") || pathname === "/";
-  const isFriends = pathname.includes("friends");
-  const isPost = pathname.includes("posts");
+  const isChat = pathname.includes('chat') || pathname === '/';
+  const isFriends = pathname.includes('friends');
+  const isPost = pathname.includes('posts');
 
   return (
     <>
@@ -157,12 +149,16 @@ export default function Navbar() {
                 {(statusProfile?.status || profile?.status) && (
                   <span
                     className={twMerge(
-                      "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#1E1F22]",
-                      (statusProfile?.status || profile?.status) === "online"
-                        ? "bg-[#23A55A]"
-                        : "bg-[#3F4246]"
+                      'absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#1E1F22]',
+                      (statusProfile?.status || profile?.status) === 'online'
+                        ? 'bg-[#23A55A]'
+                        : 'bg-[#3F4246]'
                     )}
-                    title={(statusProfile?.status || profile?.status) === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                    title={
+                      (statusProfile?.status || profile?.status) === 'online'
+                        ? 'Đang hoạt động'
+                        : 'Ngoại tuyến'
+                    }
                   />
                 )}
               </button>
@@ -188,15 +184,25 @@ export default function Navbar() {
                   </Avatar>
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-semibold leading-none">
-                      {profile?.display_name || "Chưa có tên"}
+                      {profile?.display_name || 'Chưa có tên'}
                     </p>
                     <p className="text-xs leading-none text-[#B5BAC1]">
                       {user?.email}
                     </p>
                     <div className="flex items-center gap-2 pt-1">
-                      <span className={twMerge("w-2 h-2 rounded-full", (statusProfile?.status || profile?.status) === "online" ? "bg-[#23A55A]" : "bg-[#3F4246]")}/>
+                      <span
+                        className={twMerge(
+                          'w-2 h-2 rounded-full',
+                          (statusProfile?.status || profile?.status) ===
+                            'online'
+                            ? 'bg-[#23A55A]'
+                            : 'bg-[#3F4246]'
+                        )}
+                      />
                       <span className="text-xs text-[#B5BAC1]">
-                        {(statusProfile?.status || profile?.status) === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                        {(statusProfile?.status || profile?.status) === 'online'
+                          ? 'Đang hoạt động'
+                          : 'Ngoại tuyến'}
                       </span>
                     </div>
                   </div>
@@ -213,7 +219,10 @@ export default function Navbar() {
                 <span>Thông tin cá nhân</span>
               </DropdownMenuItem>
 
-              <DropdownMenuItem className="cursor-pointer hover:bg-[#4752C4] hover:text-white">
+              <DropdownMenuItem
+                onClick={() => setSettingsModalOpen(true)}
+                className="cursor-pointer hover:bg-[#4752C4] hover:text-white"
+              >
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Cài đặt</span>
               </DropdownMenuItem>
@@ -236,7 +245,7 @@ export default function Navbar() {
           {/* Nav items */}
           <ItemWrap active={isChat}>
             <TooltipBtn
-              onClick={() => navigate("/chat")}
+              onClick={() => navigate('/chat')}
               isActive={isChat}
               icon={MessageCircle}
               label="Tin nhắn"
@@ -255,7 +264,7 @@ export default function Navbar() {
           <ItemWrap active={isFriends}>
             <div className="relative">
               <TooltipBtn
-                onClick={() => navigate("/friends")}
+                onClick={() => navigate('/friends')}
                 icon={Users}
                 hasBadge={false}
                 isActive={isFriends}
@@ -272,24 +281,43 @@ export default function Navbar() {
               />
               {/* Badge friend request kiểu Discord */}
               {hasFriendRequest && (
-                <span className="
+                <span
+                  className="
                   absolute -top-1 -right-1 min-w-4 h-4 px-1
                   z-10
                   rounded-full bg-[#ED4245]
                   text-[10px] text-white font-semibold
                   flex items-center justify-center
                   shadow
-                ">
+                "
+                >
                   {Math.min(requests!.length, 9)}
                 </span>
               )}
             </div>
           </ItemWrap>
 
+          <ItemWrap active={false}>
+            <TooltipBtn
+              onClick={() => setSearchUsersModalOpen(true)}
+              isActive={false}
+              icon={Search}
+              label="Tìm kiếm người dùng"
+              className="
+                relative z-[1]
+                text-[#B5BAC1]
+                hover:text-white
+                !rounded-2xl
+                w-10 h-10
+                flex items-center justify-center
+                data-[active=true]:text-white
+              "
+            />
+          </ItemWrap>
 
           <ItemWrap active={isPost}>
             <TooltipBtn
-              onClick={() => navigate("/posts")}
+              onClick={() => navigate('/posts')}
               isActive={isPost}
               icon={Globe}
               label="Posts"
@@ -354,6 +382,18 @@ export default function Navbar() {
       <ProfileModal
         open={profileModalOpen}
         onOpenChange={setProfileModalOpen}
+      />
+
+      <SearchUsersModal
+        open={searchUsersModalOpen}
+        onClose={() => setSearchUsersModalOpen(false)}
+        currentUserId={userId as string}
+      />
+
+      <SettingsModal
+        open={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        userId={userId as string}
       />
     </>
   );

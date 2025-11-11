@@ -299,17 +299,74 @@ export const getSentFriendRequests = async (userId: string) => {
   return data;
 };
 
-// Lấy danh sách bạn bè
+// Lấy danh sách bạn bè (bao gồm cả những người bị block)
 export const getFriends = async (): Promise<Friend[]> => {
-  const { data, error } = await supabase.rpc('get_friends'); // KHÔNG truyền param vì RPC không có Args
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
 
-  if (error) {
-    // có thể log thêm Sentry ở đây nếu cần
-    throw error;
+  if (!currentUserId) return [];
+
+  // Query trực tiếp từ table friends để lấy tất cả bạn bè (kể cả bị block)
+  // Thay vì dùng RPC get_friends vì RPC có thể filter ra blocked users
+  const { data: friendsData, error: friendsError } = await supabase
+    .from('friends')
+    .select('friend_id')
+    .eq('user_id', currentUserId);
+
+  if (friendsError) {
+    console.error('Error fetching friends:', friendsError);
+    throw friendsError;
   }
 
-  // luôn trả mảng để phía UI dễ xử lý
-  return data ?? [];
+  console.log(
+    '📋 Friends from database:',
+    friendsData?.length || 0,
+    friendsData
+  );
+
+  if (!friendsData || friendsData.length === 0) return [];
+
+  const friendIds = friendsData.map((f) => f.friend_id);
+  console.log('👥 Friend IDs:', friendIds);
+
+  // Lấy thông tin profiles
+  const { data: profilesData, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, display_name, username, avatar_url, status, last_seen_at')
+    .in('id', friendIds)
+    .eq('is_disabled', false);
+
+  if (profilesError) throw profilesError;
+
+  // Lấy labels cho mỗi friend
+  const { data: labelsData } = await supabase
+    .from('contact_label_map')
+    .select('friend_id, label_id')
+    .in('friend_id', friendIds);
+
+  // Group labels by friend_id
+  const labelsMap = new Map<string, string[]>();
+  labelsData?.forEach((item) => {
+    if (!labelsMap.has(item.friend_id)) {
+      labelsMap.set(item.friend_id, []);
+    }
+    labelsMap.get(item.friend_id)!.push(item.label_id);
+  });
+
+  // Map to Friend format
+  const friends: Friend[] = (profilesData || []).map((profile) => ({
+    id: profile.id,
+    display_name: profile.display_name,
+    username: profile.username,
+    avatar_url: profile.avatar_url || '',
+    status: profile.status || 'offline',
+    last_seen_at: profile.last_seen_at || '',
+    label_id: labelsMap.get(profile.id) || []
+  }));
+
+  return friends;
 };
 
 // Xóa bạn bè
@@ -572,6 +629,252 @@ export const removeLabelFromFriend = async (
     .eq('label_id', labelId);
 
   if (error) throw error;
+};
+
+// ============================================
+// BLOCK/UNBLOCK USERS
+// ============================================
+
+// Block a user (không xóa friendship để vẫn hiển thị trong danh sách bạn bè)
+export const blockUser = async (userId: string): Promise<void> => {
+  console.log('🚫 Starting blockUser for userId:', userId);
+
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  console.log('👤 Current user ID:', currentUserId);
+
+  if (!currentUserId) {
+    throw new Error('User not authenticated');
+  }
+
+  if (currentUserId === userId) {
+    throw new Error('Cannot block yourself');
+  }
+
+  // Check if already blocked
+  console.log('🔍 Checking if already blocked...');
+  const { data: existing, error: checkError } = await supabase
+    .from('blocks')
+    .select('blocker_id, blocked_id')
+    .eq('blocker_id', currentUserId)
+    .eq('blocked_id', userId)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error('❌ Error checking existing block:', checkError);
+    throw checkError;
+  }
+
+  if (existing) {
+    console.log('⚠️ User already blocked');
+    throw new Error('User is already blocked');
+  }
+
+  console.log('📝 Inserting block record...');
+  console.log('   blocker_id:', currentUserId);
+  console.log('   blocked_id:', userId);
+
+  // Insert block (KHÔNG xóa friendship để vẫn hiển thị trong danh sách bạn bè)
+  const { data: insertData, error: insertError } = await supabase
+    .from('blocks')
+    .insert({
+      blocker_id: currentUserId,
+      blocked_id: userId
+    })
+    .select();
+
+  if (insertError) {
+    console.error('❌ Error inserting block:', insertError);
+    console.error('   Error code:', insertError.code);
+    console.error('   Error message:', insertError.message);
+    console.error('   Error details:', insertError.details);
+    console.error('   Error hint:', insertError.hint);
+    throw insertError;
+  }
+
+  console.log('✅ Block inserted successfully:', insertData);
+
+  // Kiểm tra xem friendship có còn tồn tại không
+  const { data: friendshipCheck } = await supabase
+    .from('friends')
+    .select('id')
+    .eq('user_id', currentUserId)
+    .eq('friend_id', userId)
+    .maybeSingle();
+
+  console.log(
+    '🔍 Friendship after block:',
+    friendshipCheck ? 'EXISTS' : 'DELETED'
+  );
+
+  // Cancel any pending friend requests (nhưng giữ friendship)
+  await supabase
+    .from('friend_requests')
+    .delete()
+    .or(
+      `and(from_user_id.eq.${currentUserId},to_user_id.eq.${userId}),and(from_user_id.eq.${userId},to_user_id.eq.${currentUserId})`
+    );
+};
+
+// Unblock a user
+export const unblockUser = async (userId: string): Promise<void> => {
+  console.log('🔓 Starting unblockUser for userId:', userId);
+
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  console.log('👤 Current user ID:', currentUserId);
+
+  if (!currentUserId) {
+    throw new Error('User not authenticated');
+  }
+
+  if (currentUserId === userId) {
+    throw new Error('Cannot unblock yourself');
+  }
+
+  // Check if block exists
+  console.log('🔍 Checking if block exists...');
+  const { data: existing, error: checkError } = await supabase
+    .from('blocks')
+    .select('blocker_id, blocked_id')
+    .eq('blocker_id', currentUserId)
+    .eq('blocked_id', userId)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error('❌ Error checking existing block:', checkError);
+    throw checkError;
+  }
+
+  if (!existing) {
+    console.log('⚠️ Block does not exist');
+    throw new Error('User is not blocked');
+  }
+
+  console.log('🗑️ Deleting block record...');
+  console.log('   blocker_id:', currentUserId);
+  console.log('   blocked_id:', userId);
+
+  // Delete block directly from table (KHÔNG dùng RPC để tránh xóa friendship)
+  const { error: deleteError } = await supabase
+    .from('blocks')
+    .delete()
+    .eq('blocker_id', currentUserId)
+    .eq('blocked_id', userId);
+
+  if (deleteError) {
+    console.error('❌ Error deleting block:', deleteError);
+    console.error('   Error code:', deleteError.code);
+    console.error('   Error message:', deleteError.message);
+    console.error('   Error details:', deleteError.details);
+    console.error('   Error hint:', deleteError.hint);
+    throw deleteError;
+  }
+
+  console.log('✅ Block deleted successfully');
+
+  // Kiểm tra xem friendship có còn tồn tại không
+  // Nếu không có, có thể đã bị xóa khi block (do RPC block_user)
+  // Cần tạo lại friendship
+  console.log('🔍 Checking if friendship exists...');
+  const { data: friendshipCheck } = await supabase
+    .from('friends')
+    .select('id')
+    .eq('user_id', currentUserId)
+    .eq('friend_id', userId)
+    .maybeSingle();
+
+  if (!friendshipCheck) {
+    console.log('⚠️ Friendship does not exist, recreating...');
+
+    // Tạo lại friendship
+    const { error: friendError } = await supabase.from('friends').insert({
+      user_id: currentUserId,
+      friend_id: userId
+    });
+
+    if (friendError) {
+      console.error('❌ Error recreating friendship:', friendError);
+      // Không throw error vì có thể friendship đã bị xóa trước đó
+      // User có thể cần kết bạn lại
+    } else {
+      console.log('✅ Friendship recreated successfully');
+    }
+  } else {
+    console.log('✅ Friendship still exists');
+  }
+};
+
+// Check if current user has blocked a user
+export const isBlockedByMe = async (userId: string): Promise<boolean> => {
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  if (!currentUserId) return false;
+
+  const { data } = await supabase
+    .from('blocks')
+    .select('blocker_id, blocked_id')
+    .eq('blocker_id', currentUserId)
+    .eq('blocked_id', userId)
+    .maybeSingle();
+
+  return !!data;
+};
+
+// Check if current user is blocked by a user
+export const isBlockedByUser = async (userId: string): Promise<boolean> => {
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  if (!currentUserId) return false;
+
+  const { data } = await supabase
+    .from('blocks')
+    .select('blocker_id, blocked_id')
+    .eq('blocker_id', userId)
+    .eq('blocked_id', currentUserId)
+    .maybeSingle();
+
+  return !!data;
+};
+
+// Check if two users have blocked each other (mutual block)
+export const isMutuallyBlocked = async (userId: string): Promise<boolean> => {
+  const [blockedByMe, blockedByUser] = await Promise.all([
+    isBlockedByMe(userId),
+    isBlockedByUser(userId)
+  ]);
+
+  return blockedByMe || blockedByUser;
+};
+
+// Get list of blocked users
+export const getBlockedUsers = async (): Promise<Profile[]> => {
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  if (!currentUserId) return [];
+
+  // Use RPC function
+  const { data, error } = await supabase.rpc('get_blocks');
+
+  if (error) throw error;
+
+  // RPC returns array of profiles directly (id, display_name, username, avatar_url, created_at)
+  return (data || []) as Profile[];
 };
 
 export { supabase };

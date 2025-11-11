@@ -7,6 +7,7 @@ import {
   useInfiniteQuery
 } from '@tanstack/react-query';
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import {
   getConversations,
   getGroupConversations,
@@ -19,6 +20,7 @@ import {
   editMessage,
   recallMessage,
   deleteMessageForMe,
+  deleteMessageAsAdmin,
   addReaction,
   removeReaction,
   markMessagesAsRead,
@@ -253,13 +255,17 @@ export const useSendTextMessage = () => {
     },
 
     // If the mutation fails, use the context returned from onMutate to roll back
-    onError: (_err, variables, context) => {
+    onError: (err, variables, context) => {
       if (context?.previousMessages) {
         queryClient.setQueryData(
           chatKeys.messages(variables.conversationId),
           context.previousMessages
         );
       }
+      
+      // Show toast error
+      const errorMessage = err instanceof Error ? err.message : 'Không thể gửi tin nhắn';
+      toast.error(errorMessage);
     },
 
     // Always refetch after error or success to sync with server
@@ -297,6 +303,10 @@ export const useSendFileMessage = () => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversations(variables.senderId)
       });
+    },
+    onError: (err) => {
+      const errorMessage = err instanceof Error ? err.message : 'Không thể gửi file';
+      toast.error(errorMessage);
     }
   });
 };
@@ -369,13 +379,17 @@ export const useSendLocationMessage = () => {
       return { previousMessages };
     },
 
-    onError: (_err, variables, context) => {
+    onError: (err, variables, context) => {
       if (context?.previousMessages) {
         queryClient.setQueryData(
           chatKeys.messages(variables.conversationId),
           context.previousMessages
         );
       }
+      
+      // Show toast error
+      const errorMessage = err instanceof Error ? err.message : 'Không thể gửi vị trí';
+      toast.error(errorMessage);
     },
 
     onSettled: (_, __, variables) => {
@@ -415,6 +429,28 @@ export const useRecallMessage = () => {
 
   return useMutation({
     mutationFn: (messageId: string) => recallMessage(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.all
+      });
+    }
+  });
+};
+
+// Hook delete message as admin
+export const useDeleteMessageAsAdmin = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      messageId,
+      adminId,
+      conversationId
+    }: {
+      messageId: string;
+      adminId: string;
+      conversationId: string;
+    }) => deleteMessageAsAdmin(messageId, adminId, conversationId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.all
@@ -590,16 +626,122 @@ export const useAddReaction = () => {
     mutationFn: ({
       messageId,
       userId,
-      emoji
+      emoji,
+      conversationId
     }: {
       messageId: string;
       userId: string;
       emoji: string;
+      conversationId?: string;
     }) => addReaction(messageId, userId, emoji),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: chatKeys.all
+    
+    // Optimistic update - update UI immediately
+    onMutate: async ({ messageId, userId, emoji, conversationId }) => {
+      if (!conversationId) return;
+
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.messages(conversationId)
       });
+
+      // Snapshot previous value
+      const previousMessages = queryClient.getQueryData(
+        chatKeys.messages(conversationId)
+      );
+
+      // Optimistically update messages - update UI immediately for smooth UX
+      // Logic matches service layer:
+      // - If user has different emoji → remove all old, add new one
+      // - If user already has this emoji → add duplicate (increase count)
+      // - If user has no reaction → add new one
+      queryClient.setQueryData(
+        chatKeys.messages(conversationId),
+        (old: any) => {
+          if (!old || !old.pages) return old;
+
+          // Handle infinite query structure
+          const updatedPages = old.pages.map((page: any[]) =>
+            page.map((msg: any) => {
+              if (msg.id !== messageId) return msg;
+
+              const existingReactions = msg.reactions || [];
+              
+              // Check if user has different emoji
+              const hasDifferentEmoji = existingReactions.some(
+                (r: any) => r.user_id === userId && r.emoji !== emoji
+              );
+
+              // Case 1: User có emoji khác → Xóa tất cả reactions cũ, thêm emoji mới
+              if (hasDifferentEmoji) {
+                // Remove all old reactions from this user
+                const filteredReactions = existingReactions.filter(
+                  (r: any) => r.user_id !== userId
+                );
+
+                // Add new reaction
+                const newReaction = {
+                  message_id: messageId,
+                  user_id: userId,
+                  emoji,
+                  user: { id: userId }
+                };
+
+                return {
+                  ...msg,
+                  reactions: [...filteredReactions, newReaction]
+                };
+              }
+
+              // Case 2: User đã có emoji này hoặc chưa có → Thêm reaction mới (tăng count)
+              // Add new reaction (duplicate if already exists, new if not)
+              const newReaction = {
+                message_id: messageId,
+                user_id: userId,
+                emoji,
+                user: { id: userId } // Minimal user data for optimistic update
+              };
+
+              return {
+                ...msg,
+                reactions: [...existingReactions, newReaction]
+              };
+            })
+          );
+
+          return {
+            ...old,
+            pages: updatedPages
+          };
+        }
+      );
+
+      return { previousMessages };
+    },
+
+    // If mutation fails, rollback
+    onError: (err, variables, context) => {
+      if (context?.previousMessages && variables.conversationId) {
+        queryClient.setQueryData(
+          chatKeys.messages(variables.conversationId),
+          context.previousMessages
+        );
+      }
+    },
+
+    // Refetch to sync with server (with small delay to avoid unnecessary re-render)
+    onSettled: (_, __, variables) => {
+      // Small delay to let optimistic update settle first
+      setTimeout(() => {
+        if (variables.conversationId) {
+          queryClient.invalidateQueries({
+            queryKey: chatKeys.messages(variables.conversationId)
+          });
+        } else {
+          queryClient.invalidateQueries({
+            queryKey: chatKeys.all
+          });
+        }
+      }, 100);
     }
   });
 };

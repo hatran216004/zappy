@@ -8,6 +8,8 @@ import {
   getPostComments,
   addPostComment,
   uploadPostImage,
+  uploadPostImages,
+  uploadPostVideo,
   updatePost,
   deletePost,
   type Post,
@@ -40,17 +42,12 @@ export const useCreatePost = () => {
 
   return useMutation({
     mutationFn: async (data: CreatePostData) => {
-      let imageUrl = data.image_url;
-      
-      // Nếu có file, upload trước
-      if (data.image_url && data.image_url.startsWith("blob:") || data.image_url instanceof File) {
-        const file = data.image_url instanceof File ? data.image_url : await fetch(data.image_url).then(r => r.blob()).then(blob => new File([blob], "image.jpg"));
-        imageUrl = await uploadPostImage(file);
-      }
-
+      // Support both old (image_url) and new (image_urls, video_url) format
       return createPost({
         content: data.content,
-        image_url: imageUrl,
+        image_url: data.image_url, // Backward compatibility
+        image_urls: data.image_urls,
+        video_url: data.video_url,
       });
     },
     onSuccess: (_, variables) => {
@@ -144,5 +141,5 @@ export const useDeletePost = () => {
   });
 };
 
-// Export uploadPostImage for direct use
-export { uploadPostImage };
+// Export upload functions for direct use
+export { uploadPostImage, uploadPostImages, uploadPostVideo };

@@ -34,6 +34,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/stores/user';
 import toast from 'react-hot-toast';
+import { TransferAdminModal } from './TransferAdminModal';
 
 interface GroupInfoModalProps {
   open: boolean;
@@ -53,6 +54,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [showTransferAdminModal, setShowTransferAdminModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -215,7 +217,16 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
     if (!confirmed) return;
 
     try {
-      await leaveGroup(conversation.id, currentUserId);
+      const result = await leaveGroup(conversation.id, currentUserId);
+      
+      // Check if user is last admin
+      if (result.isLastAdmin) {
+        // Show transfer admin modal
+        setShowTransferAdminModal(true);
+        return;
+      }
+
+      // Normal leave
       toast.success('Bạn đã rời khỏi nhóm');
       onOpenChange(false);
       setTimeout(() => {
@@ -224,6 +235,22 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
     } catch (error) {
       console.error('Error leaving group:', error);
       toast.error('Lỗi khi rời nhóm');
+    }
+  };
+
+  const handleTransferAdminSuccess = async () => {
+    // After transferring admin, automatically leave group
+    try {
+      await leaveGroup(conversation.id, currentUserId);
+      toast.success('Đã chuyển quyền admin và rời khỏi nhóm');
+      setShowTransferAdminModal(false);
+      onOpenChange(false);
+      setTimeout(() => {
+        window.location.href = '/chat';
+      }, 1000);
+    } catch (error) {
+      console.error('Error leaving group after transfer:', error);
+      toast.error('Đã chuyển quyền admin nhưng không thể rời nhóm');
     }
   };
 
@@ -525,6 +552,14 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
           )}
         </Tabs>
       </DialogContent>
+
+      <TransferAdminModal
+        open={showTransferAdminModal}
+        onClose={() => setShowTransferAdminModal(false)}
+        conversationId={conversation.id}
+        currentAdminId={currentUserId}
+        onSuccess={handleTransferAdminSuccess}
+      />
     </Dialog>
   );
 };

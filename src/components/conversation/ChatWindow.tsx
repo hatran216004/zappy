@@ -14,6 +14,7 @@ import {
   useReactionsRealtime
 } from '../../hooks/useChat';
 import { useStartCall } from '../../hooks/useStartCall';
+import { useStartGroupCall } from '../../hooks/useStartGroupCall';
 import ChatHeader from './ChatHeader';
 import { useParams } from 'react-router';
 import ChatFooter from '../ChatWindow/ChatFooter';
@@ -21,9 +22,11 @@ import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { ImagePreview } from './ImagePreview';
 import { LocationPicker } from './LocationPicker';
+import { ForwardMessageModal } from '../modal/ForwardMessageModal';
 import { twMerge } from 'tailwind-merge';
 import { PinnedMessage, getPinnedMessages, pinMessage, subscribePinnedMessages, unpinMessage } from '@/services/chatService';
 import toast from 'react-hot-toast';
+import { useIsBlockedByUser, useIsBlockedByMe } from '@/hooks/useFriends';
 
 interface ChatWindowProps {
   userId: string;
@@ -43,6 +46,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [imageToSend, setImageToSend] = useState<File | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
+  const [forwardingMessageId, setForwardingMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -65,6 +69,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const editMessageMutation = useEditMessage();
   const markAsReadMutation = useMarkMessagesAsRead();
   const startCallMutation = useStartCall();
+  const startGroupCallMutation = useStartGroupCall();
   const { typingUsers, sendTyping } = useTypingIndicator(
     conversationId,
     userId
@@ -73,6 +78,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     conversationId,
     debouncedSearchQuery
   );
+
+  // Get other participant and check block status early (needed for handlers)
+  const otherParticipant = conversation?.participants.find(
+    (p) => p.user_id !== userId
+  );
+  const isDirectChat = conversation?.type === 'direct';
+  const otherUserId = isDirectChat ? otherParticipant?.user_id : undefined;
+  const { data: isBlockedByUser } = useIsBlockedByUser(otherUserId || '');
+  const { data: isBlockedByMe } = useIsBlockedByMe(otherUserId || '');
+  const isBlocked = isBlockedByUser || isBlockedByMe;
 
   // Pinned messages state
   const [pinned, setPinned] = useState<PinnedMessage[]>([]);
@@ -258,9 +273,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   }, [sendTyping]);
 
   const handleSendMessage = useCallback(async () => {
-    setMessageText('');
-
     if (!messageText.trim()) return;
+
+    // Check if blocked
+    if (isBlocked) {
+      toast.error('Bạn không thể nhắn tin với người dùng này do đã bị chặn');
+      setMessageText(''); // Clear input
+      return;
+    }
+
+    setMessageText('');
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -311,7 +333,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     } catch (error) {
       console.error('❌ Error:', error);
     }
-  }, [messageText, conversationId, userId, replyTo, isEditing, editingMessageId, sendTextMutation, editMessageMutation, sendTyping]);
+  }, [messageText, conversationId, userId, replyTo, isEditing, editingMessageId, sendTextMutation, editMessageMutation, sendTyping, isBlocked, mentionedUserIds, conversation]);
 
   const handleEditMessage = useCallback((messageId: string, content: string) => {
     setIsEditing(true);
@@ -323,6 +345,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Check if blocked
+    if (isBlocked) {
+      toast.error('Bạn không thể gửi file với người dùng này do đã bị chặn');
+      return;
+    }
 
     let type: 'image' | 'video' | 'file' | 'audio' = 'file';
     if (file.type.startsWith('image/')) type = 'image';
@@ -348,7 +376,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [conversationId, userId, sendFileMutation]);
+  }, [conversationId, userId, sendFileMutation, isBlocked]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -364,6 +392,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
   const handleSendImage = useCallback(async () => {
     if (!imageToSend) return;
+    
+    // Check if blocked
+    if (isBlocked) {
+      toast.error('Bạn không thể gửi ảnh với người dùng này do đã bị chặn');
+      return;
+    }
+    
     try {
       await sendFileMutation.mutateAsync({
         conversationId,
@@ -376,7 +411,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     } catch (error) {
       console.error('❌ Error sending image:', error);
     }
-  }, [imageToSend, conversationId, userId, sendFileMutation]);
+  }, [imageToSend, conversationId, userId, sendFileMutation, isBlocked]);
 
   const handleCancelImage = useCallback(() => {
     setImageToSend(null);
@@ -558,12 +593,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     }
   }, [startCallMutation]);
 
+  const handleGroupCall = useCallback(async (conversationId: string, isVideo: boolean) => {
+    try {
+      await startGroupCallMutation.mutateAsync({
+        conversationId,
+        isVideoEnabled: isVideo
+      });
+    } catch (error) {
+      console.error('Error starting group call:', error);
+    }
+  }, [startGroupCallMutation]);
+
   const handleLocationSelect = useCallback(async (location: { 
     latitude: number; 
     longitude: number; 
     address: string;
     displayMode: 'interactive' | 'static';
   }) => {
+    // Check if blocked
+    if (isBlocked) {
+      toast.error('Bạn không thể gửi vị trí với người dùng này do đã bị chặn');
+      return;
+    }
+    
     try {
       await sendLocationMutation.mutateAsync({
         conversationId,
@@ -577,11 +629,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     } catch (error) {
       console.error('❌ Error sending location:', error);
     }
-  }, [conversationId, userId, sendLocationMutation]);
+  }, [conversationId, userId, sendLocationMutation, isBlocked]);
 
-  const otherParticipant = conversation?.participants.find(
-    (p) => p.user_id !== userId
-  );
 
   // Get background styling from conversation
   const getBackgroundStyle = () => {
@@ -626,6 +675,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         conversation={conversation}
         currentUserId={userId}
         onCall={handleCall}
+        onGroupCall={handleGroupCall}
         pinned={pinned}
         onUnpin={handleUnpin}
         onJumpTo={(messageId) => { void jumpToMessage(messageId); }}
@@ -698,6 +748,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
                 onPin={() => handlePin(message.id)}
                 onUnpin={() => handleUnpin(message.id)}
                 onJumpToMessage={(id) => { void jumpToMessage(id); }}
+                onForward={() => setForwardingMessageId(message.id)}
+                isAdmin={conversation?.participants?.some(
+                  (p) => p.user_id === userId && p.role === 'admin'
+                )}
+                conversationType={conversation?.type}
+                conversationId={conversationId}
               />
             </div>
           );
@@ -713,6 +769,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Block warning message */}
+      {isBlocked && isDirectChat && (
+        <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+          <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-sm font-medium">
+              {isBlockedByUser 
+                ? 'Bạn đã bị người dùng này chặn. Bạn không thể nhắn tin.'
+                : 'Bạn đã chặn người dùng này. Bạn không thể nhắn tin.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Reply preview */}
       {replyTo && (
@@ -796,6 +868,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             prev.includes(userId) ? prev : [...prev, userId]
           );
         }}
+        disabled={isBlocked}
       />
 
       {/* Image Preview Modal */}
@@ -813,6 +886,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         <LocationPicker
           onLocationSelect={handleLocationSelect}
           onClose={() => setShowLocationPicker(false)}
+        />
+      )}
+
+      {/* Forward Message Modal */}
+      {forwardingMessageId && (
+        <ForwardMessageModal
+          open={!!forwardingMessageId}
+          onClose={() => setForwardingMessageId(null)}
+          messageId={forwardingMessageId}
+          userId={userId}
+          currentConversationId={conversationId}
         />
       )}
     </div>

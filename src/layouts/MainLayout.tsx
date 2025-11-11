@@ -7,17 +7,27 @@ import VideoCall from '@/components/VideoCall';
 
 export default function MainLayout() {
   const { user } = useAuth();
-  
+
   // Tự động set status online khi user đã đăng nhập
   useUserStatusTracker({
     userId: user?.id as string,
-    onStatusChange: (status) => {
-      console.log('🔔 Status changed:', status);
+    onStatusChange: () => {
+      // console.log('🔔 Status changed:', status);
     }
   });
 
   // Lắng nghe video call
-  const { activeCall, endCall, acceptCall, toggleMic, toggleCamera, micEnabled, cameraEnabled } = useCall(user?.id);
+  const {
+    activeCall,
+    endCall,
+    acceptCall,
+    toggleMic,
+    toggleCamera,
+    micEnabled,
+    cameraEnabled,
+    remoteParticipants,
+    localParticipant
+  } = useCall(user?.id);
 
   return (
     <div className="h-screen flex dark:bg-gray-900">
@@ -25,7 +35,7 @@ export default function MainLayout() {
       <div className="grid grid-cols-12 flex-1">
         <Outlet />
       </div>
-      
+
       {/* Video Call Overlay */}
       {activeCall && (
         <VideoCall
@@ -38,6 +48,8 @@ export default function MainLayout() {
           onToggleCamera={toggleCamera}
           micEnabled={micEnabled}
           cameraEnabled={cameraEnabled}
+          remoteParticipants={remoteParticipants}
+          localParticipant={localParticipant}
         />
       )}
     </div>

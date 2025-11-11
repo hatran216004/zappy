@@ -1,0 +1,115 @@
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { supabase } from '@/lib/supabase';
+import { useProfile } from '@/hooks/useProfile';
+import toast from 'react-hot-toast';
+import { Settings } from 'lucide-react';
+
+interface SettingsModalProps {
+  open: boolean;
+  onClose: () => void;
+  userId: string;
+}
+
+export function SettingsModal({
+  open,
+  onClose,
+  userId,
+}: SettingsModalProps) {
+  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: profile, refetch } = useProfile(userId);
+
+  const [blockStrangers, setBlockStrangers] = useState(
+    profile?.block_messages_from_strangers || false
+  );
+
+  // Update local state when profile changes
+  useEffect(() => {
+    if (profile) {
+      setBlockStrangers(profile.block_messages_from_strangers || false);
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          block_messages_from_strangers: blockStrangers,
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Invalidate profile query
+      queryClient.invalidateQueries({
+        queryKey: ['profile', userId],
+      });
+
+      // Refetch profile
+      await refetch();
+
+      toast.success('Đã lưu cài đặt');
+      onClose();
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Không thể lưu cài đặt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Cài đặt
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Block messages from strangers */}
+          <div className="flex items-center justify-between space-x-4">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="block-strangers" className="text-base font-medium">
+                Chặn tin nhắn từ người lạ
+              </Label>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Khi bật, bạn sẽ không nhận được tin nhắn từ những người chưa kết bạn
+              </p>
+            </div>
+            <Switch
+              id="block-strangers"
+              checked={blockStrangers}
+              onCheckedChange={setBlockStrangers}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Hủy
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Đang lưu...' : 'Lưu'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

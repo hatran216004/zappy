@@ -7,8 +7,9 @@ export type CallParticipant = Database['public']['Tables']['call_participants'][
 export type CallInfo = Database['public']['Functions']['get_call_info']['Returns'][number];
 
 // Lấy thông tin cuộc gọi
+// Dùng get_call_info_web (riêng cho React) thay vì get_call_info (Flutter dùng)
 export const getCallInfo = async (callId: string): Promise<CallInfo | null> => {
-  const { data, error } = await supabase.rpc('get_call_info', {
+  const { data, error } = await supabase.rpc('get_call_info_web', {
     _call_id: callId,
   });
 
@@ -25,19 +26,65 @@ export const getCallInfo = async (callId: string): Promise<CallInfo | null> => {
 };
 
 // Tạo cuộc gọi 1:1
+// Zappy-main (Flutter) dùng function: create_direct_call
+// Function này đã có trên database production (từ Zappy-main)
 export const createDirectCall = async (
   userId: string,
   isVideoEnabled: boolean
 ): Promise<void> => {
-  const { error } = await supabase.rpc('initiate_direct_call', {
+  // Try create_direct_call first (from Zappy-main, with real tokens)
+  const { error } = await supabase.rpc('create_direct_call', {
     _user_id: userId,
     _is_video_enabled: isVideoEnabled,
   });
 
   if (error) {
     console.error('Error creating direct call:', error);
+    console.error('Function: create_direct_call not found. Make sure database is synced with Zappy-main.');
     throw error;
   }
+  
+  console.log('✅ Call created using create_direct_call (Zappy-main function)');
+};
+
+// Tạo cuộc gọi nhóm
+export const createGroupCall = async (
+  conversationId: string,
+  isVideoEnabled: boolean
+): Promise<void> => {
+  const { error } = await supabase.rpc('create_group_call', {
+    _conversation_id: conversationId,
+    _is_video_enabled: isVideoEnabled,
+  });
+
+  if (error) {
+    console.error('Error creating group call:', error);
+    throw error;
+  }
+  
+  console.log('✅ Group call created');
+};
+
+// Accept incoming call - update joined_at
+export const acceptCall = async (callId: string): Promise<void> => {
+  const { data: currentUser } = await supabase.auth.getUser();
+  if (!currentUser.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const { error } = await supabase
+    .from('call_participants')
+    .update({ joined_at: new Date().toISOString() })
+    .eq('call_id', callId)
+    .eq('user_id', currentUser.user.id)
+    .is('joined_at', null);
+
+  if (error) {
+    console.error('Error accepting call:', error);
+    throw error;
+  }
+
+  console.log('✅ Call accepted, joined_at updated');
 };
 
 // Subscribe to call_participants changes cho user hiện tại
@@ -82,7 +129,7 @@ export const subscribeCallParticipants = (
         }
       }
     )
-    // UPDATE: nếu left_at != null thì rời cuộc gọi
+    // UPDATE: nếu left_at != null thì rời cuộc gọi, nếu joined_at được set thì join
     .on(
       'postgres_changes',
       {
@@ -93,6 +140,19 @@ export const subscribeCallParticipants = (
       },
       async (payload: PostgresChangeEvent<CallParticipant>) => {
         const participant = payload.new;
+        const oldParticipant = payload.old;
+        
+        // Check if joined_at was just set (from null to non-null)
+        if (!oldParticipant.joined_at && participant.joined_at) {
+          console.log('🎉 Participant accepted call, joining room...');
+          const callInfo = await getCallInfo(participant.call_id);
+          if (callInfo) {
+            handlers.onJoined(callInfo, participant);
+          }
+          return;
+        }
+        
+        // Check if left_at was set
         if (participant.left_at) {
           handlers.onLeft(participant);
         }

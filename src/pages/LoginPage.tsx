@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Link } from 'react-router';
 import { FcGoogle } from 'react-icons/fc';
-import { FaFacebook } from 'react-icons/fa';
 import Button from '@/components/Button';
 import Divider from '@/components/Divider';
 import { useMutation } from '@tanstack/react-query';
@@ -73,7 +72,7 @@ const LoginPage = () => {
               register={register}
               name="password"
               placeholder="Password"
-              defaultValue="Test1234@"
+              defaultValue="Test@123"
               errorMessage={errors.password?.message}
               type="password"
               icon={Lock}

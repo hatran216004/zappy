@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast';
 export default function CustomToast() {
   return (
     <Toaster
-      position="top-right"
+      position="bottom-left"
       gutter={10}
       toastOptions={{
         // Palette Zalo
