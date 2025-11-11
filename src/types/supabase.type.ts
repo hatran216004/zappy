@@ -39,6 +39,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      _message: {
+        Row: {
+          content_text: string | null
+          conversation_id: string | null
+          created_at: string | null
+          edited_at: string | null
+          fts: unknown
+          id: string | null
+          location: unknown
+          location_address: string | null
+          location_display_mode: string | null
+          location_latitude: number | null
+          location_longitude: number | null
+          recalled_at: string | null
+          reply_to_id: string | null
+          sender_id: string | null
+          type: Database["public"]["Enums"]["msg_type"] | null
+        }
+        Insert: {
+          content_text?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          fts?: unknown
+          id?: string | null
+          location?: unknown
+          location_address?: string | null
+          location_display_mode?: string | null
+          location_latitude?: number | null
+          location_longitude?: number | null
+          recalled_at?: string | null
+          reply_to_id?: string | null
+          sender_id?: string | null
+          type?: Database["public"]["Enums"]["msg_type"] | null
+        }
+        Update: {
+          content_text?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          fts?: unknown
+          id?: string | null
+          location?: unknown
+          location_address?: string | null
+          location_display_mode?: string | null
+          location_latitude?: number | null
+          location_longitude?: number | null
+          recalled_at?: string | null
+          reply_to_id?: string | null
+          sender_id?: string | null
+          type?: Database["public"]["Enums"]["msg_type"] | null
+        }
+        Relationships: []
+      }
       attachments: {
         Row: {
           byte_size: number
@@ -824,6 +878,176 @@ export type Database = {
           },
         ]
       }
+      pinned_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          message_id: string
+          pinned_by: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message_id: string
+          pinned_by: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+          pinned_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pinned_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pinned_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pinned_messages_pinned_by_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poll_options: {
+        Row: {
+          id: string
+          idx: number
+          option_text: string
+          poll_id: string
+        }
+        Insert: {
+          id?: string
+          idx: number
+          option_text: string
+          poll_id: string
+        }
+        Update: {
+          id?: string
+          idx?: number
+          option_text?: string
+          poll_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_options_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poll_votes: {
+        Row: {
+          created_at: string
+          option_id: string
+          poll_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          option_id: string
+          poll_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          option_id?: string
+          poll_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_votes_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "poll_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      polls: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          created_by: string
+          id: string
+          message_id: string
+          multiple: boolean
+          question: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          message_id: string
+          multiple?: boolean
+          question: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          message_id?: string
+          multiple?: boolean
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "polls_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polls_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polls_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comments: {
         Row: {
           content: string
@@ -1052,6 +1276,15 @@ export type Database = {
         Returns: undefined
       }
       cancel_friend_request: { Args: { _user_id: string }; Returns: boolean }
+      create_call: {
+        Args: {
+          _conversation_id: string
+          _is_video_enabled: boolean
+          _participants: string[]
+          _user_query: string
+        }
+        Returns: undefined
+      }
       create_contact_label: {
         Args: { _color: number; _name: string; _user_ids: string[] }
         Returns: boolean
@@ -1059,6 +1292,16 @@ export type Database = {
       create_direct_call: {
         Args: { _is_video_enabled: boolean; _user_id: string }
         Returns: undefined
+      }
+      get_blocks: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          created_at: string
+          display_name: string
+          id: string
+          username: string
+        }[]
       }
       get_call_info: {
         Args: { _call_id: string }
@@ -1086,22 +1329,25 @@ export type Database = {
         Returns: {
           content_text: string
           display_name: string
-          group_type: string
           id: string
+          is_hidden: boolean
           message_type: string
+          msg_id: string
           photo_url: string
           sender_id: string
           title: string
+          type: string
+          unread_count: number
           updated_at: string
         }[]
       }
       get_direct_conversation: {
         Args: { _user_id: string }
         Returns: {
-          group_type: string
           id: string
           photo_url: string
           title: string
+          type: string
         }[]
       }
       get_friends: {
@@ -1135,6 +1381,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_latest_message_conversation: {
+        Args: { _conversation_id: string }
+        Returns: {
+          content: string
+          display_name: string
+          id: string
+          sender_id: string
+          type: string
+        }[]
+      }
       get_requests: {
         Args: never
         Returns: {
@@ -1146,6 +1402,20 @@ export type Database = {
           status: string
           username: string
         }[]
+      }
+      get_unread_count: { Args: { _conversation_id: string }; Returns: number }
+      get_user_from_direct_conversation: {
+        Args: { _direct_conversation_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          username: string
+        }[]
+      }
+      initiate_direct_call: {
+        Args: { _is_video_enabled: boolean; _user_id: string }
+        Returns: undefined
       }
       join_group_via_invite: { Args: { _invite_code: string }; Returns: string }
       livekit_event_participant_joined: {
@@ -1164,8 +1434,11 @@ export type Database = {
         Args: { _color: number; _label_id: string; _name: string }
         Returns: boolean
       }
+      recall_message: { Args: { _message_id: string }; Returns: undefined }
       reject_friend_request: { Args: { _user_id: string }; Returns: boolean }
+      remove_block_user: { Args: { _user_id: string }; Returns: undefined }
       remove_contact_label: { Args: { _label_id: string }; Returns: boolean }
+      remove_friend: { Args: { _user_id: string }; Returns: undefined }
       search_users: {
         Args: { _search: string }
         Returns: {
@@ -1178,10 +1451,33 @@ export type Database = {
           username: string
         }[]
       }
+      search_users_by_email: {
+        Args: { _current_user_id: string; _term: string }
+        Returns: {
+          avatar_url: string
+          bio: string
+          created_at: string
+          display_name: string
+          gender: boolean
+          id: string
+          is_disabled: boolean
+          last_seen_at: string | null
+          status: Database["public"]["Enums"]["user_status"]
+          status_updated_at: string
+          username: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       send_friend_request: {
         Args: { _message: string; _user_id: string }
         Returns: boolean
       }
+      set_online_status: { Args: never; Returns: undefined }
       verify_user_password: { Args: { _password: string }; Returns: boolean }
     }
     Enums: {
@@ -1199,6 +1495,7 @@ export type Database = {
         | "audio"
         | "location"
         | "system"
+        | "poll"
       notif_level: "all" | "mentions" | "none"
       post_reaction_type: "like" | "love" | "haha" | "wow" | "sad" | "angry"
       role_type: "admin" | "member"
@@ -1347,6 +1644,7 @@ export const Constants = {
         "audio",
         "location",
         "system",
+        "poll",
       ],
       notif_level: ["all", "mentions", "none"],
       post_reaction_type: ["like", "love", "haha", "wow", "sad", "angry"],
