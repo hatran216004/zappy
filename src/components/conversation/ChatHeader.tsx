@@ -22,6 +22,8 @@ import { supabaseUrl } from "@/lib/supabase";
 import { BackgroundPicker } from "./BackgroundPicker";
 import { useUpdateConversationBackground } from "@/hooks/useChat";
 import { PinnedMessagesModal } from "../modal/PinnedMessagesModal";
+import { CreatePollModal } from "../modal/CreatePollModal";
+import useUser from "@/hooks/useUser";
 
 interface ChatHeaderProps {
   otherParticipant:
@@ -59,6 +61,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onUnpin,
   onJumpTo,
 }) => {
+  const { user } = useUser();
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -203,6 +206,24 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             </Button>
           ) : (
             <TooltipBtn icon={Info} label="Thông tin" />
+          )}
+
+          {/* Create Poll (only for groups) */}
+          {isGroupChat && conversation && user?.id && (
+            <CreatePollModal
+              conversationId={conversation.id}
+              userId={user.id}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full text-xs px-2"
+                  title="Tạo bình chọn"
+                >
+                  Tạo bình chọn
+                </Button>
+              }
+            />
           )}
 
           {/* Pinned messages button */}

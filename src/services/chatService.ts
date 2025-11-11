@@ -1631,6 +1631,207 @@ export const subscribePinnedMessages = (
 };
 
 // ============================================
+// POLLS
+// ============================================
+
+export type Poll = {
+  id: string;
+  conversation_id: string;
+  message_id: string;
+  question: string;
+  multiple: boolean;
+  created_by: string;
+  created_at: string;
+};
+
+export type PollOption = {
+  id: string;
+  poll_id: string;
+  option_text: string;
+  idx: number;
+  votes_count?: number;
+};
+
+export type PollWithOptions = Poll & {
+  options: (PollOption & { votes_count: number })[];
+  my_votes?: string[]; // option_ids
+};
+
+export const createPoll = async (
+  conversationId: string,
+  creatorId: string,
+  question: string,
+  options: string[],
+  multiple: boolean
+): Promise<{ message: Message; poll: PollWithOptions }> => {
+  const { data: msg, error: msgErr } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id: creatorId,
+      type: 'poll',
+      content_text: question
+    })
+    .select()
+    .single();
+  if (msgErr) throw msgErr;
+
+  const { data: poll, error: pollErr } = await supabase
+    .from('polls')
+    .insert({
+      conversation_id: conversationId,
+      message_id: msg.id,
+      question,
+      multiple,
+      created_by: creatorId
+    })
+    .select()
+    .single();
+  if (pollErr) throw pollErr;
+
+  const optionRows = options
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+    .map((t, i) => ({
+      poll_id: poll.id,
+      option_text: t,
+      idx: i
+    }));
+  if (optionRows.length < 2) {
+    throw new Error('Cần ít nhất 2 lựa chọn');
+  }
+  const { error: optErr } = await supabase.from('poll_options').insert(optionRows);
+  if (optErr) throw optErr;
+
+  await supabase
+    .from('conversations')
+    .update({ last_message_id: msg.id, updated_at: new Date().toISOString() })
+    .eq('id', conversationId);
+
+  const full = await getPollByMessage(msg.id, creatorId);
+  return { message: msg, poll: full };
+};
+
+export const getPollByMessage = async (
+  messageId: string,
+  currentUserId?: string
+): Promise<PollWithOptions> => {
+  const { data: poll, error } = await supabase
+    .from('polls')
+    .select('*')
+    .eq('message_id', messageId)
+    .single();
+  if (error || !poll) throw error || new Error('Poll not found');
+
+  const [{ data: options }, { data: myVotes }, { data: allVotes }] = await Promise.all([
+    supabase
+      .from('poll_options')
+      .select('*')
+      .eq('poll_id', poll.id)
+      .order('idx', { ascending: true }),
+    currentUserId
+      ? supabase
+          .from('poll_votes')
+          .select('option_id')
+          .eq('poll_id', poll.id)
+          .eq('user_id', currentUserId)
+      : Promise.resolve({ data: [] as any } as any),
+    supabase
+      .from('poll_votes')
+      .select('option_id')
+      .eq('poll_id', poll.id)
+  ]);
+
+  const countByOption = new Map<string, number>();
+  (allVotes || []).forEach((r: any) => {
+    const k = r.option_id as string;
+    countByOption.set(k, (countByOption.get(k) || 0) + 1);
+  });
+
+  return {
+    ...(poll as Poll),
+    options: (options || []).map((o) => ({
+      ...o,
+      votes_count: countByOption.get(o.id) || 0
+    })),
+    my_votes: (myVotes || []).map((v: any) => v.option_id)
+  };
+};
+
+export const votePoll = async (
+  pollId: string,
+  optionId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('poll_votes')
+    .insert({ poll_id: pollId, option_id: optionId, user_id: userId });
+  if (error) throw error;
+};
+
+export const unvotePoll = async (
+  pollId: string,
+  optionId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('poll_votes')
+    .delete()
+    .eq('poll_id', pollId)
+    .eq('option_id', optionId)
+    .eq('user_id', userId);
+  if (error) throw error;
+};
+
+export const subscribePollVotes = (
+  conversationId: string,
+  onChange: (payload: { poll_id: string }) => void
+) => {
+  const channel = supabase
+    .channel(`polls:${conversationId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'poll_votes' },
+      async (payload) => {
+        const pollId = (payload.new as any)?.poll_id || (payload.old as any)?.poll_id;
+        if (!pollId) return;
+        const { data: poll } = await supabase
+          .from('polls')
+          .select('conversation_id')
+          .eq('id', pollId)
+          .single();
+        if (poll?.conversation_id === conversationId) {
+          onChange({ poll_id: pollId });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// More efficient subscription for a specific poll id
+export const subscribePollVotesForPoll = (
+  pollId: string,
+  onChange: () => void
+) => {
+  const channel = supabase
+    .channel(`poll:${pollId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'poll_votes', filter: `poll_id=eq.${pollId}` },
+      () => onChange()
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// ============================================
 // SEARCH CONVERSATIONS (direct + group)
 // ============================================
 
