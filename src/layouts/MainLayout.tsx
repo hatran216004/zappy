@@ -17,7 +17,7 @@ export default function MainLayout() {
   });
 
   // Lắng nghe video call
-  const { activeCall, endCall } = useCall(user?.id);
+  const { activeCall, endCall, acceptCall, toggleMic, toggleCamera, micEnabled, cameraEnabled } = useCall(user?.id);
 
   return (
     <div className="h-screen flex dark:bg-gray-900">
@@ -31,7 +31,13 @@ export default function MainLayout() {
         <VideoCall
           callInfo={activeCall.callInfo}
           participant={activeCall.participant}
+          status={activeCall.status}
+          onAcceptCall={acceptCall}
           onEndCall={endCall}
+          onToggleMic={toggleMic}
+          onToggleCamera={toggleCamera}
+          micEnabled={micEnabled}
+          cameraEnabled={cameraEnabled}
         />
       )}
     </div>

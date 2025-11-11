@@ -1,13 +1,20 @@
 import { Search, Loader2 } from 'lucide-react';
 import AddFriendModal from './modal/AddFriendModal';
 import { useState, useRef, useEffect } from 'react';
-import { searchUsersByUsername, type SearchUserResult } from '@/services/friendServices';
+import {
+  searchUsersByUsername,
+  type SearchUserResult
+} from '@/services/friendServices';
 import useUser from '@/hooks/useUser';
 import { UserAvatar } from './UserAvatar';
 import { useNavigate } from 'react-router';
 import { useGetOrCreateDirectConversation } from '@/hooks/useChat';
 import toast from 'react-hot-toast';
 import { useSendFriendRequest } from '@/hooks/useFriends';
+import {
+  searchConversations,
+  type ConversationSearchResult
+} from '@/services/chatService';
 
 export default function SearchBar() {
   const { user } = useUser();
@@ -15,18 +22,24 @@ export default function SearchBar() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchUserResult[]>([]);
+  const [conversationResults, setConversationResults] = useState<
+    ConversationSearchResult[]
+  >([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
-  
+
   const getOrCreateConversation = useGetOrCreateDirectConversation();
   const sendFriendRequestMutation = useSendFriendRequest();
 
   // Close results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
         setShowResults(false);
       }
     };
@@ -50,8 +63,13 @@ export default function SearchBar() {
     setIsSearching(true);
     timeoutRef.current = setTimeout(async () => {
       try {
-        const results = await searchUsersByUsername(searchTerm.trim(), userId);
-        setSearchResults(results);
+        const term = searchTerm.trim();
+        const [userRes, convoRes] = await Promise.all([
+          searchUsersByUsername(term, userId),
+          searchConversations(userId, term)
+        ]);
+        setSearchResults(userRes);
+        setConversationResults(convoRes);
         setShowResults(true);
       } catch (error) {
         console.error('Search error:', error);
@@ -72,7 +90,7 @@ export default function SearchBar() {
     try {
       const conversationId = await getOrCreateConversation.mutateAsync({
         currentUserId: userId,
-        otherUserId: targetUserId,
+        otherUserId: targetUserId
       });
       navigate(`/chat/${conversationId}`);
       setSearchTerm('');
@@ -174,46 +192,94 @@ export default function SearchBar() {
       </div>
 
       {/* Search Results Dropdown */}
-      {showResults && searchResults.length > 0 && (
-        <div className="absolute top-full left-3 right-3 mt-1 max-h-[400px] overflow-y-auto bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-          <div className="p-2 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-            Kết quả tìm kiếm ({searchResults.length})
-          </div>
-          {searchResults.map((result) => (
-            <div
-              key={result.id}
-              className="flex items-center gap-3 p-3 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-            >
-              <UserAvatar
-                avatarUrl={result.avatar_url}
-                displayName={result.display_name}
-                status={result.status}
-                size="sm"
-                showStatus={true}
-                className="w-10 h-10"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {result.display_name}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  @{result.username}
-                </p>
-              </div>
-              {getActionButton(result)}
+      {showResults &&
+        (searchResults.length > 0 || conversationResults.length > 0) && (
+          <div className="absolute top-full left-3 right-3 mt-1 max-h-[400px] overflow-y-auto bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+            {conversationResults.length > 0 && (
+              <>
+                <div className="px-3 pt-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Cuộc trò chuyện ({conversationResults.length})
+                </div>
+                {conversationResults.map((c) => (
+                  <div
+                    key={`c-${c.id}`}
+                    onClick={() => {
+                      navigate(`/chat/${c.id}`);
+                      setShowResults(false);
+                      setSearchTerm('');
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-white/5 cursor-pointer"
+                  >
+                    <UserAvatar
+                      avatarUrl={
+                        c.type === 'group'
+                          ? c.photo_url || '/default-image.png'
+                          : c.other_participant?.avatar_url
+                      }
+                      displayName={c.title}
+                      status={c.other_participant?.status || undefined}
+                      size="sm"
+                      showStatus={c.type === 'direct'}
+                      className="w-9 h-9"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {c.title}
+                      </p>
+                      {c.last_message_preview && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {c.last_message_preview}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+              </>
+            )}
+
+            <div className="px-3 pt-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Người dùng ({searchResults.length})
             </div>
-          ))}
-        </div>
-      )}
+            {searchResults.map((result) => (
+              <div
+                key={result.id}
+                className="flex items-center gap-3 p-3 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+              >
+                <UserAvatar
+                  avatarUrl={result.avatar_url}
+                  displayName={result.display_name}
+                  status={result.status}
+                  size="sm"
+                  showStatus={true}
+                  className="w-10 h-10"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {result.display_name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    @{result.username}
+                  </p>
+                </div>
+                {getActionButton(result)}
+              </div>
+            ))}
+          </div>
+        )}
 
       {/* No results */}
-      {showResults && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching && (
-        <div className="absolute top-full left-3 right-3 mt-1 bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-6 text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Không tìm thấy người dùng nào
-          </p>
-        </div>
-      )}
+      {showResults &&
+        searchTerm.length >= 2 &&
+        searchResults.length === 0 &&
+        conversationResults.length === 0 &&
+        !isSearching && (
+          <div className="absolute top-full left-3 right-3 mt-1 bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-6 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Không tìm thấy người dùng nào
+            </p>
+          </div>
+        )}
     </div>
   );
 }

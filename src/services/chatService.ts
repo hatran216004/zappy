@@ -1514,3 +1514,98 @@ export const updateConversationBackground = async (
 };
 
 export { supabase };
+
+// ============================================
+// SEARCH CONVERSATIONS (direct + group)
+// ============================================
+
+export type ConversationSearchResult = {
+  id: string;
+  type: 'direct' | 'group';
+  title: string;
+  photo_url: string | null;
+  other_participant?: {
+    id: string;
+    display_name: string;
+    username: string | null;
+    avatar_url: string | null;
+    status: Database['public']['Tables']['profiles']['Row']['status'] | null;
+  };
+  last_message_preview?: string | null;
+};
+
+export const searchConversations = async (
+  userId: string,
+  term: string
+): Promise<ConversationSearchResult[]> => {
+  const query = term.trim().toLowerCase();
+  if (query.length < 2) return [];
+
+  // 1) Load all conversations for user (cached util functions)
+  const all = await getConversations(userId);
+
+  // 2) If searching email, get matching profile ids from auth.users via RPC
+  let emailMatchedIds = new Set<string>();
+  if (query.includes('@')) {
+    const rpcClient = supabase as unknown as {
+      rpc: (
+        fn: string,
+        args: Record<string, unknown>
+      ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+    };
+    const { data, error } = await rpcClient.rpc('search_users_by_email', {
+      _term: term,
+      _current_user_id: userId,
+    });
+    if (!error && data) {
+      const profiles = data as Database['public']['Tables']['profiles']['Row'][];
+      emailMatchedIds = new Set(profiles.map((p) => p.id));
+    }
+  }
+
+  // 3) Filter conversations
+  const results: ConversationSearchResult[] = [];
+  for (const convo of all) {
+    if (convo.type === 'group') {
+      const title = (convo.title || '').toLowerCase();
+      if (title.includes(query)) {
+        results.push({
+          id: convo.id,
+          type: 'group',
+          title: convo.title || 'Nhóm',
+          photo_url: convo.photo_url || null,
+          last_message_preview: convo.last_message?.content_text || null,
+        });
+      }
+    } else {
+      // direct: find the other participant
+      const other = (convo.participants || []).find((p) => p.user_id !== userId)?.profile;
+      if (!other) continue;
+      const dn = (other.display_name || '').toLowerCase();
+      const un = (other as any).username ? String((other as any).username).toLowerCase() : '';
+      const match =
+        dn.includes(query) ||
+        (un && un.includes(query)) ||
+        (emailMatchedIds.size > 0 && emailMatchedIds.has(other.id));
+      if (match) {
+        results.push({
+          id: convo.id,
+          type: 'direct',
+          title: other.display_name || 'Direct',
+          photo_url: other.avatar_url || null,
+          other_participant: {
+            id: other.id,
+            display_name: other.display_name || '',
+            username: (other as any).username || null,
+            avatar_url: other.avatar_url,
+            status: other.status || null,
+          },
+          last_message_preview: convo.last_message?.content_text || null,
+        });
+      }
+    }
+  }
+
+  // Optional: limit results
+  return results.slice(0, 20);
+};

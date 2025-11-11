@@ -106,11 +106,11 @@ export const FriendSearch = () => {
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Input
-                type="email"
-                inputMode="email"
+                type="text"
+                inputMode="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Nhập email để tìm kiếm..."
+                placeholder="Nhập username hoặc email để tìm kiếm..."
                 className="w-full pl-9 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:ring-[#0068ff]"
               />
               <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />

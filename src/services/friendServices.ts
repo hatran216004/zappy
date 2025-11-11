@@ -20,18 +20,52 @@ export const searchUsersByUsername = async (
   searchTerm: string,
   currentUserId: string
 ): Promise<SearchUserResult[]> => {
-  const { data: users, error } = await supabase
+  const term = searchTerm.trim();
+
+  // 1) Profile search by username/display_name
+  const { data: byProfile, error: profileErr } = await supabase
     .from('profiles')
     .select('*')
-    .or(`username.ilike.%${searchTerm}%,display_name.ilike.%${searchTerm}%`)
+    .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
     .neq('id', currentUserId)
     .eq('is_disabled', false)
     .limit(20);
 
-  if (error) throw error;
+  if (profileErr) throw profileErr;
+
+  // 2) Email search via SQL function (auth.users), if term likely email or contains '@'
+  let byEmail: Profile[] = [];
+  if (term.includes('@')) {
+    const rpcClient = supabase as unknown as {
+      rpc: (
+        fn: string,
+        args: Record<string, unknown>
+      ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+    };
+    const { data: emailData, error: emailErr } = await rpcClient.rpc(
+      'search_users_by_email',
+      {
+        _term: term,
+        _current_user_id: currentUserId
+      }
+    );
+    if (!emailErr && emailData) {
+      byEmail = emailData as Profile[];
+    } else if (emailErr) {
+      console.warn('Email search RPC error:', emailErr.message);
+    }
+  }
+
+  // Combine unique by id, prioritize profile search order
+  const map = new Map<string, Profile>();
+  (byProfile || []).forEach((p) => map.set(p.id, p));
+  byEmail.forEach((p) => {
+    if (!map.has(p.id)) map.set(p.id, p);
+  });
+  const users = Array.from(map.values());
 
   // Check friend status và friend request status
-  const userIds = users?.map((u) => u.id) || [];
+  const userIds = users.map((u) => u.id);
 
   const [friendsData, requestsData, blocksData] = await Promise.all([
     supabase
@@ -187,18 +221,18 @@ export const acceptFriendRequest = async (
         const { error: insertError1 } = await supabase
           .from('friends')
           .insert({ user_id: me, friend_id: fromUserId });
-        
+
         if (insertError1 && insertError1.code !== '23505') {
           console.warn('Error inserting me -> friend:', insertError1);
         }
       }
 
-      // Insert friend -> me if doesn't exist  
+      // Insert friend -> me if doesn't exist
       if (!friendToMe.data) {
         const { error: insertError2 } = await supabase
           .from('friends')
           .insert({ user_id: fromUserId, friend_id: me });
-        
+
         if (insertError2 && insertError2.code !== '23505') {
           console.warn('Error inserting friend -> me:', insertError2);
         }
@@ -280,7 +314,9 @@ export const getFriends = async (): Promise<Friend[]> => {
 
 // Xóa bạn bè
 export const removeFriend = async (friendId: string): Promise<void> => {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
   const currentUserId = user?.id;
 
   if (!currentUserId) {
@@ -303,7 +339,7 @@ export const removeFriend = async (friendId: string): Promise<void> => {
   // This deletes: (current user -> friend) OR (friend -> current user)
   // Since we can only delete our own friendships due to RLS, we delete in two steps
   // but use a single logical operation
-  
+
   // Step 1: Delete relationship where current user is the user_id (we own this)
   const { error } = await supabase
     .from('friends')
@@ -331,8 +367,12 @@ export const removeFriend = async (friendId: string): Promise<void> => {
     // Since get_friends() only returns friends where user_id = current_user,
     // the reverse row won't affect the UI - it's just orphaned data
     console.warn('Could not delete reverse friendship. Error:', error2);
-    console.warn('Main friendship deleted successfully. Reverse row may remain due to RLS policies.');
-    console.warn('This is not critical as get_friends() only queries user_id = current_user.');
+    console.warn(
+      'Main friendship deleted successfully. Reverse row may remain due to RLS policies.'
+    );
+    console.warn(
+      'This is not critical as get_friends() only queries user_id = current_user.'
+    );
     // Don't throw - main deletion succeeded and UI will update correctly
   }
 
@@ -443,10 +483,13 @@ export const subscribeFriends = (
 // CONTACT LABELS (Nhãn phân loại bạn bè)
 // ============================================
 
-export type ContactLabel = Database['public']['Tables']['contact_labels']['Row'];
+export type ContactLabel =
+  Database['public']['Tables']['contact_labels']['Row'];
 
 // Lấy tất cả labels của user
-export const getContactLabels = async (userId: string): Promise<ContactLabel[]> => {
+export const getContactLabels = async (
+  userId: string
+): Promise<ContactLabel[]> => {
   const { data, error } = await supabase
     .from('contact_labels')
     .select('*')
@@ -509,12 +552,10 @@ export const assignLabelToFriend = async (
   friendId: string,
   labelId: string
 ): Promise<void> => {
-  const { error } = await supabase
-    .from('contact_label_map')
-    .insert({
-      friend_id: friendId,
-      label_id: labelId
-    });
+  const { error } = await supabase.from('contact_label_map').insert({
+    friend_id: friendId,
+    label_id: labelId
+  });
 
   if (error) throw error;
 };
