@@ -519,6 +519,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     setCurrentSearchIndex(0);
   }, []);
 
+  // Jump to a specific message id (for reply preview/pins)
+  const jumpToMessage = useCallback(
+    async (messageId: string) => {
+      const isLoaded = messages.some((msg) => msg.id === messageId);
+      if (isLoaded) {
+        const el = messageRefs.current[messageId];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (!messages.some((m) => m.id === messageId) && attempts < maxAttempts && hasNextPage) {
+        await fetchNextPage();
+        attempts++;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      setTimeout(() => {
+        const el = messageRefs.current[messageId];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+    },
+    [messages, hasNextPage, fetchNextPage]
+  );
+
   const handleLocationClick = useCallback(() => {
     setShowLocationPicker(true);
   }, []);
@@ -604,14 +628,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         onCall={handleCall}
         pinned={pinned}
         onUnpin={handleUnpin}
-        onJumpTo={(messageId) => {
-          const el = messageRefs.current[messageId];
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          else {
-            // best effort: try to fetch older pages then scroll (simplified)
-            console.log('Pinned message not loaded yet');
-          }
-        }}
+        onJumpTo={(messageId) => { void jumpToMessage(messageId); }}
       />
 
       <div
@@ -680,6 +697,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
                 isPinned={pinned.some((p) => p.message_id === message.id)}
                 onPin={() => handlePin(message.id)}
                 onUnpin={() => handleUnpin(message.id)}
+                onJumpToMessage={(id) => { void jumpToMessage(id); }}
               />
             </div>
           );
