@@ -38,6 +38,7 @@ interface MessageBubbleProps {
   isPinned?: boolean;
   onPin?: () => void;
   onUnpin?: () => void;
+  onJumpToMessage?: (messageId: string) => void;
 }
 
 // Helper function to detect and linkify URLs and render mentions with avatar+name
@@ -117,7 +118,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   currentUserId,
   isPinned,
   onPin,
-  onUnpin
+  onUnpin,
+  onJumpToMessage
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.content_text || '');
@@ -284,9 +286,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
           {/* Reply to */}
           {message?.reply_to && (
-            <div className="px-3 py-1 mb-1 bg-gray-100 rounded-t-lg text-xs text-gray-600 border-l-2 border-primary">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (message.reply_to?.id) {
+                  onJumpToMessage?.(message.reply_to.id);
+                }
+              }}
+              className="text-left px-3 py-1 mb-1 bg-gray-100 hover:bg-gray-200 rounded-t-lg text-xs text-gray-700 border-l-2 border-primary transition-colors"
+              title="Nhảy tới tin nhắn được trả lời"
+            >
               Trả lời: {message.reply_to.content_text || 'Tin nhắn'}
-            </div>
+            </button>
           )}
 
           {/* Message content */}
