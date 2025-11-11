@@ -1516,6 +1516,121 @@ export const updateConversationBackground = async (
 export { supabase };
 
 // ============================================
+// PINNED MESSAGES
+// ============================================
+
+export type PinnedMessage = {
+  id: string;
+  conversation_id: string;
+  message_id: string;
+  pinned_by: string;
+  created_at: string;
+  message?: Pick<
+    MessageWithDetails,
+    'id' | 'content_text' | 'sender' | 'created_at' | 'type'
+  >;
+};
+
+// Get pinned messages for a conversation (latest first, max 3)
+export const getPinnedMessages = async (
+  conversationId: string
+): Promise<PinnedMessage[]> => {
+  // Fetch pinned rows
+  const { data, error } = await supabase
+    .from('pinned_messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  if (error) throw error;
+  const pins = data || [];
+
+  if (pins.length === 0) return [];
+
+  // Fetch messages for these pins
+  const messageIds = pins.map((p) => p.message_id);
+  const { data: msgs } = await supabase
+    .from('messages')
+    .select(
+      `
+      id, content_text, type, sender_id, created_at,
+      sender:profiles!messages_sender_id_fkey(*)
+    `
+    )
+    .in('id', messageIds);
+
+  const byId = new Map(
+    (msgs || []).map((m) => [m.id, m as unknown as PinnedMessage['message']])
+  );
+
+  return pins.map((p) => ({
+    ...p,
+    message: byId.get(p.message_id)
+  }));
+};
+
+// Pin a message (enforced max 3 by trigger)
+export const pinMessage = async (
+  conversationId: string,
+  messageId: string,
+  userId: string
+): Promise<void> => {
+  // Optional client-side guard
+  const current = await getPinnedMessages(conversationId);
+  if (current.find((p) => p.message_id === messageId)) return; // already pinned
+  if (current.length >= 3) {
+    throw new Error('Tối đa ghim 3 tin nhắn cho mỗi cuộc trò chuyện');
+  }
+
+  const { error } = await supabase.from('pinned_messages').insert({
+    conversation_id: conversationId,
+    message_id: messageId,
+    pinned_by: userId
+  });
+
+  if (error) throw error;
+};
+
+// Unpin by messageId
+export const unpinMessage = async (
+  conversationId: string,
+  messageId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('pinned_messages')
+    .delete()
+    .eq('conversation_id', conversationId)
+    .eq('message_id', messageId);
+
+  if (error) throw error;
+};
+
+// Subscribe to pinned messages changes
+export const subscribePinnedMessages = (
+  conversationId: string,
+  onChange: () => void
+) => {
+  const channel = supabase
+    .channel(`pins:${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'pinned_messages',
+        filter: `conversation_id=eq.${conversationId}`
+      },
+      () => onChange()
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// ============================================
 // SEARCH CONVERSATIONS (direct + group)
 // ============================================
 
