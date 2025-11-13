@@ -32,6 +32,11 @@ import {
   subscribeConversations,
   subscribeMessages,
   subscribeReactions,
+  subscribeReadReceipts,
+  subscribeThreadReadReceipts,
+  subscribeThreads,
+  subscribeThreadMessages,
+  subscribeThreadReactions,
   subscribeTyping,
   searchMessages,
   getConversationMedia,
@@ -44,7 +49,21 @@ import {
   // type ConversationWithDetails,
   // type MessageWithDetails,
   type Message,
-  type ReportReason
+  type ReportReason,
+  createThread,
+  getThreads,
+  joinThread,
+  leaveThread,
+  getThreadMessages,
+  sendThreadMessage,
+  toggleThreadPin,
+  toggleThreadClose,
+  markThreadAsRead,
+  markThreadMessagesAsRead,
+  getThreadParticipants,
+  type Thread,
+  type ThreadWithDetails,
+  type MessageWithDetails
 } from '../services/chatService';
 
 // Keys cho query cache
@@ -57,7 +76,12 @@ export const chatKeys = {
   conversation: (conversationId: string) =>
     [...chatKeys.all, 'conversation', conversationId] as const,
   messages: (conversationId: string) =>
-    [...chatKeys.all, 'messages', conversationId] as const
+    [...chatKeys.all, 'messages', conversationId] as const,
+  threads: (conversationId: string) =>
+    [...chatKeys.all, 'threads', conversationId] as const,
+  thread: (threadId: string) => [...chatKeys.all, 'thread', threadId] as const,
+  threadMessages: (threadId: string) =>
+    [...chatKeys.all, 'threadMessages', threadId] as const
 };
 
 // ============================================
@@ -148,7 +172,7 @@ export const useConversationRealtime = (conversationId: string) => {
         },
         (payload) => {
           console.log('🔄 Conversation updated:', payload.new);
-          
+
           // Update conversation cache with new data
           queryClient.setQueryData(
             chatKeys.conversation(conversationId),
@@ -156,7 +180,7 @@ export const useConversationRealtime = (conversationId: string) => {
               if (!old) return old;
               return {
                 ...old,
-                ...payload.new,
+                ...payload.new
               };
             }
           );
@@ -183,7 +207,8 @@ export const useConversationRealtime = (conversationId: string) => {
 export const useMessages = (conversationId: string, currentUserId?: string) => {
   return useInfiniteQuery({
     queryKey: chatKeys.messages(conversationId),
-    queryFn: ({ pageParam }) => getMessages(conversationId, 50, pageParam, currentUserId),
+    queryFn: ({ pageParam }) =>
+      getMessages(conversationId, 50, pageParam, currentUserId),
     getNextPageParam: (lastPage) => {
       if (lastPage.length === 0) return undefined;
       return lastPage[0].created_at;
@@ -210,10 +235,23 @@ export const useSendTextMessage = () => {
       content: string;
       replyToId?: string;
       mentionedUserIds?: string[];
-    }) => sendTextMessage(conversationId, senderId, content, replyToId, mentionedUserIds),
+    }) =>
+      sendTextMessage(
+        conversationId,
+        senderId,
+        content,
+        replyToId,
+        mentionedUserIds
+      ),
 
     // Optimistic update - thêm message ngay lập tức
-    onMutate: async ({ conversationId, senderId, content, replyToId, mentionedUserIds }) => {
+    onMutate: async ({
+      conversationId,
+      senderId,
+      content,
+      replyToId,
+      mentionedUserIds
+    }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({
         queryKey: chatKeys.messages(conversationId)
@@ -244,7 +282,9 @@ export const useSendTextMessage = () => {
             attachments: [],
             reactions: [],
             read_receipts: [],
-            mentions: (mentionedUserIds || []).map((uid) => ({ mentioned_user_id: uid })),
+            mentions: (mentionedUserIds || []).map((uid) => ({
+              mentioned_user_id: uid
+            })),
             reply_to: null
           };
 
@@ -268,9 +308,10 @@ export const useSendTextMessage = () => {
           context.previousMessages
         );
       }
-      
+
       // Show toast error
-      const errorMessage = err instanceof Error ? err.message : 'Không thể gửi tin nhắn';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể gửi tin nhắn';
       toast.error(errorMessage);
     },
 
@@ -311,7 +352,8 @@ export const useSendFileMessage = () => {
       });
     },
     onError: (err) => {
-      const errorMessage = err instanceof Error ? err.message : 'Không thể gửi file';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể gửi file';
       toast.error(errorMessage);
     }
   });
@@ -336,10 +378,25 @@ export const useSendLocationMessage = () => {
       longitude: number;
       address?: string;
       displayMode?: 'interactive' | 'static';
-    }) => sendLocationMessage(conversationId, senderId, latitude, longitude, address, displayMode),
-    
+    }) =>
+      sendLocationMessage(
+        conversationId,
+        senderId,
+        latitude,
+        longitude,
+        address,
+        displayMode
+      ),
+
     // Optimistic update
-    onMutate: async ({ conversationId, senderId, latitude, longitude, address, displayMode }) => {
+    onMutate: async ({
+      conversationId,
+      senderId,
+      latitude,
+      longitude,
+      address,
+      displayMode
+    }) => {
       await queryClient.cancelQueries({
         queryKey: chatKeys.messages(conversationId)
       });
@@ -357,7 +414,9 @@ export const useSendLocationMessage = () => {
             id: `temp-${Date.now()}`,
             conversation_id: conversationId,
             sender_id: senderId,
-            content_text: address || `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            content_text:
+              address ||
+              `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
             type: 'text',
             created_at: new Date().toISOString(),
             location_latitude: latitude,
@@ -392,9 +451,10 @@ export const useSendLocationMessage = () => {
           context.previousMessages
         );
       }
-      
+
       // Show toast error
-      const errorMessage = err instanceof Error ? err.message : 'Không thể gửi vị trí';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể gửi vị trí';
       toast.error(errorMessage);
     },
 
@@ -470,9 +530,14 @@ export const useDeleteMessageForMe = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ messageId, userId }: { messageId: string; userId: string }) =>
-      deleteMessageForMe(messageId, userId),
-    
+    mutationFn: ({
+      messageId,
+      userId
+    }: {
+      messageId: string;
+      userId: string;
+    }) => deleteMessageForMe(messageId, userId),
+
     // Optimistic update - update UI ngay lập tức
     onMutate: async ({ messageId, userId }) => {
       // Cancel any outgoing refetches
@@ -486,28 +551,23 @@ export const useDeleteMessageForMe = () => {
       });
 
       // Optimistically update - thêm flag deleted_for_me
-      queryClient.setQueriesData(
-        { queryKey: chatKeys.all },
-        (old: any) => {
-          if (!old) return old;
+      queryClient.setQueriesData({ queryKey: chatKeys.all }, (old: any) => {
+        if (!old) return old;
 
-          // Nếu là messages query
-          if (old.pages) {
-            return {
-              ...old,
-              pages: old.pages.map((page: any[]) =>
-                page.map((msg: any) =>
-                  msg.id === messageId
-                    ? { ...msg, deleted_for_me: true }
-                    : msg
-                )
+        // Nếu là messages query
+        if (old.pages) {
+          return {
+            ...old,
+            pages: old.pages.map((page: any[]) =>
+              page.map((msg: any) =>
+                msg.id === messageId ? { ...msg, deleted_for_me: true } : msg
               )
-            };
-          }
-
-          return old;
+            )
+          };
         }
-      );
+
+        return old;
+      });
 
       return { previousData };
     },
@@ -538,45 +598,79 @@ export const useMessagesRealtime = (
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!conversationId) {
+      console.warn('⚠️ Cannot setup subscription: conversationId is missing');
+      return;
+    }
+
+    console.log(
+      '🔔 Setting up realtime subscription for conversation:',
+      conversationId,
+      'userId:',
+      currentUserId
+    );
     const unsubscribe = subscribeMessages(
       conversationId,
       // On Insert - thêm message mới vào cache
-      (newMessage: Message) => {
+      (newMessage: MessageWithDetails) => {
+        console.log('✅ onInsert callback called with message:', newMessage.id);
         queryClient.setQueryData(
           chatKeys.messages(conversationId),
           (old: any) => {
-            if (!old) return old;
+            if (!old) {
+              console.warn(
+                '⚠️ No cache found for messages, creating new structure'
+              );
+              return {
+                pages: [[newMessage]],
+                pageParams: [undefined]
+              };
+            }
 
             // Check if message already exists (avoid duplicates)
             const allMessages = old.pages.flat();
             const exists = allMessages.some(
               (msg: any) => msg.id === newMessage.id
             );
-            if (exists) return old;
+            if (exists) {
+              console.log('⚠️ Message already exists in cache:', newMessage.id);
+              return old;
+            }
 
             // Remove temporary messages (optimistic updates) before adding real message
             const updatedPages = old.pages.map((page: any[]) =>
               page.filter((msg: any) => !msg.id.startsWith('temp-'))
             );
 
-            // Add new message to the last page
-            return {
+            // Add new message to the last page - create new array references to trigger re-render
+            const newPages = updatedPages.map((page: any[], index: number) =>
+              index === updatedPages.length - 1
+                ? [...page, newMessage]
+                : [...page]
+            );
+            const result = {
               ...old,
-              pages: updatedPages.map((page: any[], index: number) =>
-                index === updatedPages.length - 1 ? [...page, newMessage] : page
-              )
+              pages: newPages,
+              pageParams: [...old.pageParams] // Create new array reference
             };
+            console.log(
+              '✅ Added message to cache:',
+              newMessage.id,
+              'Total pages:',
+              newPages.length
+            );
+            return result;
           }
         );
 
-        // Chỉ invalidate conversations để update last_message
+        // Invalidate conversations để update last_message
         queryClient.invalidateQueries({
           queryKey: chatKeys.conversations(currentUserId)
         });
       },
 
       // On Update - update message trong cache
-      (updatedMessage: Message) => {
+      (updatedMessage: MessageWithDetails) => {
         queryClient.setQueryData(
           chatKeys.messages(conversationId),
           (old: any) => {
@@ -633,16 +727,84 @@ export const useAddReaction = () => {
       messageId,
       userId,
       emoji,
-      conversationId
+      conversationId,
+      threadId
     }: {
       messageId: string;
       userId: string;
       emoji: string;
       conversationId?: string;
+      threadId?: string;
     }) => addReaction(messageId, userId, emoji),
-    
+
     // Optimistic update - update UI immediately
-    onMutate: async ({ messageId, userId, emoji, conversationId }) => {
+    onMutate: async ({
+      messageId,
+      userId,
+      emoji,
+      conversationId,
+      threadId
+    }) => {
+      // Get current user profile for optimistic reaction
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (!userProfile) return;
+
+      const optimisticReaction = {
+        message_id: messageId,
+        user_id: userId,
+        emoji,
+        created_at: new Date().toISOString(),
+        user: userProfile
+      };
+
+      // Update thread messages if threadId provided
+      if (threadId) {
+        await queryClient.cancelQueries({
+          queryKey: chatKeys.threadMessages(threadId)
+        });
+
+        const previousThreadMessages = queryClient.getQueryData(
+          chatKeys.threadMessages(threadId)
+        );
+
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== messageId) return msg;
+
+                  const existingReactions = msg.reactions || [];
+                  // Check if user already has this emoji reaction
+                  const hasReaction = existingReactions.some(
+                    (r: any) => r.user_id === userId && r.emoji === emoji
+                  );
+
+                  if (hasReaction) return msg; // Already has this reaction
+
+                  return {
+                    ...msg,
+                    reactions: [...existingReactions, optimisticReaction]
+                  };
+                })
+              )
+            };
+          }
+        );
+
+        return { previousThreadMessages, threadId };
+      }
+
+      // Update main conversation messages
       if (!conversationId) return;
 
       // Cancel any outgoing refetches
@@ -671,7 +833,7 @@ export const useAddReaction = () => {
               if (msg.id !== messageId) return msg;
 
               const existingReactions = msg.reactions || [];
-              
+
               // Check if user has different emoji
               const hasDifferentEmoji = existingReactions.some(
                 (r: any) => r.user_id === userId && r.emoji !== emoji
@@ -793,7 +955,9 @@ export const useReportMessage = () => {
       description?: string;
     }) => reportMessage(messageId, reportedBy, reason, description),
     onSuccess: () => {
-      toast.success('Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!');
+      toast.success(
+        'Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!'
+      );
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Không thể gửi báo cáo');
@@ -829,7 +993,9 @@ export const useReportConversation = () => {
       description?: string;
     }) => reportConversation(conversationId, reportedBy, reason, description),
     onSuccess: () => {
-      toast.success('Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!');
+      toast.success(
+        'Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!'
+      );
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Không thể gửi báo cáo');
@@ -891,7 +1057,8 @@ export const useReactionsRealtime = (conversationId: string) => {
                     ? {
                         ...msg,
                         reactions: (msg.reactions || []).filter(
-                          (r: any) => !(r.user_id === user_id && r.emoji === emoji)
+                          (r: any) =>
+                            !(r.user_id === user_id && r.emoji === emoji)
                         )
                       }
                     : msg
@@ -928,11 +1095,102 @@ export const useMarkMessagesAsRead = () => {
       messageIds: string[];
     }) => markMessagesAsRead(conversationId, userId, messageIds),
     onSuccess: (_, variables) => {
+      // Invalidate messages to refresh read receipts
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(variables.conversationId)
+      });
+      // Invalidate and refetch conversations to update unread count immediately
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversations(variables.userId)
       });
+      // Also optimistically update unread_count in conversations cache
+      queryClient.setQueriesData(
+        { queryKey: chatKeys.conversations(variables.userId) },
+        (old: any) => {
+          if (!old) return old;
+          return old.map((conv: any) =>
+            conv.id === variables.conversationId
+              ? { ...conv, unread_count: 0 }
+              : conv
+          );
+        }
+      );
     }
   });
+};
+
+// Hook subscribe read receipts realtime for conversation
+export const useReadReceiptsRealtime = (conversationId: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubscribe = subscribeReadReceipts(
+      conversationId,
+      // On Insert - add read receipt to message
+      (receipt) => {
+        queryClient.setQueryData(
+          chatKeys.messages(conversationId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== receipt.message_id) return msg;
+
+                  const existingReceipts = msg.read_receipts || [];
+                  // Check if receipt already exists
+                  const exists = existingReceipts.some(
+                    (r: any) => r.user_id === receipt.user_id
+                  );
+
+                  if (exists) return msg;
+
+                  return {
+                    ...msg,
+                    read_receipts: [...existingReceipts, receipt]
+                  };
+                })
+              )
+            };
+          }
+        );
+      },
+      // On Update - update read receipt
+      (receipt) => {
+        queryClient.setQueryData(
+          chatKeys.messages(conversationId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== receipt.message_id) return msg;
+
+                  const existingReceipts = msg.read_receipts || [];
+                  return {
+                    ...msg,
+                    read_receipts: existingReceipts.map((r: any) =>
+                      r.user_id === receipt.user_id ? receipt : r
+                    )
+                  };
+                })
+              )
+            };
+          }
+        );
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [conversationId, queryClient]);
 };
 
 // ============================================
@@ -976,12 +1234,18 @@ export const useTypingIndicator = (conversationId: string, userId: string) => {
   }, [conversationId, userId]);
 
   // Memoize sendTyping function để tránh re-create
-  const sendTyping = useCallback((isTyping: boolean) => {
-    sendTypingIndicator(conversationId, userId, isTyping);
-  }, [conversationId, userId]);
+  const sendTyping = useCallback(
+    (isTyping: boolean) => {
+      sendTypingIndicator(conversationId, userId, isTyping);
+    },
+    [conversationId, userId]
+  );
 
   // Memoize typingUsers array
-  const typingUsersArray = useMemo(() => Array.from(typingUsers), [typingUsers]);
+  const typingUsersArray = useMemo(
+    () => Array.from(typingUsers),
+    [typingUsers]
+  );
 
   return {
     typingUsers: typingUsersArray,
@@ -1087,12 +1351,17 @@ export const useUpdateConversationBackground = () => {
     mutationFn: ({
       conversationId,
       backgroundType,
-      backgroundValue,
+      backgroundValue
     }: {
       conversationId: string;
       backgroundType: 'color' | 'gradient' | 'image';
       backgroundValue: string;
-    }) => updateConversationBackground(conversationId, backgroundType, backgroundValue),
+    }) =>
+      updateConversationBackground(
+        conversationId,
+        backgroundType,
+        backgroundValue
+      ),
 
     // Optimistic update - UI update ngay lập tức
     onMutate: async ({ conversationId, backgroundType, backgroundValue }) => {
@@ -1114,14 +1383,18 @@ export const useUpdateConversationBackground = () => {
           return {
             ...old,
             background_type: backgroundType,
-            background_value: backgroundValue,
+            background_value: backgroundValue
           };
         }
       );
 
       // Also update in conversations list
       queryClient.setQueriesData(
-        { predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations' },
+        {
+          predicate: (query) =>
+            query.queryKey[0] === 'chat' &&
+            query.queryKey[1] === 'conversations'
+        },
         (old: any) => {
           if (!old) return old;
           return old.map((conv: any) =>
@@ -1129,7 +1402,7 @@ export const useUpdateConversationBackground = () => {
               ? {
                   ...conv,
                   background_type: backgroundType,
-                  background_value: backgroundValue,
+                  background_value: backgroundValue
                 }
               : conv
           );
@@ -1155,9 +1428,10 @@ export const useUpdateConversationBackground = () => {
         queryKey: chatKeys.conversation(variables.conversationId)
       });
       queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
       });
-    },
+    }
   });
 };
 
@@ -1173,7 +1447,7 @@ export const useRemoveGroupMember = () => {
     mutationFn: ({
       conversationId,
       userId,
-      removedBy,
+      removedBy
     }: {
       conversationId: string;
       userId: string;
@@ -1201,7 +1475,7 @@ export const useRemoveGroupMember = () => {
             ...old,
             participants: old.participants.filter(
               (p: any) => p.user_id !== userId
-            ),
+            )
           };
         }
       );
@@ -1228,8 +1502,678 @@ export const useRemoveGroupMember = () => {
         queryKey: chatKeys.messages(variables.conversationId)
       });
       queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
       });
-    },
+    }
   });
+};
+
+// ============================================
+// THREADS (CHỦ ĐỀ)
+// ============================================
+
+// Hook lấy danh sách threads trong conversation
+export const useThreads = (
+  conversationId: string,
+  currentUserId: string,
+  options?: {
+    sortBy?: 'updated_at' | 'created_at' | 'message_count';
+    order?: 'asc' | 'desc';
+    filter?: 'all' | 'active' | 'closed' | 'pinned' | 'joined';
+  }
+) => {
+  return useQuery({
+    queryKey: [...chatKeys.threads(conversationId), options],
+    queryFn: () => getThreads(conversationId, currentUserId, options),
+    enabled: !!conversationId && !!currentUserId,
+    staleTime: 30000
+  });
+};
+
+// Hook tạo thread mới
+export const useCreateThread = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      title,
+      description,
+      rootMessageId,
+      createdBy
+    }: {
+      conversationId: string;
+      title: string;
+      description?: string;
+      rootMessageId?: string;
+      createdBy: string;
+    }) =>
+      createThread({
+        conversationId,
+        title,
+        description,
+        rootMessageId,
+        createdBy
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.threads(variables.conversationId)
+      });
+      toast.success('Đã tạo chủ đề thành công');
+    },
+    onError: (err) => {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể tạo chủ đề';
+      toast.error(errorMessage);
+    }
+  });
+};
+
+// Hook join thread
+export const useJoinThread = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ threadId, userId }: { threadId: string; userId: string }) =>
+      joinThread(threadId, userId),
+    onSuccess: (_, variables) => {
+      // Invalidate threads list to update is_joined status
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'threads'
+      });
+      toast.success('Đã tham gia chủ đề');
+    },
+    onError: (err) => {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể tham gia chủ đề';
+      toast.error(errorMessage);
+    }
+  });
+};
+
+// Hook leave thread
+export const useLeaveThread = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ threadId, userId }: { threadId: string; userId: string }) =>
+      leaveThread(threadId, userId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'threads'
+      });
+      toast.success('Đã rời chủ đề');
+    },
+    onError: (err) => {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể rời chủ đề';
+      toast.error(errorMessage);
+    }
+  });
+};
+
+// Hook lấy messages trong thread
+export const useThreadMessages = (threadId: string, currentUserId?: string) => {
+  return useInfiniteQuery({
+    queryKey: chatKeys.threadMessages(threadId),
+    queryFn: ({ pageParam }) =>
+      getThreadMessages(threadId, 50, pageParam, currentUserId),
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length === 0) return undefined;
+      return lastPage[lastPage.length - 1].created_at;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: !!threadId
+  });
+};
+
+// Hook gửi message vào thread
+export const useSendThreadMessage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      conversationId,
+      senderId,
+      content,
+      replyToId,
+      mentionedUserIds
+    }: {
+      threadId: string;
+      conversationId: string;
+      senderId: string;
+      content: string;
+      replyToId?: string;
+      mentionedUserIds?: string[];
+    }) =>
+      sendThreadMessage(
+        threadId,
+        conversationId,
+        senderId,
+        content,
+        replyToId,
+        mentionedUserIds
+      ),
+
+    // Optimistic update - thêm message ngay lập tức
+    onMutate: async ({
+      threadId,
+      senderId,
+      content,
+      replyToId,
+      mentionedUserIds
+    }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.threadMessages(threadId)
+      });
+
+      // Snapshot the previous value
+      const previousMessages = queryClient.getQueryData(
+        chatKeys.threadMessages(threadId)
+      );
+
+      // Get sender profile from cache or fetch
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', senderId)
+        .single();
+
+      if (!senderProfile) return { previousMessages };
+
+      // Create optimistic message
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: any = {
+        id: tempId,
+        thread_id: threadId,
+        sender_id: senderId,
+        content_text: content,
+        type: 'text',
+        reply_to_id: replyToId || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        sender: senderProfile,
+        reply_to: replyToId ? null : null, // Will be fetched by real-time
+        reactions: [],
+        read_receipts: [],
+        mentions:
+          mentionedUserIds?.map((userId) => ({
+            mentioned_user_id: userId,
+            user: null // Will be fetched by real-time
+          })) || [],
+        deleted_for_me: false,
+        attachments: []
+      };
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(
+        chatKeys.threadMessages(threadId),
+        (old: any) => {
+          if (!old) {
+            return {
+              pages: [[optimisticMessage]],
+              pageParams: [undefined]
+            };
+          }
+
+          // Add optimistic message to the last page
+          const lastPage = old.pages[old.pages.length - 1] || [];
+          return {
+            ...old,
+            pages: [...old.pages.slice(0, -1), [...lastPage, optimisticMessage]]
+          };
+        }
+      );
+
+      return { previousMessages };
+    },
+
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(variables.threadId),
+          context.previousMessages
+        );
+      }
+
+      const errorMessage =
+        err instanceof Error ? err.message : 'Không thể gửi tin nhắn';
+      toast.error(errorMessage);
+    },
+
+    onSuccess: (_, variables) => {
+      // Invalidate to get the real message (will replace optimistic one)
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.threadMessages(variables.threadId)
+      });
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.threads(variables.conversationId)
+      });
+    }
+  });
+};
+
+// Hook pin/unpin thread
+export const useToggleThreadPin = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      userId,
+      isPinned
+    }: {
+      threadId: string;
+      userId: string;
+      isPinned: boolean;
+    }) => toggleThreadPin(threadId, userId, isPinned),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'threads'
+      });
+      toast.success(
+        variables.isPinned ? 'Đã ghim chủ đề' : 'Đã bỏ ghim chủ đề'
+      );
+    },
+    onError: (err) => {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Không thể thay đổi trạng thái ghim';
+      toast.error(errorMessage);
+    }
+  });
+};
+
+// Hook close/reopen thread
+export const useToggleThreadClose = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      userId,
+      isClosed
+    }: {
+      threadId: string;
+      userId: string;
+      isClosed: boolean;
+    }) => toggleThreadClose(threadId, userId, isClosed),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'threads'
+      });
+      toast.success(variables.isClosed ? 'Đã đóng chủ đề' : 'Đã mở lại chủ đề');
+    },
+    onError: (err) => {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Không thể thay đổi trạng thái chủ đề';
+      toast.error(errorMessage);
+    }
+  });
+};
+
+// Hook mark thread as read
+export const useMarkThreadAsRead = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ threadId, userId }: { threadId: string; userId: string }) =>
+      markThreadAsRead(threadId, userId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.threads(variables.threadId)
+      });
+    }
+  });
+};
+
+// Hook mark thread messages as read (creates read receipts)
+export const useMarkThreadMessagesAsRead = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      userId,
+      messageIds
+    }: {
+      threadId: string;
+      userId: string;
+      messageIds: string[];
+    }) => markThreadMessagesAsRead(threadId, userId, messageIds),
+    onSuccess: (_, variables) => {
+      // Invalidate thread messages to refresh read receipts
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.threadMessages(variables.threadId)
+      });
+    }
+  });
+};
+
+// Hook lấy thread participants
+export const useThreadParticipants = (threadId: string) => {
+  return useQuery({
+    queryKey: [...chatKeys.thread(threadId), 'participants'],
+    queryFn: () => getThreadParticipants(threadId),
+    enabled: !!threadId,
+    staleTime: 60000
+  });
+};
+
+// Hook subscribe threads realtime
+export const useThreadsRealtime = (
+  conversationId: string,
+  currentUserId: string
+) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!conversationId || !currentUserId) return;
+
+    const unsubscribe = subscribeThreads(
+      conversationId,
+      // On Insert - thêm thread mới vào cache
+      (newThread: ThreadWithDetails) => {
+        queryClient.setQueryData(
+          chatKeys.threads(conversationId),
+          (old: ThreadWithDetails[] | undefined) => {
+            if (!old) return [newThread];
+
+            // Check if thread already exists
+            const exists = old.some((t) => t.id === newThread.id);
+            if (exists) return old;
+
+            // Add new thread to the beginning (most recent first)
+            return [newThread, ...old];
+          }
+        );
+      },
+      // On Update - update thread trong cache
+      (updatedThread: ThreadWithDetails) => {
+        queryClient.setQueryData(
+          chatKeys.threads(conversationId),
+          (old: ThreadWithDetails[] | undefined) => {
+            if (!old) return [updatedThread];
+
+            return old.map((t) =>
+              t.id === updatedThread.id ? { ...t, ...updatedThread } : t
+            );
+          }
+        );
+      },
+      // On Delete - remove thread from cache
+      (deletedThreadId: string) => {
+        queryClient.setQueryData(
+          chatKeys.threads(conversationId),
+          (old: ThreadWithDetails[] | undefined) => {
+            if (!old) return old;
+
+            return old.filter((t) => t.id !== deletedThreadId);
+          }
+        );
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [conversationId, currentUserId, queryClient]);
+};
+
+// Hook subscribe thread messages realtime
+export const useThreadMessagesRealtime = (
+  threadId: string,
+  currentUserId?: string
+) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!threadId) return;
+
+    const unsubscribe = subscribeThreadMessages(
+      threadId,
+      // On Insert - thêm message mới vào cache
+      (newMessage: MessageWithDetails) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            // Check if message already exists (avoid duplicates)
+            const allMessages = old.pages.flat();
+            const exists = allMessages.some(
+              (msg: any) => msg.id === newMessage.id
+            );
+            if (exists) return old;
+
+            // Remove temporary messages (optimistic updates) before adding real message
+            const updatedPages = old.pages.map((page: any[]) =>
+              page.filter((msg: any) => !msg.id.startsWith('temp-'))
+            );
+
+            // Add new message to the last page
+            return {
+              ...old,
+              pages: updatedPages.map((page: any[], index: number) =>
+                index === updatedPages.length - 1 ? [...page, newMessage] : page
+              )
+            };
+          }
+        );
+
+        // Invalidate threads list to update last_message and message_count
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === 'chat' && query.queryKey[1] === 'threads'
+        });
+      },
+      // On Update - update message trong cache
+      (updatedMessage: MessageWithDetails) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) =>
+                  msg.id === updatedMessage.id
+                    ? { ...msg, ...updatedMessage }
+                    : msg
+                )
+              )
+            };
+          }
+        );
+      },
+      // On Delete - remove message from cache
+      (deletedMessage: Message) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.filter((msg: any) => msg.id !== deletedMessage.id)
+              )
+            };
+          }
+        );
+
+        // Invalidate threads list to update message_count
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === 'chat' && query.queryKey[1] === 'threads'
+        });
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [threadId, currentUserId, queryClient]);
+};
+
+// Hook subscribe thread reactions realtime
+export const useThreadReactionsRealtime = (threadId: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!threadId) return;
+
+    const unsubscribe = subscribeThreadReactions(
+      threadId,
+      // On Insert
+      ({ message_id, reaction }) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== message_id) return msg;
+
+                  const existingReactions = msg.reactions || [];
+                  // Check if reaction already exists
+                  const exists = existingReactions.some(
+                    (r: any) =>
+                      r.user_id === reaction.user_id &&
+                      r.emoji === reaction.emoji
+                  );
+
+                  if (exists) return msg;
+
+                  return {
+                    ...msg,
+                    reactions: [...existingReactions, reaction]
+                  };
+                })
+              )
+            };
+          }
+        );
+      },
+      // On Delete
+      ({ message_id, user_id, emoji }) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== message_id) return msg;
+
+                  const existingReactions = msg.reactions || [];
+                  return {
+                    ...msg,
+                    reactions: existingReactions.filter(
+                      (r: any) => !(r.user_id === user_id && r.emoji === emoji)
+                    )
+                  };
+                })
+              )
+            };
+          }
+        );
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [threadId, queryClient]);
+};
+
+// Hook subscribe read receipts realtime for thread
+export const useThreadReadReceiptsRealtime = (threadId: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!threadId) return;
+
+    const unsubscribe = subscribeThreadReadReceipts(
+      threadId,
+      // On Insert - add read receipt to message
+      (receipt) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== receipt.message_id) return msg;
+
+                  const existingReceipts = msg.read_receipts || [];
+                  // Check if receipt already exists
+                  const exists = existingReceipts.some(
+                    (r: any) => r.user_id === receipt.user_id
+                  );
+
+                  if (exists) return msg;
+
+                  return {
+                    ...msg,
+                    read_receipts: [...existingReceipts, receipt]
+                  };
+                })
+              )
+            };
+          }
+        );
+      },
+      // On Update - update read receipt
+      (receipt) => {
+        queryClient.setQueryData(
+          chatKeys.threadMessages(threadId),
+          (old: any) => {
+            if (!old) return old;
+
+            return {
+              ...old,
+              pages: old.pages.map((page: any[]) =>
+                page.map((msg: any) => {
+                  if (msg.id !== receipt.message_id) return msg;
+
+                  const existingReceipts = msg.read_receipts || [];
+                  return {
+                    ...msg,
+                    read_receipts: existingReceipts.map((r: any) =>
+                      r.user_id === receipt.user_id ? receipt : r
+                    )
+                  };
+                })
+              )
+            };
+          }
+        );
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [threadId, queryClient]);
 };
