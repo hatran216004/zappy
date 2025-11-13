@@ -109,6 +109,26 @@ const getCurrentUser = async (): Promise<{ user: User }> => {
 };
 
 const logout = async () => {
+  // Set offline status trước khi logout
+  try {
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({
+          status: 'offline',
+          last_seen_at: new Date().toISOString(),
+          status_updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+    }
+  } catch (error) {
+    // Log nhưng không throw - vẫn tiếp tục logout
+    console.error('Error setting offline status during logout:', error);
+  }
+
   const { error } = await supabase.auth.signOut();
   if (error) {
     const message =

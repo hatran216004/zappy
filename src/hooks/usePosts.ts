@@ -12,12 +12,16 @@ import {
   uploadPostVideo,
   updatePost,
   deletePost,
+  reportPost,
+  getUserPostReports,
   type Post,
   type CreatePostData,
   type UpdatePostData,
   type PostReactionType,
   type PostComment,
+  type ReportReason,
 } from "@/services/postService";
+import toast from "react-hot-toast";
 
 export const postKeys = {
   all: ["posts"] as const,
@@ -138,6 +142,42 @@ export const useDeletePost = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: postKeys.all });
     },
+  });
+};
+
+// ============================================
+// POST REPORTS
+// ============================================
+
+// Hook to report a post
+export const useReportPost = () => {
+  return useMutation({
+    mutationFn: ({
+      postId,
+      reportedBy,
+      reason,
+      description
+    }: {
+      postId: string;
+      reportedBy: string;
+      reason: ReportReason;
+      description?: string;
+    }) => reportPost(postId, reportedBy, reason, description),
+    onSuccess: () => {
+      toast.success('Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể gửi báo cáo');
+    }
+  });
+};
+
+// Hook to get user's post reports
+export const useUserPostReports = (userId: string) => {
+  return useQuery({
+    queryKey: ['postReports', userId],
+    queryFn: () => getUserPostReports(userId),
+    enabled: !!userId
   });
 };
 

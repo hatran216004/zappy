@@ -36,6 +36,7 @@ import {
   Edit,
   Trash2,
   Video,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/stores/user";
 import { useProfile } from "@/hooks/useProfile";
@@ -56,6 +57,7 @@ import {
   useDeletePost,
   uploadPostImage,
 } from "@/hooks/usePosts";
+import { ReportPostModal } from "@/components/modal/ReportPostModal";
 import { uploadPostImages, uploadPostVideo } from "@/services/postService";
 import type { Post, PostReactionType } from "@/services/postService";
 import { supabaseUrl } from "@/lib/supabase";
@@ -655,6 +657,7 @@ function CommentModal({
 function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }) {
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const { data: reactions } = usePostReactions(post.id);
   const addReactionMutation = useAddPostReaction();
   const removeReactionMutation = useRemovePostReaction();
@@ -768,48 +771,61 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                 )}
               </div>
         </div>
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="h-9 w-9 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 flex items-center justify-center transition-colors"
-                  >
-            <MoreHorizontal className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-9 w-9 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 flex items-center justify-center transition-colors"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                {isOwner ? (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setShowEditDialog(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Chỉnh sửa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={async (e) => {
+                        e.preventDefault();
+                        const confirmed = await confirm({
+                          title: "Xóa bài viết",
+                          description: "Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.",
+                          confirmText: "Xóa",
+                          cancelText: "Hủy",
+                          destructive: true,
+                        });
+                        if (confirmed) {
+                          handleDeletePost();
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Xóa
+                    </DropdownMenuItem>
+                  </>
+                ) : (
                   <DropdownMenuItem
+                    className="text-red-600 focus:text-red-700"
                     onSelect={(e) => {
                       e.preventDefault();
-                      setShowEditDialog(true);
+                      setShowReportModal(true);
                     }}
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Chỉnh sửa
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Báo cáo bài viết
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={async (e) => {
-                      e.preventDefault();
-                      const confirmed = await confirm({
-                        title: "Xóa bài viết",
-                        description: "Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.",
-                        confirmText: "Xóa",
-                        cancelText: "Hủy",
-                        destructive: true,
-                      });
-                      if (confirmed) {
-                        handleDeletePost();
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Xóa
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
         </div>
         </div>
 
@@ -991,6 +1007,12 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
         post={post}
         open={showCommentModal}
         onOpenChange={setShowCommentModal}
+      />
+      <ReportPostModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        postId={post.id}
+        reportedBy={currentUserId}
       />
       <EditPostDialog
         post={post}

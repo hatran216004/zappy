@@ -877,4 +877,82 @@ export const getBlockedUsers = async (): Promise<Profile[]> => {
   return (data || []) as Profile[];
 };
 
+// ============================================
+// USER REPORTS
+// ============================================
+
+export type UserReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'inappropriate_content'
+  | 'violence'
+  | 'hate_speech'
+  | 'fake_news'
+  | 'other';
+
+export interface UserReport {
+  id: string;
+  reported_user_id: string;
+  reported_by: string;
+  reason: UserReportReason;
+  description: string | null;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+// Report a user
+export const reportUser = async (
+  reportedUserId: string,
+  reportedBy: string,
+  reason: UserReportReason,
+  description?: string
+): Promise<UserReport> => {
+  // Prevent self-reporting
+  if (reportedUserId === reportedBy) {
+    throw new Error('Bạn không thể báo cáo chính mình');
+  }
+
+  // Check if user already reported this user
+  const { data: existingReport } = await supabase
+    .from('user_reports')
+    .select('id')
+    .eq('reported_user_id', reportedUserId)
+    .eq('reported_by', reportedBy)
+    .single();
+
+  if (existingReport) {
+    throw new Error('Bạn đã báo cáo người dùng này rồi');
+  }
+
+  const { data, error } = await supabase
+    .from('user_reports')
+    .insert({
+      reported_user_id: reportedUserId,
+      reported_by: reportedBy,
+      reason,
+      description: description || null
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Get reports by user
+export const getUserReports = async (
+  userId: string
+): Promise<UserReport[]> => {
+  const { data, error } = await supabase
+    .from('user_reports')
+    .select('*')
+    .eq('reported_by', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};
+
 export { supabase };

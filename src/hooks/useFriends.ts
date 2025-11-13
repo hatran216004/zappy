@@ -24,8 +24,12 @@ import {
   isBlockedByMe,
   isBlockedByUser,
   isMutuallyBlocked,
-  getBlockedUsers
+  getBlockedUsers,
+  reportUser,
+  getUserReports,
+  type UserReportReason
 } from '@/services/friendServices';
+import toast from 'react-hot-toast';
 
 // Keys cho query cache
 export const friendKeys = {
@@ -372,5 +376,41 @@ export const useBlockedUsers = () => {
     queryKey: ['blocks', 'list'],
     queryFn: () => getBlockedUsers(),
     staleTime: 60000
+  });
+};
+
+// ============================================
+// USER REPORTS
+// ============================================
+
+// Hook to report a user
+export const useReportUser = () => {
+  return useMutation({
+    mutationFn: ({
+      reportedUserId,
+      reportedBy,
+      reason,
+      description
+    }: {
+      reportedUserId: string;
+      reportedBy: string;
+      reason: UserReportReason;
+      description?: string;
+    }) => reportUser(reportedUserId, reportedBy, reason, description),
+    onSuccess: () => {
+      toast.success('Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể gửi báo cáo');
+    }
+  });
+};
+
+// Hook to get user's reports
+export const useUserReports = (userId: string) => {
+  return useQuery({
+    queryKey: ['userReports', userId],
+    queryFn: () => getUserReports(userId),
+    enabled: !!userId
   });
 };

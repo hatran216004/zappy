@@ -1,12 +1,69 @@
-import { Outlet } from 'react-router';
+import { Outlet, useNavigate } from 'react-router';
 import Navbar from './Navbar';
 import { useAuth } from '@/stores/user';
 import { useUserStatusTracker } from '@/hooks/useUserStatusTracker';
 import { useCall } from '@/hooks/useCall';
 import VideoCall from '@/components/VideoCall';
+import { useEffect, useRef } from 'react';
+import { useProfile } from '@/hooks/useProfile';
+import authServices from '@/services/authServices';
+import toast from 'react-hot-toast';
 
 export default function MainLayout() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
+  const { data: profile } = useProfile(user?.id as string);
+  const previousIsDisabledRef = useRef<boolean | undefined>(undefined);
+  const isLoggingOutRef = useRef(false);
+
+  // Reset refs khi user thay đổi
+  useEffect(() => {
+    previousIsDisabledRef.current = undefined;
+    isLoggingOutRef.current = false;
+  }, [user?.id]);
+
+  // Kiểm tra is_disabled khi profile được load hoặc thay đổi (realtime)
+  useEffect(() => {
+    if (!user || !profile) return;
+    
+    const currentIsDisabled = profile.is_disabled;
+    const previousIsDisabled = previousIsDisabledRef.current;
+
+    // Chỉ logout khi is_disabled thay đổi từ false -> true (hoặc undefined -> true)
+    // Tránh logout nhiều lần nếu đã logout rồi
+    if (currentIsDisabled && !isLoggingOutRef.current) {
+      // Nếu lần đầu load và is_disabled = true, hoặc thay đổi từ false -> true
+      if (previousIsDisabled === undefined || previousIsDisabled === false) {
+        isLoggingOutRef.current = true;
+        
+        // User bị ban, logout ngay lập tức
+        const handleBan = async () => {
+          try {
+            await authServices.logout();
+            setUser(null);
+            navigate('/login', { replace: true });
+            toast.error(
+              'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ admin qua email: hieuntadmin@gmail.com để được hỗ trợ.',
+              { duration: 10000 }
+            );
+          } catch (error) {
+            console.error('Error during logout:', error);
+            // Force logout even if there's an error
+            setUser(null);
+            navigate('/login', { replace: true });
+            toast.error(
+              'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ admin qua email: hieuntadmin@gmail.com để được hỗ trợ.',
+              { duration: 10000 }
+            );
+          }
+        };
+        handleBan();
+      }
+    }
+
+    // Cập nhật previous value
+    previousIsDisabledRef.current = currentIsDisabled;
+  }, [user, profile, setUser, navigate]);
 
   // Tự động set status online khi user đã đăng nhập
   useUserStatusTracker({

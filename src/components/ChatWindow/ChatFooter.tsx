@@ -345,7 +345,7 @@ export default function ChatFooter({
           value={messageText}
           onChange={handleInputChange}
           onKeyPress={handleKeyPress}
-          placeholder={disabled ? "Bạn không thể nhắn tin với người dùng này" : "Nhập @, tin nhắn tới ..."}
+          placeholder={disabled ? "Bạn không thể gửi tin nhắn" : "Nhập @, tin nhắn tới ..."}
           rows={1}
           disabled={disabled}
           className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32 resize-none disabled:opacity-50 disabled:cursor-not-allowed"

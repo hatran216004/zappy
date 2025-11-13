@@ -27,6 +27,7 @@ import { EmojiPicker } from './EmojiPicker';
 import { UserAvatar } from '../UserAvatar';
 import { LocationMessage } from './LocationMessage';
 import { PollMessage } from './PollMessage';
+import { ReportMessageModal } from '../modal/ReportMessageModal';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -148,6 +149,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.content_text || '');
     const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+    const [showReportModal, setShowReportModal] = useState(false);
     const confirm = useConfirm();
 
     const editMutation = useEditMessage();
@@ -156,6 +158,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     const deleteAsAdminMutation = useDeleteMessageAsAdmin();
     const addReactionMutation = useAddReaction();
     const removeReactionMutation = useRemoveReaction();
+
+    // Kiểm tra xem tin nhắn có được phép chỉnh sửa không (trong vòng 5 phút)
+    const canEditMessage = () => {
+      if (!message.created_at) return false;
+      const messageTime = new Date(message.created_at).getTime();
+      const currentTime = new Date().getTime();
+      const fiveMinutesInMs = 5 * 60 * 1000; // 5 phút = 300000ms
+      return currentTime - messageTime <= fiveMinutesInMs;
+    };
 
     // Load attachment URLs
     useEffect(() => {
@@ -173,6 +184,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
 
     const handleEdit = async () => {
       if (!editText.trim()) return;
+
+      // Kiểm tra thời gian trước khi chỉnh sửa
+      if (!canEditMessage()) {
+        toast.error(
+          'Chỉ có thể chỉnh sửa tin nhắn trong vòng 5 phút sau khi gửi'
+        );
+        setIsEditing(false);
+        return;
+      }
 
       try {
         await editMutation.mutateAsync({
@@ -200,6 +220,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
 
       try {
         await recallMutation.mutateAsync(message.id);
+        // Nếu tin nhắn đang được ghim, tự động hủy ghim
+        if (isPinned && onUnpin) {
+          onUnpin();
+        }
       } catch (error) {
         console.error('Error recalling message:', error);
       }
@@ -277,7 +301,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
         console.error('Error handling reaction:', error);
         const errorMessage =
           error instanceof Error ? error.message : 'Không thể thêm reaction';
-        toast.error(errorMessage);
+
+        // Nếu lỗi là reaction trùng lặp, xóa reaction đó thay vì hiển thị lỗi
+        if (errorMessage.includes('trùng lặp')) {
+          try {
+            await removeReactionMutation.mutateAsync({
+              messageId: message.id,
+              userId: currentUserId,
+              emoji
+            });
+          } catch (removeError) {
+            console.error('Error removing reaction:', removeError);
+            const removeErrorMessage =
+              removeError instanceof Error
+                ? removeError.message
+                : 'Không thể xóa reaction';
+            toast.error(removeErrorMessage);
+          }
+        } else {
+          toast.error(errorMessage);
+        }
       }
     };
 
@@ -607,6 +650,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                     {isOwn && message.type === 'text' && (
                       <DropdownMenuItem
                         onClick={() => {
+                          // Kiểm tra thời gian trước khi cho phép chỉnh sửa
+                          if (!canEditMessage()) {
+                            toast.error(
+                              'Chỉ có thể chỉnh sửa tin nhắn trong vòng 5 phút sau khi gửi'
+                            );
+                            return;
+                          }
                           onEdit(message.content_text || '');
                           // trạng thái edit thực tế do parent quản
                           // nếu muốn edit inline ở đây thì gọi setIsEditing(true)
@@ -623,7 +673,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                       onClick={handleDeleteForMe}
                       className="text-orange-600 focus:text-orange-700"
                     >
-                      Xóa ở phía tôi
+                      Thu hồi ở phía tôi
                     </DropdownMenuItem>
 
                     {isOwn && (
@@ -647,6 +697,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                           Xóa tin nhắn (Admin)
                         </DropdownMenuItem>
                       )}
+
+                    {/* Report message option - only for messages from others */}
+                    {!isOwn && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setShowReportModal(true)}
+                          className="text-red-600 focus:text-red-700"
+                        >
+                          Báo cáo tin nhắn
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -655,7 +718,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
             {/* Reactions */}
             {groupedReactions && Object.keys(groupedReactions).length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1 px-2">
-                {Object.entries(groupedReactions).map(([emoji, reactions]) => (
+                {Object.entries(groupedReactions).map(([emoji]) => (
                   <button
                     key={emoji}
                     onClick={() => handleReaction(emoji)}
@@ -687,6 +750,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
             )}
           </div>
         </div>
+
+        {/* Report Message Modal */}
+        <ReportMessageModal
+          open={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          messageId={message.id}
+          reportedBy={currentUserId}
+        />
       </div>
     );
   }

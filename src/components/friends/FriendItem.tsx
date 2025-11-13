@@ -18,9 +18,11 @@ import {
   useIsBlockedByMe
 } from "@/hooks/useFriends";
 import useUser from "@/hooks/useUser";
-import { Check, Tag, Ban, Unlock } from "lucide-react";
+import { Check, Tag, Ban, Unlock, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/components/modal/ModalConfirm";
+import { ReportUserModal } from "@/components/modal/ReportUserModal";
+import { useState } from "react";
 
 interface FriendItemProps {
   friend: {
@@ -53,6 +55,7 @@ export default function FriendItem({
 }: FriendItemProps) {
   const { user } = useUser();
   const userId = user?.id as string;
+  const [showReportModal, setShowReportModal] = useState(false);
   const { data: labels } = useContactLabels(userId || ''); // Pass empty string if undefined
   const assignLabelMutation = useAssignLabelToFriend();
   const removeLabelMutation = useRemoveLabelFromFriend();
@@ -268,6 +271,13 @@ export default function FriendItem({
             </DropdownMenuSub>
 
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setShowReportModal(true)}
+              className="text-red-600 focus:text-red-700"
+            >
+              <AlertTriangle className="size-4 mr-2" />
+              Báo cáo người dùng
+            </DropdownMenuItem>
             {isBlocked ? (
               <DropdownMenuItem
                 onClick={handleUnblock}
@@ -293,6 +303,17 @@ export default function FriendItem({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Report User Modal */}
+        {userId && (
+          <ReportUserModal
+            open={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            reportedUserId={friend.id}
+            reportedBy={userId}
+            reportedUserName={friend.display_name}
+          />
+        )}
       </div>
     </li>
   );

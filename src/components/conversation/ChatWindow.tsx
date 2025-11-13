@@ -89,6 +89,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const { data: isBlockedByMe } = useIsBlockedByMe(otherUserId || '');
   const isBlocked = isBlockedByUser || isBlockedByMe;
 
+  // Check if chat is restricted (only admins can chat)
+  const isGroupChat = conversation?.type === 'group';
+  const currentUserParticipant = conversation?.participants?.find(
+    (p) => p.user_id === userId
+  );
+  const isAdmin = currentUserParticipant?.role === 'admin';
+  const chatEnabled = conversation?.chat_enabled || false;
+  const isChatRestricted = isGroupChat && chatEnabled && !isAdmin;
+
   // Pinned messages state
   const [pinned, setPinned] = useState<PinnedMessage[]>([]);
   useEffect(() => {
@@ -282,6 +291,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       return;
     }
 
+    // Check if chat is restricted (only admins can chat)
+    if (isChatRestricted) {
+      toast.error('Chỉ admin mới có thể gửi tin nhắn trong nhóm này');
+      setMessageText(''); // Clear input
+      return;
+    }
+
     setMessageText('');
 
     if (typingTimeoutRef.current) {
@@ -333,7 +349,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     } catch (error) {
       console.error('❌ Error:', error);
     }
-  }, [messageText, conversationId, userId, replyTo, isEditing, editingMessageId, sendTextMutation, editMessageMutation, sendTyping, isBlocked, mentionedUserIds, conversation]);
+  }, [messageText, conversationId, userId, replyTo, isEditing, editingMessageId, sendTextMutation, editMessageMutation, sendTyping, isBlocked, isChatRestricted, mentionedUserIds, conversation]);
 
   const handleEditMessage = useCallback((messageId: string, content: string) => {
     setIsEditing(true);
@@ -349,6 +365,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     // Check if blocked
     if (isBlocked) {
       toast.error('Bạn không thể gửi file với người dùng này do đã bị chặn');
+      return;
+    }
+    if (isChatRestricted) {
+      toast.error('Chỉ admin mới có thể gửi file trong nhóm này');
       return;
     }
 
@@ -376,7 +396,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [conversationId, userId, sendFileMutation, isBlocked]);
+  }, [conversationId, userId, sendFileMutation, isBlocked, isChatRestricted]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -396,6 +416,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     // Check if blocked
     if (isBlocked) {
       toast.error('Bạn không thể gửi ảnh với người dùng này do đã bị chặn');
+      return;
+    }
+    if (isChatRestricted) {
+      toast.error('Chỉ admin mới có thể gửi ảnh trong nhóm này');
       return;
     }
     
@@ -613,6 +637,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     // Check if blocked
     if (isBlocked) {
       toast.error('Bạn không thể gửi vị trí với người dùng này do đã bị chặn');
+      return;
+    }
+    if (isChatRestricted) {
+      toast.error('Chỉ admin mới có thể gửi vị trí trong nhóm này');
       return;
     }
     
@@ -868,7 +896,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             prev.includes(userId) ? prev : [...prev, userId]
           );
         }}
-        disabled={isBlocked}
+        disabled={isBlocked || isChatRestricted}
       />
 
       {/* Image Preview Modal */}
