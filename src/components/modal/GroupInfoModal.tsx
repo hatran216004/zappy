@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import {
   updateGroupInfo,
   addGroupMembers,
@@ -18,7 +19,7 @@ import {
   type ConversationWithDetails
 } from '@/services/chatService';
 import { useFriends } from '@/hooks/useFriends';
-import { useRemoveGroupMember } from '@/hooks/useChat';
+import { useRemoveGroupMember, useToggleChatEnabled } from '@/hooks/useChat';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { useConfirm } from './ModalConfirm';
 import { UserAvatar } from '../UserAvatar';
@@ -29,12 +30,15 @@ import {
   Edit2,
   Upload,
   LogOut,
-  Shield
+  Shield,
+  AlertTriangle
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/stores/user';
 import toast from 'react-hot-toast';
 import { TransferAdminModal } from './TransferAdminModal';
+import { ReportConversationModal } from './ReportConversationModal';
+import { twMerge } from 'tailwind-merge';
 
 interface GroupInfoModalProps {
   open: boolean;
@@ -53,14 +57,18 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   const [groupName, setGroupName] = useState(conversation.title || '');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
+    new Set()
+  );
   const [showTransferAdminModal, setShowTransferAdminModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: friends = [] } = useFriends(user?.id as string);
   const removeGroupMemberMutation = useRemoveGroupMember();
+  const toggleChatEnabledMutation = useToggleChatEnabled();
 
   // Get current user's role
   const currentUserParticipant = conversation.participants.find(
@@ -70,8 +78,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
 
   // Filter friends not in group
   const nonMembers = friends.filter(
-    (friend) =>
-      !conversation.participants.some((p) => p.user_id === friend.id)
+    (friend) => !conversation.participants.some((p) => p.user_id === friend.id)
   );
 
   const handleUpdateName = async () => {
@@ -82,7 +89,9 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
       await updateGroupInfo(conversation.id, { title: groupName.trim() });
       setIsEditingName(false);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['conversation', conversation.id]
+      });
       toast.success('Đã cập nhật tên nhóm');
     } catch (error) {
       console.error('Error updating group name:', error);
@@ -103,7 +112,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
 
     setIsUploading(true);
     const uploadToast = toast.loading('Đang tải ảnh lên...');
-    
+
     try {
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
@@ -118,10 +127,12 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
 
       // Update group photo
       await updateGroupInfo(conversation.id, { photo_url: filePath });
-      
+
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ['conversation', conversation.id]
+      });
+
       toast.success('Đã cập nhật ảnh nhóm', { id: uploadToast });
     } catch (error) {
       console.error('Error uploading photo:', error);
@@ -144,13 +155,18 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
         Array.from(selectedMembers),
         currentUserId
       );
+      const addedCount = selectedMembers.size;
       setSelectedMembers(new Set());
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      toast.success(`Đã thêm ${selectedMembers.size} thành viên vào nhóm`);
+      queryClient.invalidateQueries({
+        queryKey: ['conversation', conversation.id]
+      });
+      toast.success(`Đã thêm ${addedCount} thành viên vào nhóm`);
     } catch (error) {
       console.error('Error adding members:', error);
-      toast.error('Lỗi khi thêm thành viên');
+      const errorMessage =
+        error instanceof Error ? error.message : 'Lỗi khi thêm thành viên';
+      toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -197,7 +213,9 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
     try {
       await promoteToAdmin(conversation.id, userId);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['conversation', conversation.id]
+      });
       toast.success(`${userName} đã được cấp quyền Admin`);
     } catch (error) {
       console.error('Error promoting member:', error);
@@ -218,7 +236,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
 
     try {
       const result = await leaveGroup(conversation.id, currentUserId);
-      
+
       // Check if user is last admin
       if (result.isLastAdmin) {
         // Show transfer admin modal
@@ -256,7 +274,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh]">
+      <DialogContent className={twMerge('sm:max-w-[700px] max-h-[95vh]')}>
         <DialogHeader>
           <DialogTitle>Thông tin nhóm</DialogTitle>
         </DialogHeader>
@@ -365,10 +383,48 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                   Ngày tạo
                 </span>
                 <span className="font-medium">
-                  {new Date(conversation.created_at).toLocaleDateString('vi-VN')}
+                  {new Date(conversation.created_at).toLocaleDateString(
+                    'vi-VN'
+                  )}
                 </span>
               </div>
+              {/* Chat Enabled Toggle - Only for admins */}
+              {isAdmin && (
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Chế độ chỉ admin chat
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {conversation.chat_enabled
+                        ? 'Chỉ admin mới có thể gửi tin nhắn'
+                        : 'Tất cả thành viên đều có thể chat'}
+                    </span>
+                  </div>
+                  <Switch
+                    checked={conversation.chat_enabled || false}
+                    onCheckedChange={(enabled) => {
+                      toggleChatEnabledMutation.mutate({
+                        conversationId: conversation.id,
+                        adminId: currentUserId,
+                        enabled
+                      });
+                    }}
+                    disabled={toggleChatEnabledMutation.isPending}
+                  />
+                </div>
+              )}
             </div>
+
+            {/* Report Group Button */}
+            <Button
+              onClick={() => setShowReportModal(true)}
+              variant="outline"
+              className="w-full border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Báo cáo nhóm
+            </Button>
 
             {/* Leave Group Button */}
             <Button
@@ -560,7 +616,15 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
         currentAdminId={currentUserId}
         onSuccess={handleTransferAdminSuccess}
       />
+
+      {/* Report Conversation Modal */}
+      <ReportConversationModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        conversationId={conversation.id}
+        reportedBy={currentUserId}
+        conversationName={conversation.title || undefined}
+      />
     </Dialog>
   );
 };
-

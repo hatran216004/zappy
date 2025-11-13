@@ -38,7 +38,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { twMerge } from 'tailwind-merge';
 import { avatarVariants } from '@/lib/variants';
-import { useUserStatusTracker } from '@/hooks/useUserStatusTracker';
 import { useUserStatus, useUserStatusRealtime } from '@/hooks/usePresence';
 
 export default function Navbar() {
@@ -56,8 +55,7 @@ export default function Navbar() {
   const { data: statusProfile, isOnline } = useUserStatus(userId || '');
   useUserStatusRealtime(userId || '');
 
-  // Tracker: set online khi mount, heartbeat định kỳ, set offline khi unload
-  useUserStatusTracker({ userId: userId || '' });
+  // Note: useUserStatusTracker được gọi ở MainLayout để tránh duplicate
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [searchUsersModalOpen, setSearchUsersModalOpen] = useState(false);

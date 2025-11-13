@@ -31,6 +31,7 @@ export interface ConversationWithDetails extends Conversation {
   })[];
   last_message?: Message;
   unread_count?: number;
+  chat_enabled?: boolean; // For group chats: when true, only admins can send messages
 }
 
 export interface MessageWithDetails extends Message {
@@ -127,18 +128,22 @@ export const getConversations = async (
   );
 
   // Step 2: Fetch conversations and participants in PARALLEL
-  const [conversationsRes, participantsRes, directPairsRes] =
-    await Promise.all([
+  const [conversationsRes, participantsRes, directPairsRes] = await Promise.all(
+    [
       // Get conversations basic info
       supabase
         .from('conversations')
-        .select('id, title, type, updated_at, created_at, last_message_id, photo_url')
+        .select(
+          'id, title, type, updated_at, created_at, last_message_id, photo_url'
+        )
         .in('id', conversationIds),
 
       // Get ALL participants for these conversations in ONE query
       supabase
         .from('conversation_participants')
-        .select('conversation_id, user_id, profile:profiles(id, display_name, avatar_url, status)')
+        .select(
+          'conversation_id, user_id, profile:profiles(id, display_name, avatar_url, status)'
+        )
         .in('conversation_id', conversationIds)
         .is('left_at', null),
 
@@ -147,7 +152,8 @@ export const getConversations = async (
         .from('direct_pairs')
         .select('conversation_id, user_a, user_b')
         .in('conversation_id', conversationIds)
-    ]);
+    ]
+  );
 
   if (conversationsRes.error) throw conversationsRes.error;
 
@@ -162,10 +168,8 @@ export const getConversations = async (
       .from('messages')
       .select('id, content_text, type, sender_id, created_at, recalled_at')
       .in('id', messageIds);
-    
-    messagesMap = new Map(
-      messagesData?.map((msg) => [msg.id, msg]) || []
-    );
+
+    messagesMap = new Map(messagesData?.map((msg) => [msg.id, msg]) || []);
   }
 
   // Step 4: Create lookup maps for efficient data assembly
@@ -194,7 +198,7 @@ export const getConversations = async (
       return [convId, count || 0] as const;
     })
   );
-  
+
   const unreadCounts = new Map<string, number>();
   unreadCountsRes.forEach(([convId, count]) => {
     unreadCounts.set(convId, count);
@@ -231,9 +235,9 @@ export const getGroupConversations = async (
 ): Promise<ConversationWithDetails[]> => {
   // Get all conversations for user
   const allConversations = await getConversations(userId);
-  
+
   // Filter only group type
-  return allConversations.filter(convo => convo.type === 'group');
+  return allConversations.filter((convo) => convo.type === 'group');
 };
 
 // Lấy thông tin conversation
@@ -276,7 +280,6 @@ export const getMessages = async (
   before?: string,
   currentUserId?: string
 ): Promise<MessageWithDetails[]> => {
-
   // --- STEP 1: lấy messages cơ bản ---
   let query = supabase
     .from('messages')
@@ -449,7 +452,9 @@ const checkCanSendMessage = async (
         .maybeSingle();
 
       if (blockData) {
-        throw new Error('Bạn không thể nhắn tin với người dùng này do đã bị chặn');
+        throw new Error(
+          'Bạn không thể nhắn tin với người dùng này do đã bị chặn'
+        );
       }
 
       // If recipient blocks strangers, check if sender is a friend
@@ -676,10 +681,10 @@ export const searchMessages = async (
   }
 
   // Filter out null content_text (just in case)
-  return (data || []).filter((msg) => msg.content_text !== null) as { 
-    id: string; 
-    content_text: string; 
-    created_at: string 
+  return (data || []).filter((msg) => msg.content_text !== null) as {
+    id: string;
+    content_text: string;
+    created_at: string;
   }[];
 };
 
@@ -773,7 +778,7 @@ export const deleteMessageForMe = async (
 export const forwardMessage = async ({
   messageId,
   targetConversationId,
-  senderId,
+  senderId
 }: {
   messageId: string;
   targetConversationId: string;
@@ -799,7 +804,7 @@ export const forwardMessage = async ({
       type: originalMessage.type,
       content_text: originalMessage.content_text,
       is_forwarded: true,
-      forwarded_from_user_id: originalMessage.sender_id,
+      forwarded_from_user_id: originalMessage.sender_id
     })
     .select()
     .single();
@@ -823,7 +828,7 @@ export const forwardMessage = async ({
         width: att.width,
         height: att.height,
         duration_ms: att.duration_ms,
-        uploader_id: senderId,
+        uploader_id: senderId
       }));
 
       await supabase.from('attachments').insert(newAttachments);
@@ -835,7 +840,7 @@ export const forwardMessage = async ({
     .from('conversations')
     .update({
       last_message_id: newMessage.id,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     })
     .eq('id', targetConversationId);
 
@@ -860,7 +865,8 @@ export const sendLocationMessage = async (
       conversation_id: conversationId,
       sender_id: senderId,
       type: 'text',
-      content_text: address || `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      content_text:
+        address || `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
       location_latitude: latitude,
       location_longitude: longitude,
       location_address: address,
@@ -908,8 +914,8 @@ export const addReaction = async (
   if (checkError) throw checkError;
 
   // Check if user has reactions with different emoji
-  const hasDifferentEmoji = existingReactions?.some(r => r.emoji !== emoji);
-  
+  const hasDifferentEmoji = existingReactions?.some((r) => r.emoji !== emoji);
+
   // Case 1: User có emoji khác → Xóa tất cả reactions cũ, thêm emoji mới (thay thế)
   // 1 user chỉ được react 1 loại emoji (nhưng có thể click nhiều lần để tăng count)
   if (hasDifferentEmoji) {
@@ -919,18 +925,20 @@ export const addReaction = async (
       .delete()
       .eq('message_id', messageId)
       .eq('user_id', userId);
-    
+
     if (deleteError) throw deleteError;
   }
 
   // Case 2: User đã có emoji này hoặc chưa có → Thêm reaction mới (tăng count)
   // Nếu click lại emoji đã có → thêm duplicate → count tăng
   // Nếu chưa có → thêm mới
-  const { error: insertError } = await supabase.from('message_reactions').insert({
-    message_id: messageId,
-    user_id: userId,
-    emoji
-  });
+  const { error: insertError } = await supabase
+    .from('message_reactions')
+    .insert({
+      message_id: messageId,
+      user_id: userId,
+      emoji
+    });
 
   if (insertError) {
     // If duplicate constraint exists, try to handle gracefully
@@ -957,6 +965,169 @@ export const removeReaction = async (
     .eq('emoji', emoji);
 
   if (error) throw error;
+};
+
+// ============================================
+// MESSAGE REPORTS
+// ============================================
+
+export type ReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'inappropriate_content'
+  | 'violence'
+  | 'hate_speech'
+  | 'fake_news'
+  | 'other';
+
+export interface MessageReport {
+  id: string;
+  message_id: string;
+  reported_by: string;
+  reason: ReportReason;
+  description: string | null;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+// Report a message
+export const reportMessage = async (
+  messageId: string,
+  reportedBy: string,
+  reason: ReportReason,
+  description?: string
+): Promise<MessageReport> => {
+  // Check if user already reported this message
+  const { data: existingReport } = await supabase
+    .from('message_reports')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('reported_by', reportedBy)
+    .single();
+
+  if (existingReport) {
+    throw new Error('Bạn đã báo cáo tin nhắn này rồi');
+  }
+
+  const { data, error } = await supabase
+    .from('message_reports')
+    .insert({
+      message_id: messageId,
+      reported_by: reportedBy,
+      reason,
+      description: description || null
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Get reports by user
+export const getUserReports = async (
+  userId: string
+): Promise<MessageReport[]> => {
+  const { data, error } = await supabase
+    .from('message_reports')
+    .select('*')
+    .eq('reported_by', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};
+
+// ============================================
+// CONVERSATION REPORTS
+// ============================================
+
+export interface ConversationReport {
+  id: string;
+  conversation_id: string;
+  reported_by: string;
+  reason: ReportReason;
+  description: string | null;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+// Report a conversation (group only)
+export const reportConversation = async (
+  conversationId: string,
+  reportedBy: string,
+  reason: ReportReason,
+  description?: string
+): Promise<ConversationReport> => {
+  // Verify it's a group conversation
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('type')
+    .eq('id', conversationId)
+    .single();
+
+  if (convError) throw convError;
+  if (conversation?.type !== 'group') {
+    throw new Error('Chỉ có thể báo cáo cuộc trò chuyện nhóm');
+  }
+
+  // Verify user is a participant
+  const { data: participant, error: participantError } = await supabase
+    .from('conversation_participants')
+    .select('user_id')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', reportedBy)
+    .is('left_at', null)
+    .maybeSingle();
+
+  if (participantError) throw participantError;
+  if (!participant) {
+    throw new Error('Bạn phải là thành viên của nhóm để báo cáo');
+  }
+
+  // Check if user already reported this conversation
+  const { data: existingReport } = await supabase
+    .from('conversation_reports')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('reported_by', reportedBy)
+    .single();
+
+  if (existingReport) {
+    throw new Error('Bạn đã báo cáo cuộc trò chuyện này rồi');
+  }
+
+  const { data, error } = await supabase
+    .from('conversation_reports')
+    .insert({
+      conversation_id: conversationId,
+      reported_by: reportedBy,
+      reason,
+      description: description || null
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Get conversation reports by user
+export const getUserConversationReports = async (
+  userId: string
+): Promise<ConversationReport[]> => {
+  const { data, error } = await supabase
+    .from('conversation_reports')
+    .select('*')
+    .eq('reported_by', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 // ============================================
@@ -1012,7 +1183,9 @@ export const sendTypingIndicator = (
   const lastState = lastTypingState.get(key);
   const isPending = pendingTyping.get(key);
 
-  console.log(`🔍 sendTypingIndicator: isTyping=${isTyping}, lastState=${lastState}, pending=${isPending}`);
+  console.log(
+    `🔍 sendTypingIndicator: isTyping=${isTyping}, lastState=${lastState}, pending=${isPending}`
+  );
 
   // Skip nếu đang pending hoặc state giống nhau
   if (isPending) {
@@ -1031,7 +1204,7 @@ export const sendTypingIndicator = (
 
   // Lấy hoặc tạo channel
   let channel = typingChannels.get(conversationId);
-  
+
   if (!channel) {
     channel = supabase.channel(`typing:${conversationId}`);
     channel.subscribe();
@@ -1040,19 +1213,22 @@ export const sendTypingIndicator = (
   }
 
   // Gửi typing event
-  channel.send({
-    type: 'broadcast',
-    event: 'typing',
-    payload: { user_id: userId, is_typing: isTyping }
-  }).then(() => {
-    console.log(`✅ Sent: ${isTyping ? 'START ▶️' : 'STOP ⏹️'}`);
-    pendingTyping.delete(key);
-  }).catch((error: any) => {
-    console.error('❌ Error:', error);
-    // Rollback
-    lastTypingState.set(key, !isTyping);
-    pendingTyping.delete(key);
-  });
+  channel
+    .send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { user_id: userId, is_typing: isTyping }
+    })
+    .then(() => {
+      console.log(`✅ Sent: ${isTyping ? 'START ▶️' : 'STOP ⏹️'}`);
+      pendingTyping.delete(key);
+    })
+    .catch((error: any) => {
+      console.error('❌ Error:', error);
+      // Rollback
+      lastTypingState.set(key, !isTyping);
+      pendingTyping.delete(key);
+    });
 };
 
 // ============================================
@@ -1259,8 +1435,15 @@ export const subscribeMessages = (
 // Subscribe to reactions
 export const subscribeReactions = (
   conversationId: string,
-  onInsert: (reaction: { message_id: string; reaction: MessageReaction & { user: any } }) => void,
-  onDelete: (reaction: { message_id: string; user_id: string; emoji: string }) => void
+  onInsert: (reaction: {
+    message_id: string;
+    reaction: MessageReaction & { user: any };
+  }) => void,
+  onDelete: (reaction: {
+    message_id: string;
+    user_id: string;
+    emoji: string;
+  }) => void
 ) => {
   const channel = supabase
     .channel(`reactions:${conversationId}`)
@@ -1273,7 +1456,7 @@ export const subscribeReactions = (
       },
       async (payload) => {
         const reaction = payload.new as MessageReaction;
-        
+
         // Fetch message to check if it belongs to this conversation
         const { data: message } = await supabase
           .from('messages')
@@ -1285,7 +1468,7 @@ export const subscribeReactions = (
         if (!message || message.conversation_id !== conversationId) {
           return;
         }
-        
+
         // Fetch user details
         const { data: user } = await supabase
           .from('profiles')
@@ -1311,7 +1494,7 @@ export const subscribeReactions = (
       },
       async (payload) => {
         const reaction = payload.old as MessageReaction;
-        
+
         // Fetch message to check if it belongs to this conversation
         const { data: message } = await supabase
           .from('messages')
@@ -1323,7 +1506,7 @@ export const subscribeReactions = (
         if (!message || message.conversation_id !== conversationId) {
           return;
         }
-        
+
         onDelete({
           message_id: reaction.message_id,
           user_id: reaction.user_id,
@@ -1480,14 +1663,15 @@ export const createGroupConversation = async (
   creatorId: string,
   photoUrl?: string
 ): Promise<string> => {
-  // Create conversation
+  // Create conversation (chat_enabled defaults to false)
   const { data: newConvo, error: convoError } = await supabase
     .from('conversations')
     .insert({
       type: 'group',
       title,
       photo_url: photoUrl || 'default-image.png',
-      created_by: creatorId
+      created_by: creatorId,
+      chat_enabled: false // Mặc định tắt chat, chỉ admin mới có thể bật
     })
     .select()
     .single();
@@ -1603,6 +1787,65 @@ export const joinGroupViaInvite = async (
   return data as string; // Returns conversation_id
 };
 
+// Toggle chat enabled status (only admins)
+export const toggleChatEnabled = async (
+  conversationId: string,
+  adminId: string,
+  enabled: boolean
+): Promise<void> => {
+  // Verify user is admin
+  const { data: participant, error: participantError } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', adminId)
+    .is('left_at', null)
+    .single();
+
+  if (participantError || !participant || participant.role !== 'admin') {
+    throw new Error('Chỉ admin mới có quyền bật/tắt chat');
+  }
+
+  // Verify it's a group conversation
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('type')
+    .eq('id', conversationId)
+    .single();
+
+  if (convError) throw convError;
+  if (conversation?.type !== 'group') {
+    throw new Error('Chỉ có thể bật/tắt chat cho nhóm');
+  }
+
+  // Update chat_enabled
+  const { error } = await supabase
+    .from('conversations')
+    .update({ chat_enabled: enabled })
+    .eq('id', conversationId);
+
+  if (error) throw error;
+
+  // Create system message
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', adminId)
+    .single();
+
+  const adminName = adminProfile?.display_name || 'Admin';
+  const message = enabled
+    ? `${adminName} đã bật chế độ chỉ admin mới được chat`
+    : `${adminName} đã tắt chế độ chỉ admin mới được chat`;
+
+  await supabase.from('messages').insert({
+    conversation_id: conversationId,
+    sender_id: adminId,
+    type: 'system',
+    content_text: message
+  });
+};
+
 // Update group info (name, photo)
 export const updateGroupInfo = async (
   conversationId: string,
@@ -1625,25 +1868,80 @@ export const addGroupMembers = async (
   userIds: string[],
   addedBy: string
 ): Promise<void> => {
-  const participants = userIds.map((userId) => ({
-    conversation_id: conversationId,
-    user_id: userId,
-    role: 'member' as const
-  }));
+  if (!userIds || userIds.length === 0) {
+    throw new Error('Không có thành viên nào để thêm');
+  }
 
-  const { error } = await supabase
+  // Check existing participants (both active and inactive)
+  const { data: existingParticipants, error: checkError } = await supabase
     .from('conversation_participants')
-    .insert(participants);
+    .select('user_id, left_at')
+    .eq('conversation_id', conversationId)
+    .in('user_id', userIds);
 
-  if (error) throw error;
+  if (checkError) throw checkError;
+
+  const existingUserIds = new Set(
+    existingParticipants?.map((p) => p.user_id) || []
+  );
+  const leftUserIds = new Set(
+    existingParticipants
+      ?.filter((p) => p.left_at !== null)
+      .map((p) => p.user_id) || []
+  );
+
+  // Separate new members and members who left (need to rejoin)
+  const newMemberIds: string[] = [];
+  const rejoinMemberIds: string[] = [];
+
+  userIds.forEach((userId) => {
+    if (!existingUserIds.has(userId)) {
+      newMemberIds.push(userId);
+    } else if (leftUserIds.has(userId)) {
+      rejoinMemberIds.push(userId);
+    }
+  });
+
+  // Rejoin members who left (update left_at to null)
+  if (rejoinMemberIds.length > 0) {
+    const { error: rejoinError } = await supabase
+      .from('conversation_participants')
+      .update({ left_at: null })
+      .eq('conversation_id', conversationId)
+      .in('user_id', rejoinMemberIds);
+
+    if (rejoinError) throw rejoinError;
+  }
+
+  // Add new members
+  if (newMemberIds.length > 0) {
+    const participants = newMemberIds.map((userId) => ({
+      conversation_id: conversationId,
+      user_id: userId,
+      role: 'member' as const
+    }));
+
+    const { error: insertError } = await supabase
+      .from('conversation_participants')
+      .insert(participants);
+
+    if (insertError) throw insertError;
+  }
+
+  // Get all added member IDs (both new and rejoined)
+  const allAddedMemberIds = [...newMemberIds, ...rejoinMemberIds];
+
+  if (allAddedMemberIds.length === 0) {
+    throw new Error('Tất cả người dùng đã là thành viên của nhóm');
+  }
 
   // Create system messages for each added member
   const { data: profiles } = await supabase
     .from('profiles')
     .select('id, display_name')
-    .in('id', userIds);
+    .in('id', allAddedMemberIds);
 
-  if (profiles) {
+  if (profiles && profiles.length > 0) {
     const messages = profiles.map((profile) => ({
       conversation_id: conversationId,
       sender_id: addedBy,
@@ -1651,7 +1949,11 @@ export const addGroupMembers = async (
       content_text: `${profile.display_name} đã được thêm vào nhóm`
     }));
 
-    await supabase.from('messages').insert(messages);
+    const { error: msgError } = await supabase.from('messages').insert(messages);
+    if (msgError) {
+      console.error('Error creating system messages:', msgError);
+      // Don't throw, just log - members were added successfully
+    }
   }
 };
 
@@ -1672,11 +1974,7 @@ export const removeGroupMember = async (
 
   // Get member và admin names
   const [memberResult, adminResult] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', userId)
-      .single(),
+    supabase.from('profiles').select('display_name').eq('id', userId).single(),
     supabase
       .from('profiles')
       .select('display_name')
@@ -1747,8 +2045,16 @@ export const transferAdminRole = async (
 
   // Create system message
   const [currentAdminProfile, newAdminProfile] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', currentAdminId).single(),
-    supabase.from('profiles').select('display_name').eq('id', newAdminId).single()
+    supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', currentAdminId)
+      .single(),
+    supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', newAdminId)
+      .single()
   ]);
 
   const currentName = currentAdminProfile.data?.display_name || 'Admin';
@@ -1789,7 +2095,7 @@ export const leaveGroup = async (
 
     if (adminError) throw adminError;
 
-    const adminCount = admins?.filter(a => a.user_id !== userId).length || 0;
+    const adminCount = admins?.filter((a) => a.user_id !== userId).length || 0;
 
     if (adminCount === 0) {
       // This is the last admin
@@ -2048,7 +2354,9 @@ export const createPoll = async (
   if (optionRows.length < 2) {
     throw new Error('Cần ít nhất 2 lựa chọn');
   }
-  const { error: optErr } = await supabase.from('poll_options').insert(optionRows);
+  const { error: optErr } = await supabase
+    .from('poll_options')
+    .insert(optionRows);
   if (optErr) throw optErr;
 
   await supabase
@@ -2071,24 +2379,22 @@ export const getPollByMessage = async (
     .single();
   if (error || !poll) throw error || new Error('Poll not found');
 
-  const [{ data: options }, { data: myVotes }, { data: allVotes }] = await Promise.all([
-    supabase
-      .from('poll_options')
-      .select('*')
-      .eq('poll_id', poll.id)
-      .order('idx', { ascending: true }),
-    currentUserId
-      ? supabase
-          .from('poll_votes')
-          .select('option_id')
-          .eq('poll_id', poll.id)
-          .eq('user_id', currentUserId)
-      : Promise.resolve({ data: [] as any } as any),
-    supabase
-      .from('poll_votes')
-      .select('option_id')
-      .eq('poll_id', poll.id)
-  ]);
+  const [{ data: options }, { data: myVotes }, { data: allVotes }] =
+    await Promise.all([
+      supabase
+        .from('poll_options')
+        .select('*')
+        .eq('poll_id', poll.id)
+        .order('idx', { ascending: true }),
+      currentUserId
+        ? supabase
+            .from('poll_votes')
+            .select('option_id')
+            .eq('poll_id', poll.id)
+            .eq('user_id', currentUserId)
+        : Promise.resolve({ data: [] as any } as any),
+      supabase.from('poll_votes').select('option_id').eq('poll_id', poll.id)
+    ]);
 
   const countByOption = new Map<string, number>();
   (allVotes || []).forEach((r: any) => {
@@ -2141,7 +2447,8 @@ export const subscribePollVotes = (
       'postgres_changes',
       { event: '*', schema: 'public', table: 'poll_votes' },
       async (payload) => {
-        const pollId = (payload.new as any)?.poll_id || (payload.old as any)?.poll_id;
+        const pollId =
+          (payload.new as any)?.poll_id || (payload.old as any)?.poll_id;
         if (!pollId) return;
         const { data: poll } = await supabase
           .from('polls')
@@ -2169,7 +2476,12 @@ export const subscribePollVotesForPoll = (
     .channel(`poll:${pollId}`)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'poll_votes', filter: `poll_id=eq.${pollId}` },
+      {
+        event: '*',
+        schema: 'public',
+        table: 'poll_votes',
+        filter: `poll_id=eq.${pollId}`
+      },
       () => onChange()
     )
     .subscribe();
@@ -2219,10 +2531,11 @@ export const searchConversations = async (
     };
     const { data, error } = await rpcClient.rpc('search_users_by_email', {
       _term: term,
-      _current_user_id: userId,
+      _current_user_id: userId
     });
     if (!error && data) {
-      const profiles = data as Database['public']['Tables']['profiles']['Row'][];
+      const profiles =
+        data as Database['public']['Tables']['profiles']['Row'][];
       emailMatchedIds = new Set(profiles.map((p) => p.id));
     }
   }
@@ -2238,15 +2551,19 @@ export const searchConversations = async (
           type: 'group',
           title: convo.title || 'Nhóm',
           photo_url: convo.photo_url || null,
-          last_message_preview: convo.last_message?.content_text || null,
+          last_message_preview: convo.last_message?.content_text || null
         });
       }
     } else {
       // direct: find the other participant
-      const other = (convo.participants || []).find((p) => p.user_id !== userId)?.profile;
+      const other = (convo.participants || []).find(
+        (p) => p.user_id !== userId
+      )?.profile;
       if (!other) continue;
       const dn = (other.display_name || '').toLowerCase();
-      const un = (other as any).username ? String((other as any).username).toLowerCase() : '';
+      const un = (other as any).username
+        ? String((other as any).username).toLowerCase()
+        : '';
       const match =
         dn.includes(query) ||
         (un && un.includes(query)) ||
@@ -2262,9 +2579,9 @@ export const searchConversations = async (
             display_name: other.display_name || '',
             username: (other as any).username || null,
             avatar_url: other.avatar_url,
-            status: other.status || null,
+            status: other.status || null
           },
-          last_message_preview: convo.last_message?.content_text || null,
+          last_message_preview: convo.last_message?.content_text || null
         });
       }
     }
@@ -2301,9 +2618,12 @@ export const startChatWithUser = async (
     throw new Error('Bạn không thể nhắn tin với người dùng này do đã bị chặn');
   }
 
-  const { data, error } = await supabase.rpc('get_or_create_direct_conversation', {
-    _user_id: userId,
-  });
+  const { data, error } = await supabase.rpc(
+    'get_or_create_direct_conversation',
+    {
+      _user_id: userId
+    }
+  );
 
   if (error) {
     console.error('Error starting chat with user:', error);
@@ -2335,7 +2655,7 @@ export const searchUsers = async (
   }
 
   const searchTerm = `%${query}%`;
-  
+
   const { data, error } = await supabase
     .from('profiles')
     .select('id, username, display_name, avatar_url, status')

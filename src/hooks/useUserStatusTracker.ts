@@ -86,11 +86,14 @@ export const useUserStatusTracker = ({
         .update({
           status: "online",
           last_seen_at: new Date().toISOString(),
+          status_updated_at: new Date().toISOString(),
         })
         .eq("id", userId);
 
       if (error) {
         console.error("Heartbeat failed:", error);
+        // Nếu heartbeat fail, có thể user đã logout hoặc bị ban
+        // Không set isOnlineRef.current = false ở đây để tránh conflict
       }
     } catch (error) {
       console.error("Heartbeat error:", error);
@@ -161,7 +164,10 @@ export const useUserStatusTracker = ({
     setOnline();
 
     // 2. Bắt đầu heartbeat
-    heartbeatRef.current = setInterval(heartbeat, heartbeatInterval);
+    const intervalId = setInterval(() => {
+      heartbeat();
+    }, heartbeatInterval);
+    heartbeatRef.current = intervalId;
 
     // 3. Lắng nghe sự kiện đóng tab
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -171,22 +177,20 @@ export const useUserStatusTracker = ({
       // Clear heartbeat
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
+        heartbeatRef.current = undefined;
       }
 
       // Remove event listener
       window.removeEventListener("beforeunload", handleBeforeUnload);
 
       // Set offline khi component unmount (ví dụ: đăng xuất)
-      setOffline();
+      // Chỉ set offline nếu đang online để tránh race condition
+      if (isOnlineRef.current) {
+        setOffline();
+      }
     };
-  }, [
-    userId,
-    setOnline,
-    setOffline,
-    heartbeat,
-    handleBeforeUnload,
-    heartbeatInterval,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, heartbeatInterval]); // Chỉ depend vào userId và interval
 
   // Return các hàm để có thể sử dụng thủ công nếu cần
   return {

@@ -9,6 +9,7 @@ import Button from '@/components/Button';
 import Divider from '@/components/Divider';
 import { useMutation } from '@tanstack/react-query';
 import authServices from '@/services/authServices';
+import profileServices from '@/services/profileServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/stores/user';
 
@@ -35,9 +36,29 @@ const LoginPage = () => {
     mutate(
       { email, password },
       {
-        onSuccess: (data) => {
-          toast.success('Đăng nhập thành công');
-          setUser(data.user);
+        onSuccess: async (data) => {
+          // Kiểm tra is_disabled sau khi login thành công
+          try {
+            const profile = await profileServices.getProfile(data.user.id);
+            if (profile.is_disabled) {
+              // User bị ban, logout ngay lập tức
+              await authServices.logout();
+              setUser(null);
+              toast.error(
+                'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ admin qua email: hieuntadmin@gmail.com để được hỗ trợ.',
+                { duration: 10000 }
+              );
+              return;
+            }
+            // Login thành công nếu không bị ban
+            toast.success('Đăng nhập thành công');
+            setUser(data.user);
+          } catch (error) {
+            console.error('Error checking profile:', error);
+            // Nếu không lấy được profile, vẫn cho login (fallback)
+            toast.success('Đăng nhập thành công');
+            setUser(data.user);
+          }
         },
         onError: (error) => {
           toast.error(error.message);

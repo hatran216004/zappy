@@ -440,3 +440,76 @@ export const deletePost = async (postId: string): Promise<void> => {
 
   if (error) throw error;
 };
+
+// ============================================
+// POST REPORTS
+// ============================================
+
+export type ReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'inappropriate_content'
+  | 'violence'
+  | 'hate_speech'
+  | 'fake_news'
+  | 'other';
+
+export interface PostReport {
+  id: string;
+  post_id: string;
+  reported_by: string;
+  reason: ReportReason;
+  description: string | null;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+// Report a post
+export const reportPost = async (
+  postId: string,
+  reportedBy: string,
+  reason: ReportReason,
+  description?: string
+): Promise<PostReport> => {
+  // Check if user already reported this post
+  const { data: existingReport } = await supabase
+    .from('post_reports')
+    .select('id')
+    .eq('post_id', postId)
+    .eq('reported_by', reportedBy)
+    .single();
+
+  if (existingReport) {
+    throw new Error('Bạn đã báo cáo bài viết này rồi');
+  }
+
+  const { data, error } = await supabase
+    .from('post_reports')
+    .insert({
+      post_id: postId,
+      reported_by: reportedBy,
+      reason,
+      description: description || null
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Get reports by user
+export const getUserPostReports = async (
+  userId: string
+): Promise<PostReport[]> => {
+  const { data, error } = await supabase
+    .from('post_reports')
+    .select('*')
+    .eq('reported_by', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};

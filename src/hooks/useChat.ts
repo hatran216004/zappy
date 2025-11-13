@@ -23,6 +23,10 @@ import {
   deleteMessageAsAdmin,
   addReaction,
   removeReaction,
+  reportMessage,
+  getUserReports,
+  reportConversation,
+  getUserConversationReports,
   markMessagesAsRead,
   sendTypingIndicator,
   subscribeConversations,
@@ -35,10 +39,12 @@ import {
   getConversationLinks,
   updateConversationBackground,
   removeGroupMember,
+  toggleChatEnabled,
   supabase,
   // type ConversationWithDetails,
   // type MessageWithDetails,
-  type Message
+  type Message,
+  type ReportReason
 } from '../services/chatService';
 
 // Keys cho query cache
@@ -768,6 +774,78 @@ export const useRemoveReaction = () => {
   });
 };
 
+// ============================================
+// MESSAGE REPORTS
+// ============================================
+
+// Hook to report a message
+export const useReportMessage = () => {
+  return useMutation({
+    mutationFn: ({
+      messageId,
+      reportedBy,
+      reason,
+      description
+    }: {
+      messageId: string;
+      reportedBy: string;
+      reason: ReportReason;
+      description?: string;
+    }) => reportMessage(messageId, reportedBy, reason, description),
+    onSuccess: () => {
+      toast.success('Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể gửi báo cáo');
+    }
+  });
+};
+
+// Hook to get user's reports
+export const useUserReports = (userId: string) => {
+  return useQuery({
+    queryKey: ['userReports', userId],
+    queryFn: () => getUserReports(userId),
+    enabled: !!userId
+  });
+};
+
+// ============================================
+// CONVERSATION REPORTS
+// ============================================
+
+// Hook to report a conversation
+export const useReportConversation = () => {
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      reportedBy,
+      reason,
+      description
+    }: {
+      conversationId: string;
+      reportedBy: string;
+      reason: ReportReason;
+      description?: string;
+    }) => reportConversation(conversationId, reportedBy, reason, description),
+    onSuccess: () => {
+      toast.success('Đã gửi báo cáo thành công. Cảm ơn bạn đã giúp cải thiện cộng đồng!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể gửi báo cáo');
+    }
+  });
+};
+
+// Hook to get user's conversation reports
+export const useUserConversationReports = (userId: string) => {
+  return useQuery({
+    queryKey: ['conversationReports', userId],
+    queryFn: () => getUserConversationReports(userId),
+    enabled: !!userId
+  });
+};
+
 // Hook subscribe reactions realtime
 export const useReactionsRealtime = (conversationId: string) => {
   const queryClient = useQueryClient();
@@ -959,6 +1037,41 @@ export const useConversationLinks = (conversationId: string) => {
     queryFn: () => getConversationLinks(conversationId),
     enabled: !!conversationId,
     staleTime: 60000
+  });
+};
+
+// Hook toggle chat enabled (only admins)
+export const useToggleChatEnabled = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      adminId,
+      enabled
+    }: {
+      conversationId: string;
+      adminId: string;
+      enabled: boolean;
+    }) => toggleChatEnabled(conversationId, adminId, enabled),
+    onSuccess: (_, variables) => {
+      // Invalidate conversation để cập nhật chat_enabled
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.conversation(variables.conversationId)
+      });
+      // Invalidate messages để hiển thị system message
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(variables.conversationId)
+      });
+      toast.success(
+        variables.enabled
+          ? 'Đã bật chế độ chỉ admin mới được chat'
+          : 'Đã tắt chế độ chỉ admin mới được chat'
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể thay đổi cài đặt chat');
+    }
   });
 };
 
