@@ -46,6 +46,8 @@ interface MessageBubbleProps {
   isAdmin?: boolean; // Current user is admin
   conversationType?: string; // 'direct' | 'group'
   conversationId?: string; // For admin delete
+  onCreateThread?: (messageId: string, preview: string) => void; // Create thread from message
+  threadId?: string; // Thread ID if message is in a thread
 }
 
 // Helper function to detect and linkify URLs and render mentions with avatar+name
@@ -144,7 +146,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     onForward,
     isAdmin = false,
     conversationType,
-    conversationId
+    conversationId,
+    onCreateThread,
+    threadId
   }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.content_text || '');
@@ -295,7 +299,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
           messageId: message.id,
           userId: currentUserId,
           emoji,
-          conversationId
+          conversationId,
+          threadId
         });
       } catch (error) {
         console.error('Error handling reaction:', error);
@@ -308,7 +313,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
             await removeReactionMutation.mutateAsync({
               messageId: message.id,
               userId: currentUserId,
-              emoji
+              emoji,
+              threadId
             });
           } catch (removeError) {
             console.error('Error removing reaction:', removeError);
@@ -633,6 +639,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
                     {onForward && (
                       <DropdownMenuItem onClick={onForward}>
                         Chuyển tiếp
+                      </DropdownMenuItem>
+                    )}
+
+                    {/* Create Thread (only for group chats) */}
+                    {onCreateThread && conversationType === 'group' && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          onCreateThread(
+                            message.id,
+                            message.content_text || 'Đã gửi file'
+                          )
+                        }
+                      >
+                        Tạo chủ đề từ tin nhắn này
                       </DropdownMenuItem>
                     )}
 

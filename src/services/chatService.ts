@@ -186,16 +186,39 @@ export const getConversations = async (
   );
 
   // Step 5: Get unread counts in parallel for all conversations
+  // Improved: Count messages that don't have read_receipts for this user
   const unreadCountsRes = await Promise.all(
     conversationIds.map(async (convId) => {
       const lastReadAt = lastReadMap.get(convId);
-      const { count } = await supabase
+      
+      // Get all unread message IDs (messages after last_read_at, not sent by user)
+      const { data: unreadMessages } = await supabase
         .from('messages')
-        .select('id', { count: 'exact', head: true })
+        .select('id')
         .eq('conversation_id', convId)
         .gt('created_at', lastReadAt || '1970-01-01')
-        .neq('sender_id', userId);
-      return [convId, count || 0] as const;
+        .neq('sender_id', userId)
+        .is('thread_id', null); // Only count main conversation messages, not thread messages
+      
+      if (!unreadMessages || unreadMessages.length === 0) {
+        return [convId, 0] as const;
+      }
+      
+      const unreadMessageIds = unreadMessages.map((m) => m.id);
+      
+      // Get read receipts for these messages by this user
+      const { data: readReceipts } = await supabase
+        .from('read_receipts')
+        .select('message_id')
+        .in('message_id', unreadMessageIds)
+        .eq('user_id', userId);
+      
+      const readMessageIds = new Set(readReceipts?.map((r) => r.message_id) || []);
+      
+      // Count messages that don't have read receipts
+      const unreadCount = unreadMessageIds.filter((id) => !readMessageIds.has(id)).length;
+      
+      return [convId, unreadCount] as const;
     })
   );
 
@@ -312,6 +335,7 @@ export const getMessages = async (
     `
     )
     .eq('conversation_id', conversationId)
+    .is('thread_id', null) // Only get messages in main conversation, not in threads
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -1286,6 +1310,25 @@ export const subscribeMessages = (
         filter: `conversation_id=eq.${conversationId}`
       },
       async (payload) => {
+        console.log('📥 INSERT event received:', {
+          messageId: payload.new.id,
+          conversationId: payload.new.conversation_id,
+          threadId: payload.new.thread_id,
+          senderId: payload.new.sender_id
+        });
+        
+        // Filter out thread messages manually
+        if (payload.new.thread_id !== null) {
+          console.log('⏭️ Skipping thread message:', payload.new.id);
+          return;
+        }
+        
+        // Double check conversation_id
+        if (payload.new.conversation_id !== conversationId) {
+          console.warn('⚠️ Message conversation_id mismatch:', payload.new.conversation_id, 'expected:', conversationId);
+          return;
+        }
+        
         const messageId = payload.new.id;
 
         // Fetch đầy đủ thông tin message như getMessages
@@ -1341,9 +1384,11 @@ export const subscribeMessages = (
           reply_to: replyTo,
           reactions: reactions || [],
           read_receipts: readReceipts || [],
-          deleted_for_me: false // New messages are not deleted
+          deleted_for_me: false, // New messages are not deleted
+          mentions: [] // Initialize mentions array
         };
 
+        console.log('📨 Realtime message received:', fullMessage.id);
         onInsert(fullMessage as unknown as MessageWithDetails);
       }
     )
@@ -1356,6 +1401,11 @@ export const subscribeMessages = (
         filter: `conversation_id=eq.${conversationId}`
       },
       async (payload) => {
+        // Filter out thread messages manually
+        if (payload.new.thread_id !== null || payload.new.conversation_id !== conversationId) {
+          return;
+        }
+        
         const messageId = payload.new.id;
 
         // Fetch đầy đủ thông tin
@@ -1423,7 +1473,105 @@ export const subscribeMessages = (
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       },
-      (payload) => onDelete(payload.old as Message)
+      (payload) => {
+        // Filter out thread messages manually
+        if (payload.old.thread_id !== null || payload.old.conversation_id !== conversationId) {
+          return;
+        }
+        onDelete(payload.old as Message);
+      }
+    )
+    .subscribe((status, err) => {
+      console.log('📡 Messages subscription status:', status, 'for conversation:', conversationId);
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Successfully subscribed to messages for conversation:', conversationId);
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Channel error for conversation:', conversationId, err);
+      } else if (status === 'TIMED_OUT') {
+        console.error('⏱️ Subscription timed out for conversation:', conversationId);
+      } else if (status === 'CLOSED') {
+        console.warn('🔒 Subscription closed for conversation:', conversationId);
+      }
+    });
+
+  return () => {
+    console.log('🔌 Unsubscribing from messages:', conversationId);
+    supabase.removeChannel(channel);
+  };
+};
+
+// Subscribe to read receipts for a conversation
+export const subscribeReadReceipts = (
+  conversationId: string,
+  onInsert: (receipt: ReadReceipt) => void,
+  onUpdate: (receipt: ReadReceipt) => void
+) => {
+  // Get all message IDs in this conversation (for filtering)
+  // We'll filter by messages that belong to this conversation and have no thread_id
+  const channel = supabase
+    .channel(`read_receipts:${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'read_receipts',
+        filter: `message_id=in.(SELECT id FROM messages WHERE conversation_id=eq.${conversationId} AND thread_id IS NULL)`
+      },
+      (payload) => {
+        onInsert(payload.new as ReadReceipt);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'read_receipts',
+        filter: `message_id=in.(SELECT id FROM messages WHERE conversation_id=eq.${conversationId} AND thread_id IS NULL)`
+      },
+      (payload) => {
+        onUpdate(payload.new as ReadReceipt);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// Subscribe to read receipts for a thread
+export const subscribeThreadReadReceipts = (
+  threadId: string,
+  onInsert: (receipt: ReadReceipt) => void,
+  onUpdate: (receipt: ReadReceipt) => void
+) => {
+  const channel = supabase
+    .channel(`thread_read_receipts:${threadId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'read_receipts',
+        filter: `message_id=in.(SELECT id FROM messages WHERE thread_id=eq.${threadId})`
+      },
+      (payload) => {
+        onInsert(payload.new as ReadReceipt);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'read_receipts',
+        filter: `message_id=in.(SELECT id FROM messages WHERE thread_id=eq.${threadId})`
+      },
+      (payload) => {
+        onUpdate(payload.new as ReadReceipt);
+      }
     )
     .subscribe();
 
@@ -2668,5 +2816,1105 @@ export const searchUsers = async (
     throw error;
   }
 
+  return data || [];
+};
+
+// ============================================
+// THREADS (CHỦ ĐỀ)
+// ============================================
+
+// Subscribe to threads in a conversation
+export const subscribeThreads = (
+  conversationId: string,
+  onInsert: (thread: ThreadWithDetails) => void,
+  onUpdate: (thread: ThreadWithDetails) => void,
+  onDelete: (threadId: string) => void
+) => {
+  const channel = supabase
+    .channel(`threads:${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'threads',
+        filter: `conversation_id=eq.${conversationId}`
+      },
+      async (payload) => {
+        const threadId = payload.new.id;
+        
+        // Fetch full thread details
+        const { data: thread } = await supabase
+          .from('threads')
+          .select(
+            `
+            *,
+            creator:profiles!threads_created_by_fkey(*),
+            root_message:messages!threads_root_message_id_fkey(
+              id,
+              content_text,
+              type,
+              sender_id,
+              created_at,
+              sender:profiles!messages_sender_id_fkey(*)
+            ),
+            last_message:messages!threads_last_message_id_fkey(
+              id,
+              content_text,
+              type,
+              sender_id,
+              created_at,
+              sender:profiles!messages_sender_id_fkey(*)
+            )
+          `
+          )
+          .eq('id', threadId)
+          .single();
+
+        if (thread) {
+          onInsert({
+            ...thread,
+            is_joined: false,
+            last_read_at: null
+          } as ThreadWithDetails);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'threads',
+        filter: `conversation_id=eq.${conversationId}`
+      },
+      async (payload) => {
+        const threadId = payload.new.id;
+        
+        // Fetch full thread details
+        const { data: thread } = await supabase
+          .from('threads')
+          .select(
+            `
+            *,
+            creator:profiles!threads_created_by_fkey(*),
+            root_message:messages!threads_root_message_id_fkey(
+              id,
+              content_text,
+              type,
+              sender_id,
+              created_at,
+              sender:profiles!messages_sender_id_fkey(*)
+            ),
+            last_message:messages!threads_last_message_id_fkey(
+              id,
+              content_text,
+              type,
+              sender_id,
+              created_at,
+              sender:profiles!messages_sender_id_fkey(*)
+            )
+          `
+          )
+          .eq('id', threadId)
+          .single();
+
+        if (thread) {
+          onUpdate({
+            ...thread,
+            is_joined: false, // Will be updated by query
+            last_read_at: null
+          } as ThreadWithDetails);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'threads',
+        filter: `conversation_id=eq.${conversationId}`
+      },
+      (payload) => {
+        onDelete(payload.old.id);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// Subscribe to reactions in thread messages
+export const subscribeThreadReactions = (
+  threadId: string,
+  onInsert: (reaction: {
+    message_id: string;
+    reaction: MessageReaction & { user: any };
+  }) => void,
+  onDelete: (reaction: {
+    message_id: string;
+    user_id: string;
+    emoji: string;
+  }) => void
+) => {
+  const channel = supabase
+    .channel(`thread_reactions:${threadId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'message_reactions'
+      },
+      async (payload) => {
+        const reaction = payload.new as MessageReaction;
+
+        // Fetch message to check if it belongs to this thread
+        const { data: message } = await supabase
+          .from('messages')
+          .select('thread_id')
+          .eq('id', reaction.message_id)
+          .single();
+
+        // Only process if message belongs to this thread
+        if (!message || message.thread_id !== threadId) {
+          return;
+        }
+
+        // Fetch user details
+        const { data: user } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', reaction.user_id)
+          .single();
+
+        onInsert({
+          message_id: reaction.message_id,
+          reaction: {
+            ...reaction,
+            user: user || null
+          }
+        });
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'message_reactions'
+      },
+      async (payload) => {
+        const reaction = payload.old as MessageReaction;
+
+        // Fetch message to check if it belongs to this thread
+        const { data: message } = await supabase
+          .from('messages')
+          .select('thread_id')
+          .eq('id', reaction.message_id)
+          .single();
+
+        // Only process if message belongs to this thread
+        if (!message || message.thread_id !== threadId) {
+          return;
+        }
+
+        onDelete({
+          message_id: reaction.message_id,
+          user_id: reaction.user_id,
+          emoji: reaction.emoji
+        });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// Subscribe to messages in a thread
+export const subscribeThreadMessages = (
+  threadId: string,
+  onInsert: (message: MessageWithDetails) => void,
+  onUpdate: (message: MessageWithDetails) => void,
+  onDelete: (message: Message) => void
+) => {
+  const channel = supabase
+    .channel(`thread_messages:${threadId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `thread_id=eq.${threadId}`
+      },
+      async (payload) => {
+        const messageId = payload.new.id;
+
+        // Fetch full message details (similar to subscribeMessages)
+        const { data: message } = await supabase
+          .from('messages')
+          .select(
+            `
+            *,
+            sender:profiles!messages_sender_id_fkey(*),
+            attachments(*)
+          `
+          )
+          .eq('id', messageId)
+          .single();
+
+        if (!message) return;
+
+        // Fetch reply_to if any
+        let replyTo = null;
+        if (message.reply_to_id) {
+          const { data: reply } = await supabase
+            .from('messages')
+            .select(
+              `
+              id, content_text, type, sender_id, created_at,
+              sender:profiles!messages_sender_id_fkey(*)
+            `
+            )
+            .eq('id', message.reply_to_id)
+            .single();
+          replyTo = reply;
+        }
+
+        // Fetch reactions
+        const { data: reactions } = await supabase
+          .from('message_reactions')
+          .select(
+            `
+            *,
+            user:profiles!message_reactions_user_id_fkey(*)
+          `
+          )
+          .eq('message_id', messageId);
+
+        // Fetch read receipts
+        const { data: readReceipts } = await supabase
+          .from('read_receipts')
+          .select('*')
+          .eq('message_id', messageId);
+
+        // Fetch mentions
+        const { data: mentions } = await supabase
+          .from('message_mentions')
+          .select(
+            `
+            mentioned_user_id,
+            user:profiles!message_mentions_mentioned_user_id_fkey(*)
+          `
+          )
+          .eq('message_id', messageId);
+
+        const fullMessage = {
+          ...message,
+          reply_to: replyTo,
+          reactions: reactions || [],
+          read_receipts: readReceipts || [],
+          mentions: mentions || [],
+          deleted_for_me: false
+        };
+
+        onInsert(fullMessage as unknown as MessageWithDetails);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `thread_id=eq.${threadId}`
+      },
+      async (payload) => {
+        const messageId = payload.new.id;
+
+        // Fetch full message details
+        const { data: message } = await supabase
+          .from('messages')
+          .select(
+            `
+            *,
+            sender:profiles!messages_sender_id_fkey(*),
+            attachments(*)
+          `
+          )
+          .eq('id', messageId)
+          .single();
+
+        if (!message) return;
+
+        // Fetch reply_to, reactions, read_receipts, mentions
+        let replyTo = null;
+        if (message.reply_to_id) {
+          const { data: reply } = await supabase
+            .from('messages')
+            .select(
+              `
+              id, content_text, type, sender_id, created_at,
+              sender:profiles!messages_sender_id_fkey(*)
+            `
+            )
+            .eq('id', message.reply_to_id)
+            .single();
+          replyTo = reply;
+        }
+
+        const { data: reactions } = await supabase
+          .from('message_reactions')
+          .select(
+            `
+            *,
+            user:profiles!message_reactions_user_id_fkey(*)
+          `
+          )
+          .eq('message_id', messageId);
+
+        const { data: readReceipts } = await supabase
+          .from('read_receipts')
+          .select('*')
+          .eq('message_id', messageId);
+
+        const { data: mentions } = await supabase
+          .from('message_mentions')
+          .select(
+            `
+            mentioned_user_id,
+            user:profiles!message_mentions_mentioned_user_id_fkey(*)
+          `
+          )
+          .eq('message_id', messageId);
+
+        const fullMessage = {
+          ...message,
+          reply_to: replyTo,
+          reactions: reactions || [],
+          read_receipts: readReceipts || [],
+          mentions: mentions || [],
+          deleted_for_me: false
+        };
+
+        onUpdate(fullMessage as unknown as MessageWithDetails);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'messages',
+        filter: `thread_id=eq.${threadId}`
+      },
+      (payload) => onDelete(payload.old as Message)
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// Subscribe to thread participants changes
+export const subscribeThreadParticipants = (
+  threadId: string,
+  onInsert: (participant: ThreadParticipant) => void,
+  onDelete: (userId: string) => void
+) => {
+  const channel = supabase
+    .channel(`thread_participants:${threadId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'thread_participants',
+        filter: `thread_id=eq.${threadId}`
+      },
+      async (payload) => {
+        const participant = payload.new;
+        
+        // Fetch profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', participant.user_id)
+          .single();
+
+        onInsert({
+          ...participant,
+          profile: profile || undefined
+        } as ThreadParticipant);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'thread_participants',
+        filter: `thread_id=eq.${threadId}`
+      },
+      (payload) => {
+        onDelete(payload.old.user_id);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+export interface Thread {
+  id: string;
+  conversation_id: string;
+  title: string;
+  description: string | null;
+  root_message_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  is_pinned: boolean;
+  is_closed: boolean;
+  closed_by: string | null;
+  closed_at: string | null;
+  last_message_id: string | null;
+  message_count: number;
+  participant_count: number;
+}
+
+export interface ThreadWithDetails extends Thread {
+  creator: Database['public']['Tables']['profiles']['Row'];
+  root_message?: MessageWithDetails;
+  last_message?: MessageWithDetails;
+  is_joined?: boolean; // Whether current user has joined this thread
+  last_read_at?: string | null; // Current user's last read timestamp
+}
+
+export interface ThreadParticipant {
+  thread_id: string;
+  user_id: string;
+  joined_at: string;
+  last_read_at: string | null;
+  profile?: Database['public']['Tables']['profiles']['Row'];
+}
+
+// Create a new thread
+export const createThread = async ({
+  conversationId,
+  title,
+  description,
+  rootMessageId,
+  createdBy
+}: {
+  conversationId: string;
+  title: string;
+  description?: string;
+  rootMessageId?: string;
+  createdBy: string;
+}): Promise<Thread> => {
+  // Verify user is a participant in the conversation
+  const { data: participant } = await supabase
+    .from('conversation_participants')
+    .select('user_id')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', createdBy)
+    .is('left_at', null)
+    .maybeSingle();
+
+  if (!participant) {
+    throw new Error('Bạn phải là thành viên của đoạn chat để tạo chủ đề');
+  }
+
+  // Verify root message exists and belongs to conversation (if provided)
+  if (rootMessageId) {
+    const { data: rootMessage } = await supabase
+      .from('messages')
+      .select('id, conversation_id')
+      .eq('id', rootMessageId)
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
+
+    if (!rootMessage) {
+      throw new Error('Tin nhắn gốc không tồn tại hoặc không thuộc đoạn chat này');
+    }
+  }
+
+  // Create thread
+  const { data: thread, error } = await supabase
+    .from('threads')
+    .insert({
+      conversation_id: conversationId,
+      title,
+      description: description || null,
+      root_message_id: rootMessageId || null,
+      created_by: createdBy
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Auto-join creator to thread
+  await supabase.from('thread_participants').insert({
+    thread_id: thread.id,
+    user_id: createdBy
+  });
+
+  return thread;
+};
+
+// Get threads for a conversation
+export const getThreads = async (
+  conversationId: string,
+  currentUserId: string,
+  options?: {
+    sortBy?: 'updated_at' | 'created_at' | 'message_count';
+    order?: 'asc' | 'desc';
+    filter?: 'all' | 'active' | 'closed' | 'pinned' | 'joined';
+  }
+): Promise<ThreadWithDetails[]> => {
+  const {
+    sortBy = 'updated_at',
+    order = 'desc',
+    filter = 'all'
+  } = options || {};
+
+  let query = supabase
+    .from('threads')
+    .select(
+      `
+      *,
+      creator:profiles!threads_created_by_fkey(*),
+      root_message:messages!threads_root_message_id_fkey(
+        id,
+        content_text,
+        type,
+        sender_id,
+        created_at,
+        sender:profiles!messages_sender_id_fkey(*)
+      ),
+      last_message:messages!threads_last_message_id_fkey(
+        id,
+        content_text,
+        type,
+        sender_id,
+        created_at,
+        sender:profiles!messages_sender_id_fkey(*)
+      )
+    `
+    )
+    .eq('conversation_id', conversationId);
+
+  // Apply filters
+  if (filter === 'active') {
+    query = query.eq('is_closed', false);
+  } else if (filter === 'closed') {
+    query = query.eq('is_closed', true);
+  } else if (filter === 'pinned') {
+    query = query.eq('is_pinned', true);
+  }
+
+  // Apply sorting
+  query = query.order(sortBy, { ascending: order === 'asc' });
+
+  const { data: threads, error } = await query;
+
+  if (error) throw error;
+  if (!threads) return [];
+
+  // Get joined status and last_read_at for current user
+  const threadIds = threads.map((t) => t.id);
+  const { data: participants } = await supabase
+    .from('thread_participants')
+    .select('thread_id, last_read_at')
+    .eq('user_id', currentUserId)
+    .in('thread_id', threadIds);
+
+  const participantMap = new Map(
+    participants?.map((p) => [p.thread_id, p]) || []
+  );
+
+  // Filter by 'joined' if needed
+  let filteredThreads = threads;
+  if (filter === 'joined') {
+    filteredThreads = threads.filter((t) => participantMap.has(t.id));
+  }
+
+  // Add is_joined and last_read_at
+  return filteredThreads.map((thread) => {
+    const participant = participantMap.get(thread.id);
+    return {
+      ...thread,
+      is_joined: !!participant,
+      last_read_at: participant?.last_read_at || null
+    };
+  });
+};
+
+// Join a thread
+export const joinThread = async (
+  threadId: string,
+  userId: string
+): Promise<void> => {
+  // Verify thread exists and is not closed
+  const { data: thread } = await supabase
+    .from('threads')
+    .select('id, is_closed, conversation_id')
+    .eq('id', threadId)
+    .maybeSingle();
+
+  if (!thread) {
+    throw new Error('Chủ đề không tồn tại');
+  }
+
+  if (thread.is_closed) {
+    throw new Error('Chủ đề đã bị đóng, không thể tham gia');
+  }
+
+  // Verify user is a participant in the conversation
+  const { data: participant } = await supabase
+    .from('conversation_participants')
+    .select('user_id')
+    .eq('conversation_id', thread.conversation_id)
+    .eq('user_id', userId)
+    .is('left_at', null)
+    .maybeSingle();
+
+  if (!participant) {
+    throw new Error('Bạn phải là thành viên của đoạn chat để tham gia chủ đề');
+  }
+
+  // Insert or update participation
+  const { error } = await supabase.from('thread_participants').upsert(
+    {
+      thread_id: threadId,
+      user_id: userId,
+      joined_at: new Date().toISOString()
+    },
+    {
+      onConflict: 'thread_id,user_id',
+      ignoreDuplicates: false
+    }
+  );
+
+  if (error) throw error;
+};
+
+// Leave a thread
+export const leaveThread = async (
+  threadId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('thread_participants')
+    .delete()
+    .eq('thread_id', threadId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+};
+
+// Get messages in a thread
+export const getThreadMessages = async (
+  threadId: string,
+  limit: number = 50,
+  before?: string,
+  currentUserId?: string
+): Promise<MessageWithDetails[]> => {
+  let query = supabase
+    .from('messages')
+    .select(
+      `
+      id,
+      conversation_id,
+      content_text,
+      type,
+      sender_id,
+      created_at,
+      reply_to_id,
+      recalled_at,
+      edited_at,
+      fts,
+      location,
+      location_latitude,
+      location_longitude,
+      location_address,
+      location_display_mode,
+      is_forwarded,
+      forwarded_from_user_id,
+      forwarded_from_user:profiles!messages_forwarded_from_user_id_fkey(*),
+      mentions:message_mentions(
+        mentioned_user_id,
+        user:profiles!message_mentions_mentioned_user_id_fkey(*)
+      ),
+      sender:profiles!messages_sender_id_fkey(*),
+      attachments(*)
+    `
+    )
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (before) query = query.lt('created_at', before);
+
+  const { data: messages, error } = await query;
+  if (error) throw error;
+  if (!messages || messages.length === 0) return [];
+
+  // Mark deleted messages
+  let deletedMessageIds = new Set<string>();
+  if (currentUserId) {
+    const messageIds = messages.map((m) => m.id);
+    const { data: deletedMessages } = await supabase
+      .from('deleted_messages')
+      .select('message_id')
+      .eq('user_id', currentUserId)
+      .in('message_id', messageIds);
+
+    deletedMessageIds = new Set(
+      deletedMessages?.map((dm) => dm.message_id) || []
+    );
+  }
+
+  // Get reply_to messages
+  const replyToIds = messages
+    .map((m) => m.reply_to_id)
+    .filter((id): id is string => !!id);
+  const replyToMap = new Map<string, any>();
+
+  if (replyToIds.length > 0) {
+    const { data: replyMessages } = await supabase
+      .from('messages')
+      .select(
+        `
+        id,
+        content_text,
+        type,
+        sender_id,
+        created_at,
+        sender:profiles!messages_sender_id_fkey(*)
+      `
+      )
+      .in('id', replyToIds);
+
+    replyMessages?.forEach((msg) => {
+      replyToMap.set(msg.id, msg);
+    });
+  }
+
+  // Get reactions
+  const messageIds = messages.map((m) => m.id);
+  const { data: reactions } = await supabase
+    .from('message_reactions')
+    .select(
+      `
+      message_id,
+      user_id,
+      emoji,
+      user:profiles!message_reactions_user_id_fkey(*)
+    `
+    )
+    .in('message_id', messageIds);
+
+  const reactionsMap = new Map<string, any[]>();
+  reactions?.forEach((reaction) => {
+    if (!reactionsMap.has(reaction.message_id)) {
+      reactionsMap.set(reaction.message_id, []);
+    }
+    reactionsMap.get(reaction.message_id)?.push(reaction);
+  });
+
+  // Get read receipts
+  const { data: readReceipts } = await supabase
+    .from('read_receipts')
+    .select('message_id, user_id, read_at')
+    .in('message_id', messageIds);
+
+  const readReceiptsMap = new Map<string, any[]>();
+  readReceipts?.forEach((receipt) => {
+    if (!readReceiptsMap.has(receipt.message_id)) {
+      readReceiptsMap.set(receipt.message_id, []);
+    }
+    readReceiptsMap.get(receipt.message_id)?.push(receipt);
+  });
+
+  // Combine all data
+  return messages.map((msg) => ({
+    ...msg,
+    deleted_for_me: deletedMessageIds.has(msg.id),
+    reply_to: msg.reply_to_id ? replyToMap.get(msg.reply_to_id) : undefined,
+    reactions: reactionsMap.get(msg.id) || [],
+    read_receipts: readReceiptsMap.get(msg.id) || [],
+    mentions: msg.mentions || []
+  })) as MessageWithDetails[];
+};
+
+// Send message to thread
+export const sendThreadMessage = async (
+  threadId: string,
+  conversationId: string,
+  senderId: string,
+  content: string,
+  replyToId?: string,
+  mentionedUserIds?: string[]
+): Promise<Message> => {
+  // Verify thread exists and is not closed
+  const { data: thread } = await supabase
+    .from('threads')
+    .select('id, is_closed')
+    .eq('id', threadId)
+    .maybeSingle();
+
+  if (!thread) {
+    throw new Error('Chủ đề không tồn tại');
+  }
+
+  if (thread.is_closed) {
+    throw new Error('Chủ đề đã bị đóng, không thể gửi tin nhắn mới');
+  }
+
+  // Verify user has joined the thread
+  const { data: participant } = await supabase
+    .from('thread_participants')
+    .select('user_id')
+    .eq('thread_id', threadId)
+    .eq('user_id', senderId)
+    .maybeSingle();
+
+  if (!participant) {
+    throw new Error('Bạn cần tham gia chủ đề trước khi gửi tin nhắn');
+  }
+
+  // Check if message can be sent (block strangers check)
+  await checkCanSendMessage(conversationId, senderId);
+
+  // Create message with thread_id
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      thread_id: threadId,
+      sender_id: senderId,
+      type: 'text',
+      content_text: content,
+      reply_to_id: replyToId
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Insert mentions if any
+  if (mentionedUserIds && mentionedUserIds.length > 0) {
+    const rows = mentionedUserIds.map((uid) => ({
+      message_id: data.id,
+      mentioned_user_id: uid
+    }));
+    const { error: mentionErr } = await supabase
+      .from('message_mentions')
+      .insert(rows);
+    if (mentionErr) console.error('Insert mentions error:', mentionErr);
+  }
+
+  // Update thread's last_message_id and updated_at
+  await supabase
+    .from('threads')
+    .update({
+      last_message_id: data.id,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', threadId);
+
+  return data;
+};
+
+// Pin/Unpin thread
+export const toggleThreadPin = async (
+  threadId: string,
+  userId: string,
+  isPinned: boolean
+): Promise<void> => {
+  // Verify user is the creator or admin
+  const { data: thread } = await supabase
+    .from('threads')
+    .select('id, created_by, conversation_id')
+    .eq('id', threadId)
+    .maybeSingle();
+
+  if (!thread) {
+    throw new Error('Chủ đề không tồn tại');
+  }
+
+  // Check if user is creator
+  if (thread.created_by === userId) {
+    const { error } = await supabase
+      .from('threads')
+      .update({ is_pinned: isPinned })
+      .eq('id', threadId);
+
+    if (error) throw error;
+    return;
+  }
+
+  // Check if user is admin in group conversation
+  const { data: participant } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', thread.conversation_id)
+    .eq('user_id', userId)
+    .is('left_at', null)
+    .maybeSingle();
+
+  if (participant?.role === 'admin') {
+    const { error } = await supabase
+      .from('threads')
+      .update({ is_pinned: isPinned })
+      .eq('id', threadId);
+
+    if (error) throw error;
+    return;
+  }
+
+  throw new Error('Bạn không có quyền ghim/bỏ ghim chủ đề này');
+};
+
+// Close/Reopen thread
+export const toggleThreadClose = async (
+  threadId: string,
+  userId: string,
+  isClosed: boolean
+): Promise<void> => {
+  // Verify user is admin or creator
+  const { data: thread } = await supabase
+    .from('threads')
+    .select('id, created_by, conversation_id')
+    .eq('id', threadId)
+    .maybeSingle();
+
+  if (!thread) {
+    throw new Error('Chủ đề không tồn tại');
+  }
+
+  // Check if user is creator
+  if (thread.created_by === userId) {
+    const updateData: any = { is_closed: isClosed };
+    if (isClosed) {
+      updateData.closed_by = userId;
+      updateData.closed_at = new Date().toISOString();
+    } else {
+      updateData.closed_by = null;
+      updateData.closed_at = null;
+    }
+
+    const { error } = await supabase
+      .from('threads')
+      .update(updateData)
+      .eq('id', threadId);
+
+    if (error) throw error;
+    return;
+  }
+
+  // Check if user is admin in group conversation
+  const { data: participant } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', thread.conversation_id)
+    .eq('user_id', userId)
+    .is('left_at', null)
+    .maybeSingle();
+
+  if (participant?.role === 'admin') {
+    const updateData: any = { is_closed: isClosed };
+    if (isClosed) {
+      updateData.closed_by = userId;
+      updateData.closed_at = new Date().toISOString();
+    } else {
+      updateData.closed_by = null;
+      updateData.closed_at = null;
+    }
+
+    const { error } = await supabase
+      .from('threads')
+      .update(updateData)
+      .eq('id', threadId);
+
+    if (error) throw error;
+    return;
+  }
+
+  throw new Error('Bạn không có quyền đóng/mở chủ đề này');
+};
+
+// Update last_read_at for thread
+export const markThreadAsRead = async (
+  threadId: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('thread_participants')
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('thread_id', threadId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+};
+
+// Mark thread messages as read (creates read receipts)
+export const markThreadMessagesAsRead = async (
+  threadId: string,
+  userId: string,
+  messageIds: string[]
+): Promise<void> => {
+  // Update last_read_at in thread_participants
+  const { error: updateError } = await supabase
+    .from('thread_participants')
+    .update({
+      last_read_at: new Date().toISOString()
+    })
+    .eq('thread_id', threadId)
+    .eq('user_id', userId);
+
+  if (updateError) throw updateError;
+
+  // Insert read receipts for thread messages
+  const receipts = messageIds.map((messageId) => ({
+    message_id: messageId,
+    user_id: userId
+  }));
+
+  const { error: receiptsError } = await supabase
+    .from('read_receipts')
+    .upsert(receipts, { onConflict: 'message_id,user_id' });
+
+  if (receiptsError) throw receiptsError;
+};
+
+// Get thread participants
+export const getThreadParticipants = async (
+  threadId: string
+): Promise<ThreadParticipant[]> => {
+  const { data, error } = await supabase
+    .from('thread_participants')
+    .select(
+      `
+      *,
+      profile:profiles!thread_participants_user_id_fkey(*)
+    `
+    )
+    .eq('thread_id', threadId)
+    .order('joined_at', { ascending: true });
+
+  if (error) throw error;
   return data || [];
 };

@@ -11,7 +11,8 @@ import {
   useConversation,
   useSearchMessages,
   useEditMessage,
-  useReactionsRealtime
+  useReactionsRealtime,
+  useReadReceiptsRealtime
 } from '../../hooks/useChat';
 import { useStartCall } from '../../hooks/useStartCall';
 import { useStartGroupCall } from '../../hooks/useStartGroupCall';
@@ -27,6 +28,12 @@ import { twMerge } from 'tailwind-merge';
 import { PinnedMessage, getPinnedMessages, pinMessage, subscribePinnedMessages, unpinMessage } from '@/services/chatService';
 import toast from 'react-hot-toast';
 import { useIsBlockedByUser, useIsBlockedByMe } from '@/hooks/useFriends';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ThreadList } from '@/components/thread/ThreadList';
+import { ThreadView } from '@/components/thread/ThreadView';
+import { CreateThreadModal } from '@/components/modal/CreateThreadModal';
+import { MessageSquare } from 'lucide-react';
+import type { ThreadWithDetails } from '@/services/chatService';
 
 interface ChatWindowProps {
   userId: string;
@@ -47,6 +54,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [forwardingMessageId, setForwardingMessageId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'threads'>('chat');
+  const [selectedThread, setSelectedThread] = useState<ThreadWithDetails | null>(null);
+  const [showCreateThreadModal, setShowCreateThreadModal] = useState(false);
+  const [createThreadFromMessage, setCreateThreadFromMessage] = useState<{ messageId: string; preview: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +134,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   useMessagesRealtime(conversationId, userId);
   useConversationRealtime(conversationId); // ⭐ Subscribe to conversation updates (background, etc.)
   useReactionsRealtime(conversationId); // ⭐ Subscribe to reactions updates
+  useReadReceiptsRealtime(conversationId); // ⭐ Subscribe to read receipts updates
 
   // Reset typing state khi chuyển conversation
   useEffect(() => {
@@ -142,15 +154,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   }, [searchQuery]);
 
   // Flatten & sort messages
-  const flatPages = data?.pages.flat() ?? [];
   const messages = useMemo(() => {
+    const flatPages = data?.pages.flat() ?? [];
     const arr = [...flatPages];
     arr.sort(
       (a, b) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
     return arr;
-  }, [flatPages]);
+  }, [data?.pages]);
 
   // ✅ 1. Scroll xuống cuối khi LẦN ĐẦU vào conversation
   useEffect(() => {
@@ -707,17 +719,37 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         pinned={pinned}
         onUnpin={handleUnpin}
         onJumpTo={(messageId) => { void jumpToMessage(messageId); }}
+        onCreateThread={() => setShowCreateThreadModal(true)}
       />
 
-      <div
-        ref={listRef}
-        className="
-          h-[calc(100%-122px)] overflow-y-auto p-4 space-y-2
-          discord-scroll
-        "
-        style={getBackgroundStyle()}
-      >
-        {/* Load older */}
+      {/* Tabs for Chat and Threads */}
+      <Tabs value={activeTab} onValueChange={(v) => {
+        setActiveTab(v as 'chat' | 'threads');
+        if (v === 'chat') {
+          setSelectedThread(null);
+        }
+      }} className="flex-1 flex flex-col min-h-0">
+        <div className="px-4 border-b">
+          <TabsList>
+            <TabsTrigger value="chat">Chat</TabsTrigger>
+            <TabsTrigger value="threads" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Chủ đề
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Chat Tab */}
+        <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 m-0">
+          <div
+            ref={listRef}
+            className="
+              flex-1 overflow-y-auto p-4 space-y-2
+              discord-scroll
+            "
+            style={getBackgroundStyle()}
+          >
+            {/* Load older */}
         {hasNextPage && (
           <div className="text-center pb-2">
             <button
@@ -782,6 +814,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
                 )}
                 conversationType={conversation?.type}
                 conversationId={conversationId}
+                onCreateThread={(messageId, preview) => {
+                  setCreateThreadFromMessage({ messageId, preview });
+                  setShowCreateThreadModal(true);
+                }}
               />
             </div>
           );
@@ -798,81 +834,81 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Block warning message */}
-      {isBlocked && isDirectChat && (
-        <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <p className="text-sm font-medium">
-              {isBlockedByUser 
-                ? 'Bạn đã bị người dùng này chặn. Bạn không thể nhắn tin.'
-                : 'Bạn đã chặn người dùng này. Bạn không thể nhắn tin.'}
-            </p>
-          </div>
-        </div>
-      )}
+          {/* Block warning message */}
+          {isBlocked && isDirectChat && (
+            <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="text-sm font-medium">
+                  {isBlockedByUser 
+                    ? 'Bạn đã bị người dùng này chặn. Bạn không thể nhắn tin.'
+                    : 'Bạn đã chặn người dùng này. Bạn không thể nhắn tin.'}
+                </p>
+              </div>
+            </div>
+          )}
 
-      {/* Reply preview */}
-      {replyTo && (
-        <div
-          className="
-            px-4 py-2 flex items-center justify-between
-            bg-gray-50 border-t border-gray-200 text-gray-700
-            dark:bg-[#2B2D31] dark:border-[#3F4246] dark:text-[#B5BAC1]
-          "
-        >
-          <div className="flex-1">
-            <p className="text-sm">
-              Đang trả lời:{' '}
-              {messages.find((m) => m.id === replyTo)?.content_text}
-            </p>
-          </div>
-          <button
-            onClick={() => setReplyTo(null)}
-            className="
-              text-[#5865F2] hover:opacity-80
-              dark:text-[#5865F2]
-            "
-            aria-label="Đóng"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {/* Reply preview */}
+          {replyTo && (
+            <div
+              className="
+                px-4 py-2 flex items-center justify-between
+                bg-gray-50 border-t border-gray-200 text-gray-700
+                dark:bg-[#2B2D31] dark:border-[#3F4246] dark:text-[#B5BAC1]
+              "
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-      )}
+              <div className="flex-1">
+                <p className="text-sm">
+                  Đang trả lời:{' '}
+                  {messages.find((m) => m.id === replyTo)?.content_text}
+                </p>
+              </div>
+              <button
+                onClick={() => setReplyTo(null)}
+                className="
+                  text-[#5865F2] hover:opacity-80
+                  dark:text-[#5865F2]
+                "
+                aria-label="Đóng"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          )}
 
-      {/* Edit indicator */}
-      {isEditing && (
-        <div
-          className="
-            px-4 py-2 flex items-center justify-between
-            bg-gray-50 border-t border-gray-200 text-gray-700
-            dark:bg-[#2B2D31] dark:border-[#3F4246] dark:text-[#B5BAC1]
-          "
-        >
-          <p className="text-sm">Đang chỉnh sửa tin nhắn</p>
-          <button
-            onClick={() => {
-              setIsEditing(false);
-              setEditingMessageId(null);
-              setMessageText('');
-            }}
-            className="text-[#5865F2] hover:opacity-80 dark:text-[#5865F2]"
-          >
-            Hủy
-          </button>
-        </div>
-      )}
+          {/* Edit indicator */}
+          {isEditing && (
+            <div
+              className="
+                px-4 py-2 flex items-center justify-between
+                bg-gray-50 border-t border-gray-200 text-gray-700
+                dark:bg-[#2B2D31] dark:border-[#3F4246] dark:text-[#B5BAC1]
+              "
+            >
+              <p className="text-sm">Đang chỉnh sửa tin nhắn</p>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditingMessageId(null);
+                  setMessageText('');
+                }}
+                className="text-[#5865F2] hover:opacity-80 dark:text-[#5865F2]"
+              >
+                Hủy
+              </button>
+            </div>
+          )}
 
-      <ChatFooter
+          <ChatFooter
         fileInputRef={fileInputRef}
         inputRef={inputRef}
         messageText={messageText}
@@ -896,7 +932,44 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             prev.includes(userId) ? prev : [...prev, userId]
           );
         }}
-        disabled={isBlocked || isChatRestricted}
+            disabled={isBlocked || isChatRestricted}
+          />
+        </TabsContent>
+
+        {/* Threads Tab */}
+        <TabsContent value="threads" className="flex-1 flex flex-col min-h-0 m-0">
+          {selectedThread ? (
+            <ThreadView
+              thread={selectedThread}
+              conversationId={conversationId}
+              currentUserId={userId}
+              onBack={() => setSelectedThread(null)}
+            />
+          ) : (
+            <ThreadList
+              conversationId={conversationId}
+              currentUserId={userId}
+              onSelectThread={(thread) => {
+                setSelectedThread(thread);
+              }}
+              onCreateThread={() => setShowCreateThreadModal(true)}
+              selectedThreadId={selectedThread?.id}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Create Thread Modal */}
+      <CreateThreadModal
+        open={showCreateThreadModal}
+        onClose={() => {
+          setShowCreateThreadModal(false);
+          setCreateThreadFromMessage(null);
+        }}
+        conversationId={conversationId}
+        createdBy={userId}
+        rootMessageId={createThreadFromMessage?.messageId}
+        rootMessagePreview={createThreadFromMessage?.preview}
       />
 
       {/* Image Preview Modal */}

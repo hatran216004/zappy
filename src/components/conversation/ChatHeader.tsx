@@ -25,7 +25,12 @@ import { useUpdateConversationBackground } from '@/hooks/useChat';
 import { PinnedMessagesModal } from '../modal/PinnedMessagesModal';
 import { CreatePollModal } from '../modal/CreatePollModal';
 import useUser from '@/hooks/useUser';
-import { useBlockUser, useUnblockUser, useIsBlockedByMe, useIsBlockedByUser } from '@/hooks/useFriends';
+import {
+  useBlockUser,
+  useUnblockUser,
+  useIsBlockedByMe,
+  useIsBlockedByUser
+} from '@/hooks/useFriends';
 import { useConfirm } from '@/components/modal/ModalConfirm';
 import toast from 'react-hot-toast';
 
@@ -51,6 +56,7 @@ interface ChatHeaderProps {
   pinned?: PinnedMessage[];
   onUnpin?: (messageId: string) => void;
   onJumpTo?: (messageId: string) => void;
+  onCreateThread?: () => void;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -65,7 +71,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onGroupCall,
   pinned,
   onUnpin,
-  onJumpTo
+  onJumpTo,
+  onCreateThread
 }) => {
   const { user } = useUser();
   const [showSearch, setShowSearch] = useState(false);
@@ -75,10 +82,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showPinsModal, setShowPinsModal] = useState(false);
 
   const updateBackgroundMutation = useUpdateConversationBackground();
-  
+
   // Check if group chat first (needed for block hooks)
   const isGroupChat = conversation?.type === 'group';
-  
+
   // Block/unblock hooks (only for direct chat)
   const otherUserId = !isGroupChat ? otherParticipant?.user_id : undefined;
   const { data: isBlockedByMe } = useIsBlockedByMe(otherUserId || '');
@@ -106,7 +113,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const handleBlock = async () => {
     if (!otherUserId) return;
-    
+
     const confirmed = await confirm({
       title: 'Chặn người dùng',
       description: `Bạn có chắc muốn chặn ${displayName}? Bạn sẽ không thể nhắn tin với nhau và không thấy bài viết của nhau.`,
@@ -128,7 +135,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const handleUnblock = async () => {
     if (!otherUserId) return;
-    
+
     try {
       await unblockUserMutation.mutateAsync(otherUserId);
       toast.success(`Đã bỏ chặn ${displayName}`);
@@ -243,34 +250,28 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
           {/* Call buttons for direct chat */}
           {!isGroupChat && otherParticipant && (
-            <>
-              <TooltipBtn
-                icon={Phone}
-                label="Gọi thoại"
-                onClick={() => onCall?.(otherParticipant.user_id, false)}
-              />
-              <TooltipBtn
-                icon={Video}
-                label="Gọi video"
-                onClick={() => onCall?.(otherParticipant.user_id, true)}
-              />
-            </>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={() => onCall?.(otherParticipant.user_id, false)}
+              title="Gọi thoại"
+            >
+              <Phone className="size-5" />
+            </Button>
           )}
 
           {/* Call buttons for group chat */}
           {isGroupChat && conversation && (
-            <>
-              <TooltipBtn
-                icon={Phone}
-                label="Gọi thoại nhóm"
-                onClick={() => onGroupCall?.(conversation.id, false)}
-              />
-              <TooltipBtn
-                icon={Video}
-                label="Gọi video nhóm"
-                onClick={() => onGroupCall?.(conversation.id, true)}
-              />
-            </>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={() => onGroupCall?.(conversation.id, false)}
+              title="Gọi thoại"
+            >
+              <Phone className="size-5" />
+            </Button>
           )}
 
           {/* Group Info Button */}
@@ -288,21 +289,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <>
               <TooltipBtn icon={Info} label="Thông tin" />
               {/* Block/Unblock button for direct chat */}
-              {otherUserId && (
-                isBlockedByMe ? (
+              {otherUserId &&
+                (isBlockedByMe ? (
                   <TooltipBtn
                     icon={Unlock}
                     label="Bỏ chặn"
                     onClick={handleUnblock}
                   />
                 ) : (
-                  <TooltipBtn
-                    icon={Ban}
-                    label="Chặn"
-                    onClick={handleBlock}
-                  />
-                )
-              )}
+                  <TooltipBtn icon={Ban} label="Chặn" onClick={handleBlock} />
+                ))}
             </>
           )}
 
@@ -322,6 +318,19 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                 </Button>
               }
             />
+          )}
+
+          {/* Create Thread button (only for groups) */}
+          {onCreateThread && isGroupChat && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full text-xs px-2"
+              onClick={onCreateThread}
+              title="Tạo chủ đề"
+            >
+              Tạo chủ đề
+            </Button>
           )}
 
           {/* Pinned messages button */}
