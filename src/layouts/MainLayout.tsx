@@ -8,6 +8,8 @@ import { useEffect, useRef } from 'react';
 import { useProfile } from '@/hooks/useProfile';
 import authServices from '@/services/authServices';
 import toast from 'react-hot-toast';
+import OnboardingTour from '@/components/OnboardingTour';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 export default function MainLayout() {
   const { user, setUser } = useAuth();
@@ -86,6 +88,18 @@ export default function MainLayout() {
     localParticipant
   } = useCall(user?.id);
 
+  // Onboarding tour
+  const {
+    currentStep,
+    isActive,
+    showCompletionBanner,
+    nextStep,
+    prevStep,
+    skipTour,
+    finishTour,
+    setShowCompletionBanner
+  } = useOnboarding(user?.id);
+
   return (
     <div className="h-screen flex dark:bg-gray-900">
       <Navbar />
@@ -109,6 +123,18 @@ export default function MainLayout() {
           localParticipant={localParticipant}
         />
       )}
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        currentStep={currentStep}
+        isActive={isActive}
+        showCompletionBanner={showCompletionBanner}
+        onNext={nextStep}
+        onPrev={prevStep}
+        onSkip={skipTour}
+        onFinish={finishTour}
+        onDismissBanner={() => setShowCompletionBanner(false)}
+      />
     </div>
   );
 }
