@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
+import { useOnboarding } from '@/hooks/useOnboarding';
 import toast from 'react-hot-toast';
-import { Settings } from 'lucide-react';
+import { Settings, BookOpen } from 'lucide-react';
 
 interface SettingsModalProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function SettingsModal({
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
   const { data: profile, refetch } = useProfile(userId);
+  const { restartTour } = useOnboarding(userId);
 
   const [blockStrangers, setBlockStrangers] = useState(
     profile?.block_messages_from_strangers || false
@@ -96,6 +98,30 @@ export function SettingsModal({
               checked={blockStrangers}
               onCheckedChange={setBlockStrangers}
             />
+          </div>
+
+          {/* Xem lại hướng dẫn */}
+          <div className="flex items-center justify-between space-x-4 pt-2 border-t">
+            <div className="flex-1 space-y-1">
+              <Label className="text-base font-medium">
+                Hướng dẫn sử dụng
+              </Label>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Xem lại tour hướng dẫn để khám phá các tính năng của hệ thống
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                restartTour();
+                onClose();
+                toast.success('Đã khởi động lại hướng dẫn');
+              }}
+              className="flex items-center gap-2"
+            >
+              <BookOpen className="h-4 w-4" />
+              Xem lại hướng dẫn
+            </Button>
           </div>
         </div>
 

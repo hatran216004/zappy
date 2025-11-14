@@ -695,8 +695,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   };
 
   return (
-    <div
-      className="
+      <div
+        data-tour-id="chat-window"
+        className="
         flex flex-col h-screen justify-between
         bg-white text-gray-900
         dark:bg-[#313338] dark:text-[#F2F3F5]

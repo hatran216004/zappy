@@ -129,7 +129,10 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   }
 
   return (
-    <div className="overflow-y-auto bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]">
+    <div
+      data-tour-id="conversations"
+      className="overflow-y-auto bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]"
+    >
       {/* Danh sách conversations */}
       {filteredConversations && filteredConversations.length > 0 && (
         <>

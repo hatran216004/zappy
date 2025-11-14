@@ -115,6 +115,7 @@ export default function Navbar() {
   return (
     <>
       <div
+        data-tour-id="navbar"
         className="
           w-[72px]
           flex flex-col items-center py-3 justify-between
