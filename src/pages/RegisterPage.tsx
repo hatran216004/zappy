@@ -6,7 +6,6 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import Divider from '@/components/Divider';
 import Button from '@/components/Button';
 import { FcGoogle } from 'react-icons/fc';
-import { FaFacebook } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import authServices from '@/services/authServices';

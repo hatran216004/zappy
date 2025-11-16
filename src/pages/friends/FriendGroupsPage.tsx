@@ -60,7 +60,9 @@ export default function FriendGroupsPage() {
           <div className="text-muted-foreground mb-4">
             <Users className="w-20 h-20 mx-auto" />
           </div>
-          <p className="text-foreground/80 text-lg">Bạn chưa tham gia nhóm nào</p>
+          <p className="text-foreground/80 text-lg">
+            Bạn chưa tham gia nhóm nào
+          </p>
           <p className="text-muted-foreground text-sm mt-2">
             Hãy tạo nhóm mới hoặc tham gia nhóm từ lời mời
           </p>
@@ -96,7 +98,6 @@ export default function FriendGroupsPage() {
                     {!!group.unread_count && group.unread_count > 0 && (
                       <span className="absolute -top-1 -right-1 bg-destructive text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                         {group.unread_count > 9 ? '9+' : group.unread_count}
-                        Tin nhắn mới
                       </span>
                     )}
                   </div>
@@ -109,11 +110,13 @@ export default function FriendGroupsPage() {
                       </h3>
                       {group.last_message && (
                         <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                          {new Date(group.last_message.created_at).toLocaleDateString('vi-VN')}
+                          {new Date(
+                            group.last_message.created_at
+                          ).toLocaleDateString('vi-VN')}
                         </span>
                       )}
                     </div>
-                    
+
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="size-4" />
                       <span>{memberCount} thành viên</span>
