@@ -130,15 +130,9 @@ const AuthenticationPage = () => {
     >
       <div className={`w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)]`}>
         <div
-          className={`relative bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-700 ease-in-out ${
-            isLogin ? 'h-auto min-h-[600px]' : 'h-auto min-h-[700px]'
-          }`}
+          className={`relative bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-700 ease-in-out h-[calc(100vh-2rem)]`}
         >
-          <div
-            className={`relative flex h-full overflow-hidden ${
-              isLogin ? 'min-h-[600px]' : 'min-h-[700px]'
-            }`}
-          >
+          <div className={`relative flex overflow-hidden h-[calc(100vh-2rem)]`}>
             {/* Gradient Panel - Right when login, Left when register */}
             <div
               className={`absolute inset-0 w-[50%] bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 z-10 will-change-transform`}
@@ -282,7 +276,9 @@ const AuthenticationPage = () => {
                 {/* Close button */}
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => navigate('/')}
+                    onClick={() =>
+                      isLogin ? navigate('/register') : navigate('/login')
+                    }
                     className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white hover:bg-purple-700 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -298,13 +294,39 @@ const AuthenticationPage = () => {
                   >
                     {isLogin ? 'Xin chào!' : 'Chào mừng!'}
                   </h1>
-                  <p
-                    className={`${
-                      !isLogin ? 'text-xl md:text-2xl' : 'text-2xl md:text-3xl'
-                    } font-semibold text-purple-600`}
-                  >
-                    {isLogin ? 'Chào mừng trở lại' : 'Bắt đầu hành trình'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p
+                      className={`${
+                        !isLogin
+                          ? 'text-xl md:text-2xl'
+                          : 'text-2xl md:text-3xl'
+                      } font-semibold text-purple-600`}
+                    >
+                      {isLogin ? 'Chào mừng trở lại' : 'Bắt đầu hành trình'}
+                    </p>
+
+                    {!isLogin ? (
+                      <p className="text-gray-500 text-xs md:text-sm">
+                        Đã có tài khoản?{' '}
+                        <button
+                          onClick={toggleMode}
+                          className="text-purple-600 hover:text-purple-700 font-semibold transition-colors cursor-pointer"
+                        >
+                          Đăng nhập
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="text-gray-500 text-xs md:text-sm">
+                        Chưa có tài khoản?{' '}
+                        <button
+                          onClick={toggleMode}
+                          className="text-purple-600 hover:text-purple-700 font-semibold transition-colors cursor-pointer"
+                        >
+                          Đăng ký
+                        </button>
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Form */}
@@ -431,47 +453,24 @@ const AuthenticationPage = () => {
                     !isLogin ? 'mt-4' : 'mt-8'
                   } space-y-2 text-center`}
                 >
-                  {isLogin ? (
-                    <>
-                      <p className="text-gray-500 text-sm">
-                        Chưa có tài khoản?{' '}
-                        <button
-                          onClick={toggleMode}
-                          className="text-purple-600 hover:text-purple-700 font-semibold transition-colors cursor-pointer"
-                        >
-                          Đăng ký
-                        </button>
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-start space-x-2 mb-3">
-                        <input
-                          type="checkbox"
-                          id="agreeTerms"
-                          className="mt-1 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 flex-shrink-0"
-                          {...registerSignUp('agreeTerms')}
-                        />
-                        <label
-                          htmlFor="agreeTerms"
-                          className="text-xs md:text-sm text-gray-500 leading-relaxed cursor-pointer select-none"
-                        >
-                          Tôi đồng ý với{' '}
-                          <span className="text-purple-600 hover:text-purple-700 font-medium cursor-pointer">
-                            Điều khoản sử dụng
-                          </span>
-                        </label>
-                      </div>
-                      <p className="text-gray-500 text-xs md:text-sm">
-                        Đã có tài khoản?{' '}
-                        <button
-                          onClick={toggleMode}
-                          className="text-purple-600 hover:text-purple-700 font-semibold transition-colors cursor-pointer"
-                        >
-                          Đăng nhập
-                        </button>
-                      </p>
-                    </>
+                  {!isLogin && (
+                    <div className="flex items-start space-x-2 mb-3">
+                      <input
+                        type="checkbox"
+                        id="agreeTerms"
+                        className="mt-1 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 flex-shrink-0"
+                        {...registerSignUp('agreeTerms')}
+                      />
+                      <label
+                        htmlFor="agreeTerms"
+                        className="text-xs md:text-sm text-gray-500 leading-relaxed cursor-pointer select-none"
+                      >
+                        Tôi đồng ý với{' '}
+                        <span className="text-purple-600 hover:text-purple-700 font-medium cursor-pointer">
+                          Điều khoản sử dụng
+                        </span>
+                      </label>
+                    </div>
                   )}
                 </div>
               </div>
