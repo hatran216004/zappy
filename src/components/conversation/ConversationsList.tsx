@@ -72,11 +72,16 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
       })
     : conversations;
 
-  // Apply tab filter (all/unread)
+  // Apply tab filter (all/unread/groups)
   if (tab === 'unread') {
     filteredConversations = filteredConversations?.filter((conv) => {
       // Show conversations with unread messages
       return (conv.unread_count ?? 0) > 0;
+    });
+  } else if (tab === 'groups') {
+    filteredConversations = filteredConversations?.filter((conv) => {
+      // Show only group conversations
+      return conv.type === 'group';
     });
   }
 

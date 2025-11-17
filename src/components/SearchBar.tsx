@@ -1,5 +1,4 @@
 import { Search, Loader2 } from 'lucide-react';
-import AddFriendModal from './modal/AddFriendModal';
 import { useState, useRef, useEffect } from 'react';
 import {
   searchUsersByUsername,
@@ -33,7 +32,6 @@ export default function SearchBar() {
   const getOrCreateConversation = useGetOrCreateDirectConversation();
   const sendFriendRequestMutation = useSendFriendRequest();
 
-  // Close results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -149,7 +147,7 @@ export default function SearchBar() {
     <div
       data-tour-id="searchbar"
       className="
-        relative flex items-center gap-2 px-3 py-2
+        relative flex items-center
         bg-white text-gray-900
         dark:bg-[#2B2D31] dark:text-[#F2F3F5]
       "
@@ -159,7 +157,7 @@ export default function SearchBar() {
       <div
         className="
           group flex items-center flex-1 gap-2
-          rounded-lg px-3 h-9
+          rounded-lg px-3 h-10
           bg-gray-100 text-gray-900
           border border-transparent
           focus-within:border-[#5865F2] focus-within:ring-4 focus-within:ring-[#5865F2]/20
@@ -175,7 +173,7 @@ export default function SearchBar() {
         )}
         <input
           type="text"
-          placeholder="Tìm kiếm người dùng..."
+          placeholder="Tìm kiếm trên Messenger"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={() => searchResults.length > 0 && setShowResults(true)}
@@ -187,15 +185,10 @@ export default function SearchBar() {
         />
       </div>
 
-      {/* right actions */}
-      <div className="flex items-center gap-2">
-        <AddFriendModal />
-      </div>
-
       {/* Search Results Dropdown */}
       {showResults &&
         (searchResults.length > 0 || conversationResults.length > 0) && (
-          <div className="absolute top-full left-3 right-3 mt-1 max-h-[400px] overflow-y-auto bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+          <div className="absolute top-full left-0 right-0 mt-1 max-h-[400px] overflow-y-auto bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
             {conversationResults.length > 0 && (
               <>
                 <div className="px-3 pt-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -275,7 +268,7 @@ export default function SearchBar() {
         searchResults.length === 0 &&
         conversationResults.length === 0 &&
         !isSearching && (
-          <div className="absolute top-full left-3 right-3 mt-1 bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-6 text-center">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#2B2D31] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-6 text-center">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Không tìm thấy người dùng nào
             </p>

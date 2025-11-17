@@ -79,6 +79,69 @@ export default function ChatFooter({
     };
   }, [showEmojiPicker]);
 
+  // Handle paste image from clipboard
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      // Only handle if input is focused
+      if (!inputRef.current || document.activeElement !== inputRef.current) {
+        return;
+      }
+
+      // Don't handle if disabled
+      if (disabled || sendFileMutation.isPending) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      // Find image in clipboard
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        // Check if it's an image
+        if (item.type.indexOf('image') !== -1) {
+          e.preventDefault();
+          
+          const blob = item.getAsFile();
+          if (!blob) continue;
+
+          // Create a File object from the blob
+          const file = new File([blob], `pasted-image-${Date.now()}.png`, {
+            type: blob.type || 'image/png'
+          });
+
+          // Create fake event for handleFileSelect
+          const fakeEvent = {
+            target: {
+              files: [file]
+            }
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+          // Call handleFileSelect
+          try {
+            await handleFileSelect(fakeEvent);
+          } catch (error) {
+            console.error('Error handling pasted image:', error);
+          }
+          
+          break; // Only process first image
+        }
+      }
+    };
+
+    const textarea = inputRef.current;
+    if (textarea) {
+      textarea.addEventListener('paste', handlePaste);
+    }
+
+    return () => {
+      if (textarea) {
+        textarea.removeEventListener('paste', handlePaste);
+      }
+    };
+  }, [handleFileSelect, inputRef, disabled, sendFileMutation.isPending]);
+
   // Detect @ mention typing
   useEffect(() => {
     const el = inputRef.current;

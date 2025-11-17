@@ -11,7 +11,6 @@ function ChatPage() {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-[#313338]">
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {selectedConversationId ? (
           <ChatWindow userId={currentUserId} />
