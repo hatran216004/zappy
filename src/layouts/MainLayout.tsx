@@ -27,7 +27,7 @@ export default function MainLayout() {
   // Kiểm tra is_disabled khi profile được load hoặc thay đổi (realtime)
   useEffect(() => {
     if (!user || !profile) return;
-    
+
     const currentIsDisabled = profile.is_disabled;
     const previousIsDisabled = previousIsDisabledRef.current;
 
@@ -37,7 +37,7 @@ export default function MainLayout() {
       // Nếu lần đầu load và is_disabled = true, hoặc thay đổi từ false -> true
       if (previousIsDisabled === undefined || previousIsDisabled === false) {
         isLoggingOutRef.current = true;
-        
+
         // User bị ban, logout ngay lập tức
         const handleBan = async () => {
           try {
@@ -101,40 +101,42 @@ export default function MainLayout() {
   } = useOnboarding(user?.id);
 
   return (
-    <div className="h-screen flex dark:bg-gray-900">
-      <Navbar />
-      <div className="grid grid-cols-12 flex-1">
-        <Outlet />
-      </div>
+    <>
+      <div className="h-[calc(100vh-56px)] flex dark:bg-gray-900">
+        <div className="grid grid-cols-12 flex-1">
+          <Outlet />
+        </div>
 
-      {/* Video Call Overlay */}
-      {activeCall && (
-        <VideoCall
-          callInfo={activeCall.callInfo}
-          participant={activeCall.participant}
-          status={activeCall.status}
-          onAcceptCall={acceptCall}
-          onEndCall={endCall}
-          onToggleMic={toggleMic}
-          onToggleCamera={toggleCamera}
-          micEnabled={micEnabled}
-          cameraEnabled={cameraEnabled}
-          remoteParticipants={remoteParticipants}
-          localParticipant={localParticipant}
+        {/* Video Call Overlay */}
+        {activeCall && (
+          <VideoCall
+            callInfo={activeCall.callInfo}
+            participant={activeCall.participant}
+            status={activeCall.status}
+            onAcceptCall={acceptCall}
+            onEndCall={endCall}
+            onToggleMic={toggleMic}
+            onToggleCamera={toggleCamera}
+            micEnabled={micEnabled}
+            cameraEnabled={cameraEnabled}
+            remoteParticipants={remoteParticipants}
+            localParticipant={localParticipant}
+          />
+        )}
+
+        {/* Onboarding Tour */}
+        <OnboardingTour
+          currentStep={currentStep}
+          isActive={isActive}
+          showCompletionBanner={showCompletionBanner}
+          onNext={nextStep}
+          onPrev={prevStep}
+          onSkip={skipTour}
+          onFinish={finishTour}
+          onDismissBanner={() => setShowCompletionBanner(false)}
         />
-      )}
-
-      {/* Onboarding Tour */}
-      <OnboardingTour
-        currentStep={currentStep}
-        isActive={isActive}
-        showCompletionBanner={showCompletionBanner}
-        onNext={nextStep}
-        onPrev={prevStep}
-        onSkip={skipTour}
-        onFinish={finishTour}
-        onDismissBanner={() => setShowCompletionBanner(false)}
-      />
-    </div>
+      </div>
+      <Navbar />
+    </>
   );
 }

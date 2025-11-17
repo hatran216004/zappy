@@ -1,21 +1,15 @@
-// 🔧 DISCORD STYLING (dark rail + blurple accent) – UI ONLY
-// (KHÔNG ĐỔI LOGIC)
-
-import { TooltipBtn } from '@/components/TooltipBtn';
 import {
   MessageCircle,
   Users,
-  Cloud,
-  Briefcase,
+  Globe,
   Settings,
   Moon,
   Sun,
   User,
-  Globe,
   LogOut,
   Search
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ElementType } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   DropdownMenu,
@@ -40,6 +34,60 @@ import { twMerge } from 'tailwind-merge';
 import { avatarVariants } from '@/lib/variants';
 import { useUserStatus, useUserStatusRealtime } from '@/hooks/usePresence';
 
+type CenterNavItemProps = {
+  active: boolean;
+  icon: ElementType;
+  label: string;
+  onClick: () => void;
+  badge?: number | null;
+};
+
+const CenterNavItem = ({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+  badge
+}: CenterNavItemProps) => (
+  <button
+    onClick={onClick}
+    className={twMerge(
+      'relative flex h-[56px] w-[80px] items-center justify-center rounded-xl',
+      // icon nhạt trên nền tím + hover trắng mờ
+      'text-white/70 hover:bg-white/10'
+    )}
+  >
+    <Icon
+      className={twMerge(
+        'h-5 w-5 text-white/80 transition-colors',
+        active && 'text-white drop-shadow-sm'
+      )}
+    />
+    {/* Active underline trắng */}
+    <span
+      className={twMerge(
+        'pointer-events-none absolute bottom-0 left-4 right-4 h-[3px] rounded-full transition-colors',
+        active ? 'bg-white' : 'bg-transparent'
+      )}
+    />
+    {/* Badge (friend request) hồng hơn cho nổi trên tím */}
+    {badge && badge > 0 && (
+      <span
+        className="
+          absolute top-1 right-4 min-w-[18px] h-[18px] px-1
+          rounded-full bg-[#FF5C93]
+          text-[11px] text-white font-semibold
+          flex items-center justify-center
+          shadow
+        "
+      >
+        {badge > 9 ? '9+' : badge}
+      </span>
+    )}
+    <span className="sr-only">{label}</span>
+  </button>
+);
+
 export default function Navbar() {
   const { user } = useAuth();
   const userId = user?.id;
@@ -52,10 +100,8 @@ export default function Navbar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { data: profile } = useProfile(userId as string);
-  const { data: statusProfile, isOnline } = useUserStatus(userId || '');
+  const { data: statusProfile } = useUserStatus(userId || '');
   useUserStatusRealtime(userId || '');
-
-  // Note: useUserStatusTracker được gọi ở MainLayout để tránh duplicate
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [searchUsersModalOpen, setSearchUsersModalOpen] = useState(false);
@@ -81,103 +127,162 @@ export default function Navbar() {
 
   const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
 
-  // Helper để render nút kiểu Discord + active pill
-  const ItemWrap = ({
-    active,
-    children
-  }: {
-    active: boolean;
-    children: React.ReactNode;
-  }) => (
-    <div className="relative w-full flex items-center justify-center">
-      {/* Active pill (trái) */}
-      <div
-        className={twMerge(
-          'absolute left-0 w-1 rounded-r-full transition-all',
-          active ? 'h-8 bg-[#5865F2]' : 'h-0 bg-transparent'
-        )}
-      />
-      {/* Hover “blob” nhẹ sau icon */}
-      <div
-        className={twMerge(
-          'absolute inset-0 mx-auto w-10 h-10 rounded-2xl transition-colors',
-          active ? 'bg-[#5865F2]/20' : 'hover:bg-white/5'
-        )}
-      />
-      <div className="relative">{children}</div>
-    </div>
-  );
-
   const isChat = pathname.includes('chat') || pathname === '/';
   const isFriends = pathname.includes('friends');
   const isPost = pathname.includes('posts');
+
+  const currentStatus = statusProfile?.status ?? profile?.status;
 
   return (
     <>
       <div
         data-tour-id="navbar"
         className="
-          w-[72px]
-          flex flex-col items-center py-3 justify-between
-          border-r
-          text-white
-          bg-[#1E1F22] dark:bg-[#1E1F22]
-          border-[#2B2D31]
+          flex h-[56px] w-full items-center
+          justify-between
+          px-3
+          relative
+          z-10
+          border-b border-transparent
+          bg-gradient-to-r from-[#C93BFF] via-[#8A3BFF] to-[#3B6BFF]
         "
       >
-        {/* TOP */}
-        <div className="flex flex-col items-center gap-4 w-full">
-          {/* Avatar + status như Discord user-tray (đưa lên top cho dễ click) */}
+        {/* LEFT: Logo + Search */}
+        <div className="flex items-center gap-3 min-w-[260px]">
+          {/* Logo tròn (đổi thành nền trắng cho hợp gradient) */}
+          <button
+            onClick={() => navigate('/chat')}
+            className="
+              flex h-10 w-10 items-center justify-center
+              rounded-full bg-white/90
+              text-[#8A3BFF] text-xl font-bold
+              shadow-sm
+            "
+          >
+            f
+          </button>
+
+          {/* Ô search giả (mở modal tìm user) – nền trắng mờ, text trắng */}
+          <button
+            onClick={() => setSearchUsersModalOpen(true)}
+            className="
+              hidden sm:flex items-center
+              h-10 w-[220px] md:w-[260px]
+              rounded-full
+              bg-white/15 border border-white/25
+              px-3
+              text-sm text-white/90
+              hover:bg-white/20
+            "
+          >
+            <Search className="mr-2 h-4 w-4 text-white/90" />
+            <span className="truncate">Tìm kiếm trên ChatApp</span>
+          </button>
+        </div>
+
+        {/* CENTER: các icon điều hướng */}
+        <div className="flex flex-1 justify-center gap-1">
+          <CenterNavItem
+            active={isChat}
+            icon={MessageCircle}
+            label="Tin nhắn"
+            onClick={() => navigate('/chat')}
+          />
+          <CenterNavItem
+            active={isFriends}
+            icon={Users}
+            label="Danh bạ"
+            onClick={() => navigate('/friends')}
+            badge={hasFriendRequest ? requests!.length : null}
+          />
+          <CenterNavItem
+            active={isPost}
+            icon={Globe}
+            label="Posts"
+            onClick={() => navigate('/posts')}
+          />
+        </div>
+
+        {/* RIGHT: theme + avatar dropdown */}
+        <div className="flex items-center justify-end gap-3 min-w-[180px]">
+          {/* Nút search trên mobile */}
+          <button
+            onClick={() => setSearchUsersModalOpen(true)}
+            className="
+              flex sm:hidden h-9 w-9 items-center justify-center
+              rounded-full bg-white/18
+              text-white
+              hover:bg-white/25
+            "
+          >
+            <Search className="h-4 w-4" />
+          </button>
+
+          {/* Nút đổi theme – icon trắng trên nền trắng mờ */}
+          <button
+            onClick={toggleTheme}
+            className="
+              flex h-9 w-9 items-center justify-center
+              rounded-full bg-white/18
+              text-white
+              hover:bg-white/25
+            "
+          >
+            {theme === 'light' ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
+          </button>
+
+          {/* Avatar + dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className="
-                  relative
-                  focus:outline-none focus:ring-2 focus:ring-[#5865F2]
-                  rounded-full p-0.5
-                  transition-transform hover:scale-[1.02]
+                  relative flex h-9 w-9 items-center justify-center
+                  rounded-full bg-white/18
+                  hover:bg-white/25
+                  focus:outline-none focus:ring-2 focus:ring-white/80
                 "
               >
-                <Avatar className={twMerge(avatarVariants({ size: 'md' }))}>
+                <Avatar
+                  className={twMerge(avatarVariants({ size: 'sm' }), 'h-7 w-7')}
+                >
                   <AvatarImage src={profile?.avatar_url} />
-                  <AvatarFallback className="bg-[#5865F2] text-white">
+                  <AvatarFallback className="bg-white text-[#8A3BFF] font-semibold">
                     {profile?.display_name?.[0] || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                {/* Status indicator (viền ăn theo màu rail) */}
-                {(statusProfile?.status || profile?.status) && (
+                {currentStatus && (
                   <span
                     className={twMerge(
-                      'absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#1E1F22]',
-                      (statusProfile?.status || profile?.status) === 'online'
-                        ? 'bg-[#23A55A]'
-                        : 'bg-[#3F4246]'
+                      'absolute -bottom-[2px] -right-[2px] h-3 w-3 rounded-full border-2 border-white/90',
+                      currentStatus === 'online'
+                        ? 'bg-[#31A24C]'
+                        : 'bg-[#80838A]'
                     )}
-                    title={
-                      (statusProfile?.status || profile?.status) === 'online'
-                        ? 'Đang hoạt động'
-                        : 'Ngoại tuyến'
-                    }
                   />
                 )}
               </button>
             </DropdownMenuTrigger>
 
+            {/* Dropdown giữ nền sáng để dễ đọc, không phụ thuộc gradient */}
             <DropdownMenuContent
               className="
-                w-64 ml-3
-                bg-[#2B2D31]
-                text-[#F2F3F5]
-                border border-[#3F4246]
+                w-64 mr-2
+                bg-white
+                text-[#050505]
+                border border-[#E4E6EB]
                 shadow-xl
               "
-              align="start"
+              align="end"
             >
-              <DropdownMenuLabel className="text-white">
+              <DropdownMenuLabel className="text-[#050505]">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={profile?.avatar_url} />
-                    <AvatarFallback className="bg-[#5865F2] text-white">
+                    <AvatarFallback className="bg-[#8A3BFF] text-white">
                       {profile?.display_name?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
@@ -185,199 +290,65 @@ export default function Navbar() {
                     <p className="text-sm font-semibold leading-none">
                       {profile?.display_name || 'Chưa có tên'}
                     </p>
-                    <p className="text-xs leading-none text-[#B5BAC1]">
+                    <p className="text-xs leading-none text-[#65676B]">
                       {user?.email}
                     </p>
                     <div className="flex items-center gap-2 pt-1">
-                      <span
-                        className={twMerge(
-                          'w-2 h-2 rounded-full',
-                          (statusProfile?.status || profile?.status) ===
-                            'online'
-                            ? 'bg-[#23A55A]'
-                            : 'bg-[#3F4246]'
-                        )}
-                      />
-                      <span className="text-xs text-[#B5BAC1]">
-                        {(statusProfile?.status || profile?.status) === 'online'
-                          ? 'Đang hoạt động'
-                          : 'Ngoại tuyến'}
-                      </span>
+                      {currentStatus && (
+                        <>
+                          <span
+                            className={twMerge(
+                              'h-2 w-2 rounded-full',
+                              currentStatus === 'online'
+                                ? 'bg-[#31A24C]'
+                                : 'bg-[#80838A]'
+                            )}
+                          />
+                          <span className="text-xs text-[#65676B]">
+                            {currentStatus === 'online'
+                              ? 'Đang hoạt động'
+                              : 'Ngoại tuyến'}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
               </DropdownMenuLabel>
 
-              <DropdownMenuSeparator className="bg-[#3F4246]" />
+              <DropdownMenuSeparator className="bg-[#E4E6EB]" />
 
               <DropdownMenuItem
                 onClick={() => setProfileModalOpen(true)}
-                className="cursor-pointer hover:bg-[#4752C4] hover:text-white"
+                className="cursor-pointer hover:bg-[#F0F2F5]"
               >
-                <User className="mr-2 h-4 w-4" />
+                <User className="mr-2 h-4 w-4 text-[#8A3BFF]" />
                 <span>Thông tin cá nhân</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem
                 onClick={() => setSettingsModalOpen(true)}
-                className="cursor-pointer hover:bg-[#4752C4] hover:text-white"
+                className="cursor-pointer hover:bg-[#F0F2F5]"
               >
-                <Settings className="mr-2 h-4 w-4" />
+                <Settings className="mr-2 h-4 w-4 text-[#8A3BFF]" />
                 <span>Cài đặt</span>
               </DropdownMenuItem>
 
-              <DropdownMenuSeparator className="bg-[#3F4246]" />
+              <DropdownMenuSeparator className="bg-[#E4E6EB]" />
 
               <DropdownMenuItem
                 onClick={() => logout()}
-                className="cursor-pointer text-[#ED4245] hover:bg-[#4752C4] hover:text-white"
+                className="cursor-pointer text-[#E41E3F] hover:bg-[#FEEFEE]"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Đăng xuất</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Divider chấm như Discord */}
-          <div className="h-px w-8 bg-[#2B2D31]" />
-
-          {/* Nav items */}
-          <ItemWrap active={isChat}>
-            <TooltipBtn
-              onClick={() => navigate('/chat')}
-              isActive={isChat}
-              icon={MessageCircle}
-              label="Tin nhắn"
-              className="
-                relative z-[1]
-                text-[#B5BAC1]
-                hover:text-white
-                !rounded-2xl
-                w-10 h-10
-                flex items-center justify-center
-                data-[active=true]:text-white
-              "
-            />
-          </ItemWrap>
-
-          <ItemWrap active={isFriends}>
-            <div className="relative">
-              <TooltipBtn
-                onClick={() => navigate('/friends')}
-                icon={Users}
-                hasBadge={false}
-                isActive={isFriends}
-                label="Danh bạ"
-                className="
-                  relative z-[1]
-                  text-[#B5BAC1]
-                  hover:text-white
-                  !rounded-2xl
-                  w-10 h-10
-                  flex items-center justify-center
-                  data-[active=true]:text-white
-                "
-              />
-              {/* Badge friend request kiểu Discord */}
-              {hasFriendRequest && (
-                <span
-                  className="
-                  absolute -top-1 -right-1 min-w-4 h-4 px-1
-                  z-10
-                  rounded-full bg-[#ED4245]
-                  text-[10px] text-white font-semibold
-                  flex items-center justify-center
-                  shadow
-                "
-                >
-                  {Math.min(requests!.length, 9)}
-                </span>
-              )}
-            </div>
-          </ItemWrap>
-
-          <ItemWrap active={false}>
-            <TooltipBtn
-              onClick={() => setSearchUsersModalOpen(true)}
-              isActive={false}
-              icon={Search}
-              label="Tìm kiếm người dùng"
-              className="
-                relative z-[1]
-                text-[#B5BAC1]
-                hover:text-white
-                !rounded-2xl
-                w-10 h-10
-                flex items-center justify-center
-                data-[active=true]:text-white
-              "
-            />
-          </ItemWrap>
-
-          <ItemWrap active={isPost}>
-            <TooltipBtn
-              onClick={() => navigate('/posts')}
-              isActive={isPost}
-              icon={Globe}
-              label="Posts"
-              className="
-                relative z-[1]
-                text-[#B5BAC1]
-                hover:text-white
-                !rounded-2xl
-                w-10 h-10
-                flex items-center justify-center
-                data-[active=true]:text-white
-              "
-            />
-          </ItemWrap>
-          <div className="h-2" />
-        </div>
-
-        {/* BOTTOM – quick actions như user-tray */}
-        <div className="flex flex-col items-center gap-3 w-full">
-          <ItemWrap active={false}>
-            <TooltipBtn
-              onClick={toggleTheme}
-              icon={theme === 'light' ? Moon : Sun}
-              label={theme === 'light' ? 'Chế độ tối' : 'Chế độ sáng'}
-              className="
-                relative z-[1]
-                text-[#B5BAC1] hover:text-white
-                !rounded-2xl w-10 h-10 flex items-center justify-center
-              "
-            />
-          </ItemWrap>
-
-          {/* <ItemWrap active={false}>
-            <TooltipBtn
-              icon={Cloud}
-              label="Cloud"
-              className="relative z-[1] text-[#B5BAC1] hover:text-white !rounded-2xl w-10 h-10 flex items-center justify-center"
-            />
-          </ItemWrap>
-
-          <ItemWrap active={false}>
-            <TooltipBtn
-              icon={Briefcase}
-              label="Công việc"
-              className="relative z-[1] text-[#B5BAC1] hover:text-white !rounded-2xl w-10 h-10 flex items-center justify-center"
-            />
-          </ItemWrap>
-
-          <ItemWrap active={false}>
-            <TooltipBtn
-              icon={Settings}
-              label="Cài đặt"
-              className="relative z-[1] text-[#B5BAC1] hover:text-white !rounded-2xl w-10 h-10 flex items-center justify-center"
-            />
-          </ItemWrap> */}
-
-          {/* Khoảng cách đáy */}
-          <div className="h-1" />
         </div>
       </div>
 
+      {/* MODALS GIỮ NGUYÊN LOGIC */}
       <ProfileModal
         open={profileModalOpen}
         onOpenChange={setProfileModalOpen}

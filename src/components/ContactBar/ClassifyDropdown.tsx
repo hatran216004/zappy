@@ -47,9 +47,9 @@ export default function ClassifyDropdown({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex-1 py-2 flex items-center justify-center gap-1 bg-transparent text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition cursor-pointer">
+          <button className="px-3 py-1.5 flex items-center gap-1.5 text-sm font-medium rounded-full bg-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-[#B5BAC1] dark:hover:text-white dark:hover:bg-white/10 transition-colors">
             {getFilterDisplayName()}
-            <ChevronDown className="size-4" />
+            <ChevronDown className="w-4 h-4" />
           </button>
         </DropdownMenuTrigger>
 

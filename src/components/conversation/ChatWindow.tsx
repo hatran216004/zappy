@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback
+} from 'react';
 import {
   useMessages,
   useMessagesRealtime,
@@ -25,7 +31,13 @@ import { ImagePreview } from './ImagePreview';
 import { LocationPicker } from './LocationPicker';
 import { ForwardMessageModal } from '../modal/ForwardMessageModal';
 import { twMerge } from 'tailwind-merge';
-import { PinnedMessage, getPinnedMessages, pinMessage, subscribePinnedMessages, unpinMessage } from '@/services/chatService';
+import {
+  PinnedMessage,
+  getPinnedMessages,
+  pinMessage,
+  subscribePinnedMessages,
+  unpinMessage
+} from '@/services/chatService';
 import toast from 'react-hot-toast';
 import { useIsBlockedByUser, useIsBlockedByMe } from '@/hooks/useFriends';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -53,11 +65,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const [imageToSend, setImageToSend] = useState<File | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
-  const [forwardingMessageId, setForwardingMessageId] = useState<string | null>(null);
+  const [forwardingMessageId, setForwardingMessageId] = useState<string | null>(
+    null
+  );
   const [activeTab, setActiveTab] = useState<'chat' | 'threads'>('chat');
-  const [selectedThread, setSelectedThread] = useState<ThreadWithDetails | null>(null);
+  const [selectedThread, setSelectedThread] =
+    useState<ThreadWithDetails | null>(null);
   const [showCreateThreadModal, setShowCreateThreadModal] = useState(false);
-  const [createThreadFromMessage, setCreateThreadFromMessage] = useState<{ messageId: string; preview: string } | null>(null);
+  const [createThreadFromMessage, setCreateThreadFromMessage] = useState<{
+    messageId: string;
+    preview: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -72,8 +90,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const isTypingRef = useRef(false);
 
   const { data: conversation } = useConversation(conversationId);
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useMessages(conversationId, userId);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
+    conversationId,
+    userId
+  );
   const sendTextMutation = useSendTextMessage();
   const sendFileMutation = useSendFileMessage();
   const sendLocationMutation = useSendLocationMessage();
@@ -190,7 +210,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   // ✅ Auto-scroll khi có typing indicator xuất hiện lần đầu
   const prevTypingLengthRef = useRef(0);
   useEffect(() => {
-    if (typingUsers.length > 0 && prevTypingLengthRef.current === 0 && isNearBottom()) {
+    if (
+      typingUsers.length > 0 &&
+      prevTypingLengthRef.current === 0 &&
+      isNearBottom()
+    ) {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -260,38 +284,41 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   );
 
   // ✅ 5. Handle typing indicator
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    setMessageText(newValue);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newValue = e.target.value;
+      setMessageText(newValue);
 
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = null;
-    }
-
-    if (newValue.length === 0 || newValue.trim().length === 0) {
-      if (isTypingRef.current) {
-        isTypingRef.current = false;
-        sendTyping(false);
-        console.log('🛑 OFF');
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
       }
-      return;
-    }
 
-    if (!isTypingRef.current) {
-      isTypingRef.current = true;
-      sendTyping(true);
-      console.log('▶️ ON');
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      if (isTypingRef.current) {
-        isTypingRef.current = false;
-        sendTyping(false);
-        console.log('⏱️ OFF');
+      if (newValue.length === 0 || newValue.trim().length === 0) {
+        if (isTypingRef.current) {
+          isTypingRef.current = false;
+          sendTyping(false);
+          console.log('🛑 OFF');
+        }
+        return;
       }
-    }, 5000);
-  }, [sendTyping]);
+
+      if (!isTypingRef.current) {
+        isTypingRef.current = true;
+        sendTyping(true);
+        console.log('▶️ ON');
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        if (isTypingRef.current) {
+          isTypingRef.current = false;
+          sendTyping(false);
+          console.log('⏱️ OFF');
+        }
+      }, 5000);
+    },
+    [sendTyping]
+  );
 
   const handleSendMessage = useCallback(async () => {
     if (!messageText.trim()) return;
@@ -329,17 +356,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           messageId: editingMessageId,
           content: messageText.trim()
         });
-        
+
         setIsEditing(false);
         setEditingMessageId(null);
       } else {
         // Send new message
         // Resolve @all -> all participant IDs (except current user)
         const resolvedMentionedIds = (() => {
-          if (!mentionedUserIds || mentionedUserIds.length === 0) return undefined;
+          if (!mentionedUserIds || mentionedUserIds.length === 0)
+            return undefined;
           const hasAll = mentionedUserIds.includes('ALL');
           let ids = hasAll
-            ? (conversation?.participants || []).map((p) => p.user_id).filter((id) => id !== userId)
+            ? (conversation?.participants || [])
+                .map((p) => p.user_id)
+                .filter((id) => id !== userId)
             : mentionedUserIds;
           // unique
           ids = Array.from(new Set(ids));
@@ -352,70 +382,94 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           replyToId: replyTo || undefined,
           mentionedUserIds: resolvedMentionedIds
         });
-        
+
         setReplyTo(null);
         setMentionedUserIds([]);
       }
-      
+
       inputRef.current?.focus();
     } catch (error) {
       console.error('❌ Error:', error);
     }
-  }, [messageText, conversationId, userId, replyTo, isEditing, editingMessageId, sendTextMutation, editMessageMutation, sendTyping, isBlocked, isChatRestricted, mentionedUserIds, conversation]);
+  }, [
+    messageText,
+    conversationId,
+    userId,
+    replyTo,
+    isEditing,
+    editingMessageId,
+    sendTextMutation,
+    editMessageMutation,
+    sendTyping,
+    isBlocked,
+    isChatRestricted,
+    mentionedUserIds,
+    conversation
+  ]);
 
-  const handleEditMessage = useCallback((messageId: string, content: string) => {
-    setIsEditing(true);
-    setEditingMessageId(messageId);
-    setMessageText(content);
-    inputRef.current?.focus();
-  }, []);
+  const handleEditMessage = useCallback(
+    (messageId: string, content: string) => {
+      setIsEditing(true);
+      setEditingMessageId(messageId);
+      setMessageText(content);
+      inputRef.current?.focus();
+    },
+    []
+  );
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    // Check if blocked
-    if (isBlocked) {
-      toast.error('Bạn không thể gửi file với người dùng này do đã bị chặn');
-      return;
-    }
-    if (isChatRestricted) {
-      toast.error('Chỉ admin mới có thể gửi file trong nhóm này');
-      return;
-    }
+      // Check if blocked
+      if (isBlocked) {
+        toast.error('Bạn không thể gửi file với người dùng này do đã bị chặn');
+        return;
+      }
+      if (isChatRestricted) {
+        toast.error('Chỉ admin mới có thể gửi file trong nhóm này');
+        return;
+      }
 
-    let type: 'image' | 'video' | 'file' | 'audio' = 'file';
-    if (file.type.startsWith('image/')) type = 'image';
-    else if (file.type.startsWith('video/')) type = 'video';
-    else if (file.type.startsWith('audio/') || file.name.endsWith('.webm')) type = 'audio';
+      let type: 'image' | 'video' | 'file' | 'audio' = 'file';
+      if (file.type.startsWith('image/')) type = 'image';
+      else if (file.type.startsWith('video/')) type = 'video';
+      else if (file.type.startsWith('audio/') || file.name.endsWith('.webm'))
+        type = 'audio';
 
-    if (type === 'image') {
-      setImageToSend(file);
+      if (type === 'image') {
+        setImageToSend(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
+      try {
+        await sendFileMutation.mutateAsync({
+          conversationId,
+          senderId: userId,
+          file,
+          type
+        });
+        console.log('✅ File sent successfully');
+      } catch (error) {
+        console.error('❌ Error sending file:', error);
+      }
+
       if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
+    },
+    [conversationId, userId, sendFileMutation, isBlocked, isChatRestricted]
+  );
 
-    try {
-      await sendFileMutation.mutateAsync({
-        conversationId,
-        senderId: userId,
-        file,
-        type
-      });
-      console.log('✅ File sent successfully');
-    } catch (error) {
-      console.error('❌ Error sending file:', error);
-    }
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [conversationId, userId, sendFileMutation, isBlocked, isChatRestricted]);
-
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  }, [handleSendMessage]);
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    },
+    [handleSendMessage]
+  );
 
   const handleEmojiSelect = useCallback((emoji: string) => {
     setMessageText((prev) => prev + emoji);
@@ -424,7 +478,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
 
   const handleSendImage = useCallback(async () => {
     if (!imageToSend) return;
-    
+
     // Check if blocked
     if (isBlocked) {
       toast.error('Bạn không thể gửi ảnh với người dùng này do đã bị chặn');
@@ -434,7 +488,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       toast.error('Chỉ admin mới có thể gửi ảnh trong nhóm này');
       return;
     }
-    
+
     try {
       await sendFileMutation.mutateAsync({
         conversationId,
@@ -454,58 +508,72 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   }, []);
 
   // Pin / Unpin handlers
-  const handlePin = useCallback(async (messageId: string) => {
-    // Optimistic update
-    setPinned((prev) => {
-      if (prev.some((p) => p.message_id === messageId)) return prev;
-      if (prev.length >= 3) {
-        toast.error('Tối đa 3 tin nhắn được ghim');
-        return prev;
+  const handlePin = useCallback(
+    async (messageId: string) => {
+      // Optimistic update
+      setPinned((prev) => {
+        if (prev.some((p) => p.message_id === messageId)) return prev;
+        if (prev.length >= 3) {
+          toast.error('Tối đa 3 tin nhắn được ghim');
+          return prev;
+        }
+        const target = messages.find((m) => m.id === messageId);
+        const optimistic: PinnedMessage = {
+          id: `optimistic-${messageId}`,
+          conversation_id: conversationId,
+          message_id: messageId,
+          pinned_by: userId,
+          created_at: new Date().toISOString(),
+          message: target
+            ? {
+                id: target.id,
+                content_text: target.content_text || '',
+                created_at: target.created_at,
+                type: target.type,
+                sender: target.sender as any
+              }
+            : undefined
+        };
+        return [optimistic, ...prev].slice(0, 3);
+      });
+
+      try {
+        await pinMessage(conversationId, messageId, userId);
+        toast.success('Đã ghim tin nhắn');
+      } catch (e: any) {
+        // rollback
+        setPinned((prev) =>
+          prev.filter(
+            (p) => p.message_id !== messageId && !p.id.startsWith('optimistic-')
+          )
+        );
+        const msg = e?.message || String(e);
+        toast.error(
+          msg.includes('Maximum 3')
+            ? 'Tối đa 3 tin nhắn được ghim'
+            : 'Không thể ghim tin nhắn'
+        );
       }
-      const target = messages.find((m) => m.id === messageId);
-      const optimistic: PinnedMessage = {
-        id: `optimistic-${messageId}`,
-        conversation_id: conversationId,
-        message_id: messageId,
-        pinned_by: userId,
-        created_at: new Date().toISOString(),
-        message: target
-          ? {
-              id: target.id,
-              content_text: target.content_text || '',
-              created_at: target.created_at,
-              type: target.type,
-              sender: target.sender as any
-            }
-          : undefined
-      };
-      return [optimistic, ...prev].slice(0, 3);
-    });
+    },
+    [conversationId, userId, messages]
+  );
 
-    try {
-      await pinMessage(conversationId, messageId, userId);
-      toast.success('Đã ghim tin nhắn');
-    } catch (e: any) {
-      // rollback
-      setPinned((prev) => prev.filter((p) => p.message_id !== messageId && !p.id.startsWith('optimistic-')));
-      const msg = e?.message || String(e);
-      toast.error(msg.includes('Maximum 3') ? 'Tối đa 3 tin nhắn được ghim' : 'Không thể ghim tin nhắn');
-    }
-  }, [conversationId, userId, messages]);
-
-  const handleUnpin = useCallback(async (messageId: string) => {
-    // Optimistic update
-    setPinned((prev) => prev.filter((p) => p.message_id !== messageId));
-    try {
-      await unpinMessage(conversationId, messageId);
-      toast.success('Đã bỏ ghim');
-    } catch (e) {
-      // In case of failure, refetch server state
-      const pins = await getPinnedMessages(conversationId);
-      setPinned(pins);
-      toast.error('Không thể bỏ ghim');
-    }
-  }, [conversationId]);
+  const handleUnpin = useCallback(
+    async (messageId: string) => {
+      // Optimistic update
+      setPinned((prev) => prev.filter((p) => p.message_id !== messageId));
+      try {
+        await unpinMessage(conversationId, messageId);
+        toast.success('Đã bỏ ghim');
+      } catch (e) {
+        // In case of failure, refetch server state
+        const pins = await getPinnedMessages(conversationId);
+        setPinned(pins);
+        toast.error('Không thể bỏ ghim');
+      }
+    },
+    [conversationId]
+  );
 
   const searchResults = useMemo(() => {
     return searchData?.map((msg) => msg.id) || [];
@@ -536,7 +604,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             : 0;
       } else {
         newIndex =
-          currentSearchIndex > 0 ? currentSearchIndex - 1 : searchResults.length - 1;
+          currentSearchIndex > 0
+            ? currentSearchIndex - 1
+            : searchResults.length - 1;
       }
 
       setCurrentSearchIndex(newIndex);
@@ -547,7 +617,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       if (isLoaded) {
         const messageElement = messageRefs.current[messageId];
         if (messageElement) {
-          messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          messageElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
         }
       } else {
         console.log('Message not loaded, fetching older messages...');
@@ -555,21 +628,36 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         if (targetMessage) {
           let attempts = 0;
           const maxAttempts = 10;
-          while (!messages.some((msg) => msg.id === messageId) && attempts < maxAttempts && hasNextPage) {
+          while (
+            !messages.some((msg) => msg.id === messageId) &&
+            attempts < maxAttempts &&
+            hasNextPage
+          ) {
             await fetchNextPage();
             attempts++;
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
           }
           setTimeout(() => {
             const messageElement = messageRefs.current[messageId];
             if (messageElement) {
-              messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              messageElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+              });
             }
           }, 200);
         }
       }
     },
-    [searchQuery, searchResults, currentSearchIndex, messages, searchData, hasNextPage, fetchNextPage]
+    [
+      searchQuery,
+      searchResults,
+      currentSearchIndex,
+      messages,
+      searchData,
+      hasNextPage,
+      fetchNextPage
+    ]
   );
 
   useEffect(() => {
@@ -578,7 +666,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       const messageElement = messageRefs.current[messageId];
       if (messageElement) {
         setTimeout(() => {
-          messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          messageElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
         }, 100);
       }
     }
@@ -601,7 +692,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       }
       let attempts = 0;
       const maxAttempts = 10;
-      while (!messages.some((m) => m.id === messageId) && attempts < maxAttempts && hasNextPage) {
+      while (
+        !messages.some((m) => m.id === messageId) &&
+        attempts < maxAttempts &&
+        hasNextPage
+      ) {
         await fetchNextPage();
         attempts++;
         await new Promise((r) => setTimeout(r, 100));
@@ -618,66 +713,76 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     setShowLocationPicker(true);
   }, []);
 
-  const handleCall = useCallback(async (userId: string, isVideo: boolean) => {
-    try {
-      await startCallMutation.mutateAsync({
-        userId,
-        isVideoEnabled: isVideo
-      });
-    } catch (error) {
-      console.error('Error starting call:', error);
-    }
-  }, [startCallMutation]);
+  const handleCall = useCallback(
+    async (userId: string, isVideo: boolean) => {
+      try {
+        await startCallMutation.mutateAsync({
+          userId,
+          isVideoEnabled: isVideo
+        });
+      } catch (error) {
+        console.error('Error starting call:', error);
+      }
+    },
+    [startCallMutation]
+  );
 
-  const handleGroupCall = useCallback(async (conversationId: string, isVideo: boolean) => {
-    try {
-      await startGroupCallMutation.mutateAsync({
-        conversationId,
-        isVideoEnabled: isVideo
-      });
-    } catch (error) {
-      console.error('Error starting group call:', error);
-    }
-  }, [startGroupCallMutation]);
+  const handleGroupCall = useCallback(
+    async (conversationId: string, isVideo: boolean) => {
+      try {
+        await startGroupCallMutation.mutateAsync({
+          conversationId,
+          isVideoEnabled: isVideo
+        });
+      } catch (error) {
+        console.error('Error starting group call:', error);
+      }
+    },
+    [startGroupCallMutation]
+  );
 
-  const handleLocationSelect = useCallback(async (location: { 
-    latitude: number; 
-    longitude: number; 
-    address: string;
-    displayMode: 'interactive' | 'static';
-  }) => {
-    // Check if blocked
-    if (isBlocked) {
-      toast.error('Bạn không thể gửi vị trí với người dùng này do đã bị chặn');
-      return;
-    }
-    if (isChatRestricted) {
-      toast.error('Chỉ admin mới có thể gửi vị trí trong nhóm này');
-      return;
-    }
-    
-    try {
-      await sendLocationMutation.mutateAsync({
-        conversationId,
-        senderId: userId,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: location.address,
-        displayMode: location.displayMode
-      });
-      console.log('✅ Location sent successfully');
-    } catch (error) {
-      console.error('❌ Error sending location:', error);
-    }
-  }, [conversationId, userId, sendLocationMutation, isBlocked]);
+  const handleLocationSelect = useCallback(
+    async (location: {
+      latitude: number;
+      longitude: number;
+      address: string;
+      displayMode: 'interactive' | 'static';
+    }) => {
+      // Check if blocked
+      if (isBlocked) {
+        toast.error(
+          'Bạn không thể gửi vị trí với người dùng này do đã bị chặn'
+        );
+        return;
+      }
+      if (isChatRestricted) {
+        toast.error('Chỉ admin mới có thể gửi vị trí trong nhóm này');
+        return;
+      }
 
+      try {
+        await sendLocationMutation.mutateAsync({
+          conversationId,
+          senderId: userId,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: location.address,
+          displayMode: location.displayMode
+        });
+        console.log('✅ Location sent successfully');
+      } catch (error) {
+        console.error('❌ Error sending location:', error);
+      }
+    },
+    [conversationId, userId, sendLocationMutation, isBlocked]
+  );
 
   // Get background styling from conversation
   const getBackgroundStyle = () => {
     if (!conversation) return {};
-    
+
     const { background_type, background_value } = conversation;
-    
+
     if (background_type === 'color') {
       return { backgroundColor: background_value };
     } else if (background_type === 'gradient') {
@@ -687,17 +792,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         backgroundImage: `url(${background_value})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        backgroundRepeat: 'no-repeat'
       };
     }
-    
+
     return {};
   };
 
   return (
-      <div
-        data-tour-id="chat-window"
-        className="
+    <div
+      data-tour-id="chat-window"
+      className="
         flex flex-col h-screen justify-between
         bg-white text-gray-900
         dark:bg-[#313338] dark:text-[#F2F3F5]
@@ -719,17 +824,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         onGroupCall={handleGroupCall}
         pinned={pinned}
         onUnpin={handleUnpin}
-        onJumpTo={(messageId) => { void jumpToMessage(messageId); }}
+        onJumpTo={(messageId) => {
+          void jumpToMessage(messageId);
+        }}
         onCreateThread={() => setShowCreateThreadModal(true)}
       />
 
       {/* Tabs for Chat and Threads */}
-      <Tabs value={activeTab} onValueChange={(v) => {
-        setActiveTab(v as 'chat' | 'threads');
-        if (v === 'chat') {
-          setSelectedThread(null);
-        }
-      }} className="flex-1 flex flex-col min-h-0">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v as 'chat' | 'threads');
+          if (v === 'chat') {
+            setSelectedThread(null);
+          }
+        }}
+        className="flex-1 flex flex-col min-h-0"
+      >
         <div className="px-4 border-b">
           <TabsList>
             <TabsTrigger value="chat">Chat</TabsTrigger>
@@ -741,7 +852,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         </div>
 
         {/* Chat Tab */}
-        <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 m-0">
+        <TabsContent
+          value="chat"
+          className="flex-1 flex flex-col min-h-0 m-0 pb-14"
+        >
           <div
             ref={listRef}
             className="
@@ -751,12 +865,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             style={getBackgroundStyle()}
           >
             {/* Load older */}
-        {hasNextPage && (
-          <div className="text-center pb-2">
-            <button
-              onClick={handleLoadOlder}
-              disabled={isFetchingNextPage}
-              className="
+            {hasNextPage && (
+              <div className="text-center pb-2">
+                <button
+                  onClick={handleLoadOlder}
+                  disabled={isFetchingNextPage}
+                  className="
                 inline-flex items-center gap-2
                 text-xs px-3 py-1.5 rounded-full
                 bg-gray-100 text-gray-700 hover:bg-gray-200
@@ -764,86 +878,98 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
                 disabled:opacity-50 transition
                 ring-1 ring-transparent hover:ring-[#5865F2]/40
               "
-            >
-              {isFetchingNextPage ? 'Đang tải...' : 'Tải tin nhắn cũ hơn'}
-            </button>
-          </div>
-        )}
+                >
+                  {isFetchingNextPage ? 'Đang tải...' : 'Tải tin nhắn cũ hơn'}
+                </button>
+              </div>
+            )}
 
-        {messages.map((message, index) => {
-          const prevMessage = messages[index - 1];
-          const showAvatar =
-            !prevMessage || prevMessage.sender_id !== message.sender_id;
-          const showTimestamp =
-            !prevMessage ||
-            new Date(message.created_at).getTime() -
-              new Date(prevMessage.created_at).getTime() >
-              5 * 60 * 1000;
+            {messages.map((message, index) => {
+              const prevMessage = messages[index - 1];
+              const showAvatar =
+                !prevMessage || prevMessage.sender_id !== message.sender_id;
+              const showTimestamp =
+                !prevMessage ||
+                new Date(message.created_at).getTime() -
+                  new Date(prevMessage.created_at).getTime() >
+                  5 * 60 * 1000;
 
-          const isHighlighted =
-            searchResults.length > 0 &&
-            searchResults[currentSearchIndex] === message.id;
+              const isHighlighted =
+                searchResults.length > 0 &&
+                searchResults[currentSearchIndex] === message.id;
 
-          return (
-            <div
-              key={message.id}
-              ref={(el) => {
-                messageRefs.current[message.id] = el;
-              }}
-              className={twMerge(
-                "transition-all rounded-lg",
-                isHighlighted
-                  ? "ring-2 ring-[#5865F2]/40 bg-gray-100 dark:bg-white/5"
-                  : ""
-              )}
-            >
-              <MessageBubble
-                message={message}
-                isOwn={message.sender_id === userId}
-                showAvatar={showAvatar}
-                showTimestamp={showTimestamp}
-                onReply={() => setReplyTo(message.id)}
-                onEdit={(content) => handleEditMessage(message.id, content)}
-                currentUserId={userId}
-                isPinned={pinned.some((p) => p.message_id === message.id)}
-                onPin={() => handlePin(message.id)}
-                onUnpin={() => handleUnpin(message.id)}
-                onJumpToMessage={(id) => { void jumpToMessage(id); }}
-                onForward={() => setForwardingMessageId(message.id)}
-                isAdmin={conversation?.participants?.some(
-                  (p) => p.user_id === userId && p.role === 'admin'
-                )}
-                conversationType={conversation?.type}
-                conversationId={conversationId}
-                onCreateThread={(messageId, preview) => {
-                  setCreateThreadFromMessage({ messageId, preview });
-                  setShowCreateThreadModal(true);
-                }}
+              return (
+                <div
+                  key={message.id}
+                  ref={(el) => {
+                    messageRefs.current[message.id] = el;
+                  }}
+                  className={twMerge(
+                    'transition-all rounded-lg',
+                    isHighlighted
+                      ? 'ring-2 ring-[#5865F2]/40 bg-gray-100 dark:bg-white/5'
+                      : ''
+                  )}
+                >
+                  <MessageBubble
+                    message={message}
+                    isOwn={message.sender_id === userId}
+                    showAvatar={showAvatar}
+                    showTimestamp={showTimestamp}
+                    onReply={() => setReplyTo(message.id)}
+                    onEdit={(content) => handleEditMessage(message.id, content)}
+                    currentUserId={userId}
+                    isPinned={pinned.some((p) => p.message_id === message.id)}
+                    onPin={() => handlePin(message.id)}
+                    onUnpin={() => handleUnpin(message.id)}
+                    onJumpToMessage={(id) => {
+                      void jumpToMessage(id);
+                    }}
+                    onForward={() => setForwardingMessageId(message.id)}
+                    isAdmin={conversation?.participants?.some(
+                      (p) => p.user_id === userId && p.role === 'admin'
+                    )}
+                    conversationType={conversation?.type}
+                    conversationId={conversationId}
+                    onCreateThread={(messageId, preview) => {
+                      setCreateThreadFromMessage({ messageId, preview });
+                      setShowCreateThreadModal(true);
+                    }}
+                  />
+                </div>
+              );
+            })}
+
+            {/* Typing indicator */}
+            {typingUsers.length > 0 && (
+              <TypingIndicator
+                userName={otherParticipant?.profile?.display_name}
+                avatarUrl={otherParticipant?.profile?.avatar_url}
               />
-            </div>
-          );
-        })}
+            )}
 
-        {/* Typing indicator */}
-        {typingUsers.length > 0 && (
-          <TypingIndicator
-            userName={otherParticipant?.profile?.display_name}
-            avatarUrl={otherParticipant?.profile?.avatar_url}
-          />
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
+            <div ref={messagesEndRef} />
+          </div>
 
           {/* Block warning message */}
           {isBlocked && isDirectChat && (
             <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
                 <p className="text-sm font-medium">
-                  {isBlockedByUser 
+                  {isBlockedByUser
                     ? 'Bạn đã bị người dùng này chặn. Bạn không thể nhắn tin.'
                     : 'Bạn đã chặn người dùng này. Bạn không thể nhắn tin.'}
                 </p>
@@ -880,7 +1006,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -910,35 +1041,38 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           )}
 
           <ChatFooter
-        fileInputRef={fileInputRef}
-        inputRef={inputRef}
-        messageText={messageText}
-        handleInputChange={handleInputChange}
-        handleKeyPress={handleKeyPress}
-        handleSendMessage={handleSendMessage}
-        handleFileSelect={handleFileSelect}
-        handleEmojiSelect={handleEmojiSelect}
-        handleLocationClick={handleLocationClick}
-        sendFileMutation={sendFileMutation}
-        sendTextMutation={sendTextMutation}
-        participants={
-          conversation?.participants?.map((p) => ({
-            id: p.user_id,
-            name: p.profile.display_name,
-            avatar_url: p.profile.avatar_url
-          })) || []
-        }
-        onMentionSelected={(userId) => {
-          setMentionedUserIds((prev) =>
-            prev.includes(userId) ? prev : [...prev, userId]
-          );
-        }}
+            fileInputRef={fileInputRef}
+            inputRef={inputRef}
+            messageText={messageText}
+            handleInputChange={handleInputChange}
+            handleKeyPress={handleKeyPress}
+            handleSendMessage={handleSendMessage}
+            handleFileSelect={handleFileSelect}
+            handleEmojiSelect={handleEmojiSelect}
+            handleLocationClick={handleLocationClick}
+            sendFileMutation={sendFileMutation}
+            sendTextMutation={sendTextMutation}
+            participants={
+              conversation?.participants?.map((p) => ({
+                id: p.user_id,
+                name: p.profile.display_name,
+                avatar_url: p.profile.avatar_url
+              })) || []
+            }
+            onMentionSelected={(userId) => {
+              setMentionedUserIds((prev) =>
+                prev.includes(userId) ? prev : [...prev, userId]
+              );
+            }}
             disabled={isBlocked || isChatRestricted}
           />
         </TabsContent>
 
         {/* Threads Tab */}
-        <TabsContent value="threads" className="flex-1 flex flex-col min-h-0 m-0">
+        <TabsContent
+          value="threads"
+          className="flex-1 flex flex-col min-h-0 m-0 pb-14"
+        >
           {selectedThread ? (
             <ThreadView
               thread={selectedThread}
