@@ -5,10 +5,11 @@ import ChatPage from '@/pages/ChatPage';
 import FriendGroupsPage from '@/pages/friends/FriendGroupsPage';
 import FriendPage from '@/pages/friends/FriendPage';
 import FriendRequestsPage from '@/pages/friends/FriendRequestsPage';
-import LoginPage from '@/pages/LoginPage';
 import NotFound from '@/pages/NotFound';
-import RegisterPage from '@/pages/RegisterPage';
 import AuthenticationPage from '@/pages/AuthenticationPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import AuthCallbackPage from '@/pages/AuthCallbackPage';
 import { JoinGroupPage } from '@/pages/JoinGroupPage';
 import { useAuth } from '@/stores/user';
 import { BrowserRouter, Outlet, Route, Routes, Navigate } from 'react-router';
@@ -41,7 +42,7 @@ export default function AppRoutes() {
               <Route path="group" element={<FriendGroupsPage />} />
               <Route path="requests" element={<FriendRequestsPage />} />
             </Route>
-            
+
             <Route path="posts">
               <Route index element={<PostsPage />} />
               <Route path=":postId" element={<PostsPage />} />
@@ -53,6 +54,13 @@ export default function AppRoutes() {
           <Route path="/login" element={<AuthenticationPage />} />
           <Route path="/register" element={<AuthenticationPage />} />
         </Route>
+
+        {/* Public routes for password reset */}
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+        {/* Public route for OAuth callback */}
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         {/* Public route for joining via invite */}
         <Route path="/invite/:inviteCode" element={<JoinGroupPage />} />

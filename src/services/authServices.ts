@@ -145,4 +145,78 @@ const logout = async () => {
   return null;
 };
 
-export default { register, loginWithPassword, getCurrentUser, logout };
+const loginWithGoogle = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  });
+
+  if (error) {
+    const message =
+      AUTH_ERROR_MESSAGES[error?.code as string] ||
+      error?.message ||
+      'Có lỗi xảy ra khi đăng nhập với Google. Vui lòng thử lại';
+
+    throw new CustomError(message, {
+      type: 'authentication',
+      details: `HTTP ${error.status ?? 'unknown'}`,
+      retryable: false
+    });
+  }
+
+  return data;
+};
+
+const forgotPassword = async (email: string) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`
+  });
+
+  if (error) {
+    const message =
+      AUTH_ERROR_MESSAGES[error?.code as string] ||
+      error?.message ||
+      'Có lỗi xảy ra. Vui lòng thử lại';
+
+    throw new CustomError(message, {
+      type: 'authentication',
+      details: `HTTP ${error.status ?? 'unknown'}`,
+      retryable: false
+    });
+  }
+
+  return { success: true };
+};
+
+const resetPassword = async (newPassword: string) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+
+  if (error) {
+    const message =
+      AUTH_ERROR_MESSAGES[error?.code as string] ||
+      error?.message ||
+      'Có lỗi xảy ra. Vui lòng thử lại';
+
+    throw new CustomError(message, {
+      type: 'authentication',
+      details: `HTTP ${error.status ?? 'unknown'}`,
+      retryable: false
+    });
+  }
+
+  return { user: data.user, session: data.session };
+};
+
+export default {
+  register,
+  loginWithPassword,
+  loginWithGoogle,
+  getCurrentUser,
+  logout,
+  forgotPassword,
+  resetPassword
+};
