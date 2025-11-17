@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/stores/user';
 import { PasswordHints } from '@/components/PasswordHints';
 import SelectController from '@/components/SelectController';
-import { useNavigate, useLocation } from 'react-router';
+import { useNavigate, useLocation, Link } from 'react-router';
 
 type LoginFormData = Pick<RegisterSchema, 'email' | 'password'>;
 type SignUpFormData = RegisterSchema;
@@ -64,6 +64,12 @@ const AuthenticationPage = () => {
   const { mutate: signUpMutate, isPending: isSignUpPending } = useMutation({
     mutationFn: authServices.register
   });
+
+  // Google login mutation
+  const { mutate: googleLoginMutate, isPending: isGoogleLoginPending } =
+    useMutation({
+      mutationFn: authServices.loginWithGoogle
+    });
 
   const onLoginSubmit = (data: LoginFormData) => {
     const { email, password } = data;
@@ -122,6 +128,14 @@ const AuthenticationPage = () => {
     setIsLogin(newMode);
     // Update URL without page reload
     navigate(newMode ? '/login' : '/register', { replace: true });
+  };
+
+  const handleGoogleLogin = () => {
+    googleLoginMutate(undefined, {
+      onError: (error) => {
+        toast.error(error.message);
+      }
+    });
   };
 
   return (
@@ -336,7 +350,7 @@ const AuthenticationPage = () => {
                       ? handleSubmitLogin(onLoginSubmit)
                       : handleSubmitSignUp(onSignUpSubmit)
                   }
-                  className={`flex-1 flex flex-col ${
+                  className={`flex flex-col ${
                     !isLogin ? 'space-y-3' : 'space-y-4'
                   } pb-4`}
                 >
@@ -392,6 +406,17 @@ const AuthenticationPage = () => {
                     icon={Lock}
                   />
 
+                  {isLogin && (
+                    <div className="flex justify-end">
+                      <Link
+                        to="/forgot-password"
+                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        Quên mật khẩu?
+                      </Link>
+                    </div>
+                  )}
+
                   {!isLogin && (
                     <>
                       <PasswordHints control={control} name="password" />
@@ -432,13 +457,16 @@ const AuthenticationPage = () => {
                 </form>
 
                 {/* Social login */}
-                <div className={`${!isLogin ? 'mt-4' : 'mt-6'} space-y-3`}>
+                <div className={`mt-4 space-y-3`}>
                   <Button
+                    type="button"
                     primary={false}
                     outline
                     rounded
+                    disabled={isGoogleLoginPending}
+                    isLoading={isGoogleLoginPending}
                     className="shadow-none py-2 gap-2 border-purple-300 text-purple-600 hover:bg-purple-50"
-                    onClick={(e) => e.preventDefault()}
+                    onClick={handleGoogleLogin}
                   >
                     <FcGoogle className="size-8" />
                     <span className="text-gray-700 font-medium">

@@ -25,10 +25,6 @@ export default function Button(props: ButtonProps) {
     ...passProps
   } = props;
 
-  if (disabled && typeof onClick === 'function') {
-    delete props.onClick;
-  }
-
   return (
     <button
       type="submit"
@@ -46,6 +42,7 @@ export default function Button(props: ButtonProps) {
         }
       )}
       {...passProps}
+      onClick={disabled ? undefined : onClick}
     >
       {isLoading && <Loading />}
       {children}
