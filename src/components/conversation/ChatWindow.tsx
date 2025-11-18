@@ -22,6 +22,7 @@ import {
 } from '../../hooks/useChat';
 import { useStartCall } from '../../hooks/useStartCall';
 import { useStartGroupCall } from '../../hooks/useStartGroupCall';
+import { useStartCallWithParticipants } from '../../hooks/useStartCallWithParticipants';
 import ChatHeader from './ChatHeader';
 import { useParams } from 'react-router';
 import ChatFooter from '../ChatWindow/ChatFooter';
@@ -101,6 +102,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const markAsReadMutation = useMarkMessagesAsRead();
   const startCallMutation = useStartCall();
   const startGroupCallMutation = useStartGroupCall();
+  const startCallWithParticipantsMutation = useStartCallWithParticipants();
   const { typingUsers, sendTyping } = useTypingIndicator(
     conversationId,
     userId
@@ -741,6 +743,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     [startGroupCallMutation]
   );
 
+  // Handle call with custom participants (Zappy-main style)
+  const handleCallWithParticipants = useCallback(
+    async (
+      conversationId: string,
+      isVideo: boolean,
+      participants: string[]
+    ) => {
+      try {
+        await startCallWithParticipantsMutation.mutateAsync({
+          conversationId,
+          isVideoEnabled: isVideo,
+          participants
+        });
+      } catch (error) {
+        console.error('Error starting call with participants:', error);
+      }
+    },
+    [startCallWithParticipantsMutation]
+  );
+
   const handleLocationSelect = useCallback(
     async (location: {
       latitude: number;
@@ -822,6 +844,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         currentUserId={userId}
         onCall={handleCall}
         onGroupCall={handleGroupCall}
+        onCallWithParticipants={handleCallWithParticipants}
         pinned={pinned}
         onUnpin={handleUnpin}
         onJumpTo={(messageId) => {

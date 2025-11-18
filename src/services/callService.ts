@@ -47,7 +47,28 @@ export const createDirectCall = async (
   console.log('✅ Call created using create_direct_call (Zappy-main function)');
 };
 
-// Tạo cuộc gọi nhóm
+// Tạo cuộc gọi với danh sách participants tùy chỉnh (giống Zappy-main)
+// Dùng cho cả direct và group calls
+export const createCall = async (
+  conversationId: string,
+  isVideoEnabled: boolean,
+  participants: string[]
+): Promise<void> => {
+  const { error } = await supabase.rpc('create_call', {
+    _conversation_id: conversationId,
+    _is_video_enabled: isVideoEnabled,
+    _participants: participants,
+  });
+
+  if (error) {
+    console.error('Error creating call:', error);
+    throw error;
+  }
+  
+  console.log('✅ Call created with participants:', participants);
+};
+
+// Tạo cuộc gọi nhóm (backward compatibility - gọi tất cả members)
 export const createGroupCall = async (
   conversationId: string,
   isVideoEnabled: boolean
