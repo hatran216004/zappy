@@ -1,6 +1,7 @@
 // hooks/useFriends.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import {
   searchUsersByUsername,
   sendFriendRequest,
@@ -311,9 +312,14 @@ export const useBlockUser = () => {
 
   return useMutation({
     mutationFn: (userId: string) => blockUser(userId),
-    onSuccess: () => {
+    onSuccess: (_, userId) => {
       queryClient.invalidateQueries({ queryKey: friendKeys.all });
       queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      
+      // Invalidate specific block status queries
+      queryClient.invalidateQueries({ queryKey: ['blocks', 'by-me', userId] });
+      queryClient.invalidateQueries({ queryKey: ['blocks', 'by-user', userId] });
+      queryClient.invalidateQueries({ queryKey: ['blocks', 'mutual', userId] });
     }
   });
 };
@@ -377,6 +383,75 @@ export const useBlockedUsers = () => {
     queryFn: () => getBlockedUsers(),
     staleTime: 60000
   });
+};
+
+// Hook subscribe to block status changes realtime
+export const useBlockStatusRealtime = (currentUserId: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channelName = `blocks:${currentUserId}`;
+    
+    // Remove existing channel if any
+    const existingChannel = supabase.getChannels().find(ch => ch.topic === channelName);
+    if (existingChannel) {
+      supabase.removeChannel(existingChannel);
+    }
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'blocks',
+          filter: `blocker_id=eq.${currentUserId}`
+        },
+        (payload) => {
+          console.log('🔒 Block status changed (I blocked someone):', payload);
+          const blockedUserId = payload.new?.blocked_id || payload.old?.blocked_id;
+          if (blockedUserId) {
+            queryClient.invalidateQueries({ queryKey: ['blocks', 'by-me', blockedUserId] });
+            queryClient.invalidateQueries({ queryKey: ['blocks', 'mutual', blockedUserId] });
+            queryClient.invalidateQueries({ queryKey: ['blocks'] });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'blocks',
+          filter: `blocked_id=eq.${currentUserId}`
+        },
+        (payload) => {
+          console.log('🔒 Block status changed (Someone blocked me):', payload);
+          const blockerUserId = payload.new?.blocker_id || payload.old?.blocker_id;
+          if (blockerUserId) {
+            queryClient.invalidateQueries({ queryKey: ['blocks', 'by-user', blockerUserId] });
+            queryClient.invalidateQueries({ queryKey: ['blocks', 'mutual', blockerUserId] });
+            queryClient.invalidateQueries({ queryKey: ['blocks'] });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔒 Block subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to block status changes');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Error subscribing to block status changes');
+        }
+      });
+
+    return () => {
+      console.log('🔕 Unsubscribing from block status changes');
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, queryClient]);
 };
 
 // ============================================

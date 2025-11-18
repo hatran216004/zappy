@@ -24,7 +24,7 @@ import { useStartCall } from '../../hooks/useStartCall';
 import { useStartGroupCall } from '../../hooks/useStartGroupCall';
 import { useStartCallWithParticipants } from '../../hooks/useStartCallWithParticipants';
 import ChatHeader from './ChatHeader';
-import { useParams } from 'react-router';
+import { useParams, useLocation } from 'react-router';
 import ChatFooter from '../ChatWindow/ChatFooter';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
@@ -40,7 +40,7 @@ import {
   unpinMessage
 } from '@/services/chatService';
 import toast from 'react-hot-toast';
-import { useIsBlockedByUser, useIsBlockedByMe } from '@/hooks/useFriends';
+import { useIsBlockedByUser, useIsBlockedByMe, useBlockStatusRealtime } from '@/hooks/useFriends';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ThreadList } from '@/components/thread/ThreadList';
 import { ThreadView } from '@/components/thread/ThreadView';
@@ -54,7 +54,11 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const params = useParams();
+  const location = useLocation();
   const conversationId = params.conversationId as string;
+  
+  // Get openSearch from location state
+  const initialShowSearch = (location.state as any)?.openSearch || false;
 
   const [messageText, setMessageText] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -120,7 +124,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const otherUserId = isDirectChat ? otherParticipant?.user_id : undefined;
   const { data: isBlockedByUser } = useIsBlockedByUser(otherUserId || '');
   const { data: isBlockedByMe } = useIsBlockedByMe(otherUserId || '');
-  const isBlocked = isBlockedByUser || isBlockedByMe;
+  // Block if either user is blocked by the other (only for direct chat)
+  const isBlocked = isDirectChat && (isBlockedByUser === true || isBlockedByMe === true);
 
   // Check if chat is restricted (only admins can chat)
   const isGroupChat = conversation?.type === 'group';
@@ -157,6 +162,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   useConversationRealtime(conversationId); // ⭐ Subscribe to conversation updates (background, etc.)
   useReactionsRealtime(conversationId); // ⭐ Subscribe to reactions updates
   useReadReceiptsRealtime(conversationId); // ⭐ Subscribe to read receipts updates
+  useBlockStatusRealtime(userId); // ⭐ Subscribe to block status changes realtime
 
   // Reset typing state khi chuyển conversation
   useEffect(() => {
@@ -712,8 +718,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   );
 
   const handleLocationClick = useCallback(() => {
+    if (isBlocked) {
+      toast.error('Bạn không thể gửi vị trí với người dùng này do đã bị chặn');
+      return;
+    }
+    if (isChatRestricted) {
+      toast.error('Chỉ admin mới có thể gửi vị trí trong nhóm này');
+      return;
+    }
     setShowLocationPicker(true);
-  }, []);
+  }, [isBlocked, isChatRestricted]);
 
   const handleCall = useCallback(
     async (userId: string, isVideo: boolean) => {
@@ -825,7 +839,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     <div
       data-tour-id="chat-window"
       className="
-        flex flex-col h-screen justify-between
+        flex flex-col h-[calc(100vh-56px)] justify-between
         bg-white text-gray-900
         dark:bg-[#313338] dark:text-[#F2F3F5]
       "
@@ -843,6 +857,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         conversation={conversation}
         currentUserId={userId}
         onCall={handleCall}
+        initialShowSearch={initialShowSearch}
         onGroupCall={handleGroupCall}
         onCallWithParticipants={handleCallWithParticipants}
         pinned={pinned}
@@ -875,10 +890,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         </div>
 
         {/* Chat Tab */}
-        <TabsContent
-          value="chat"
-          className="flex-1 flex flex-col min-h-0 m-0 pb-14"
-        >
+        <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 m-0">
           <div
             ref={listRef}
             className="
@@ -1094,7 +1106,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         {/* Threads Tab */}
         <TabsContent
           value="threads"
-          className="flex-1 flex flex-col min-h-0 m-0 pb-14"
+          className="flex-1 flex flex-col min-h-0 m-0"
         >
           {selectedThread ? (
             <ThreadView

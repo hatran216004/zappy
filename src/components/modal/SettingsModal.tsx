@@ -4,7 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -21,24 +21,32 @@ interface SettingsModalProps {
   userId: string;
 }
 
-export function SettingsModal({
-  open,
-  onClose,
-  userId,
-}: SettingsModalProps) {
+interface ProfileWithPrivacy {
+  block_messages_from_strangers?: boolean;
+  is_private?: boolean;
+}
+
+export function SettingsModal({ open, onClose, userId }: SettingsModalProps) {
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
   const { data: profile, refetch } = useProfile(userId);
   const { restartTour } = useOnboarding(userId);
 
   const [blockStrangers, setBlockStrangers] = useState(
-    profile?.block_messages_from_strangers || false
+    (profile as ProfileWithPrivacy)?.block_messages_from_strangers || false
+  );
+  const [isPrivate, setIsPrivate] = useState(
+    (profile as ProfileWithPrivacy)?.is_private || false
   );
 
   // Update local state when profile changes
   useEffect(() => {
     if (profile) {
-      setBlockStrangers(profile.block_messages_from_strangers || false);
+      const profileWithPrivacy = profile as ProfileWithPrivacy;
+      setBlockStrangers(
+        profileWithPrivacy.block_messages_from_strangers || false
+      );
+      setIsPrivate(profileWithPrivacy.is_private || false);
     }
   }, [profile]);
 
@@ -49,14 +57,15 @@ export function SettingsModal({
         .from('profiles')
         .update({
           block_messages_from_strangers: blockStrangers,
-        })
+          is_private: isPrivate
+        } as Record<string, unknown>)
         .eq('id', userId);
 
       if (error) throw error;
 
       // Invalidate profile query
       queryClient.invalidateQueries({
-        queryKey: ['profile', userId],
+        queryKey: ['profile', userId]
       });
 
       // Refetch profile
@@ -86,11 +95,15 @@ export function SettingsModal({
           {/* Block messages from strangers */}
           <div className="flex items-center justify-between space-x-4">
             <div className="flex-1 space-y-1">
-              <Label htmlFor="block-strangers" className="text-base font-medium">
+              <Label
+                htmlFor="block-strangers"
+                className="text-base font-medium"
+              >
                 Chặn tin nhắn từ người lạ
               </Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Khi bật, bạn sẽ không nhận được tin nhắn từ những người chưa kết bạn
+                Khi bật, bạn sẽ không nhận được tin nhắn từ những người chưa kết
+                bạn
               </p>
             </div>
             <Switch
@@ -100,12 +113,27 @@ export function SettingsModal({
             />
           </div>
 
+          {/* Privacy mode */}
+          <div className="flex items-center justify-between space-x-4">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="privacy-mode" className="text-base font-medium">
+                Chế độ riêng tư
+              </Label>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Khi bật, bạn sẽ không nhận được lời mời kết bạn từ người khác
+              </p>
+            </div>
+            <Switch
+              id="privacy-mode"
+              checked={isPrivate}
+              onCheckedChange={setIsPrivate}
+            />
+          </div>
+
           {/* Xem lại hướng dẫn */}
           <div className="flex items-center justify-between space-x-4 pt-2 border-t">
             <div className="flex-1 space-y-1">
-              <Label className="text-base font-medium">
-                Hướng dẫn sử dụng
-              </Label>
+              <Label className="text-base font-medium">Hướng dẫn sử dụng</Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Xem lại tour hướng dẫn để khám phá các tính năng của hệ thống
               </p>
@@ -138,4 +166,3 @@ export function SettingsModal({
     </Dialog>
   );
 }
-

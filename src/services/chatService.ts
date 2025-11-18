@@ -130,19 +130,20 @@ export const getConversations = async (
   // Step 2: Fetch conversations and participants in PARALLEL
   const [conversationsRes, participantsRes, directPairsRes] = await Promise.all(
     [
-      // Get conversations basic info
+      // Get conversations basic info (exclude deleted groups)
       supabase
         .from('conversations')
         .select(
           'id, title, type, updated_at, created_at, last_message_id, photo_url'
         )
-        .in('id', conversationIds),
+        .in('id', conversationIds)
+        .or('is_deleted.is.null,is_deleted.eq.false'),
 
       // Get ALL participants for these conversations in ONE query
       supabase
         .from('conversation_participants')
         .select(
-          'conversation_id, user_id, profile:profiles(id, display_name, avatar_url, status)'
+          'conversation_id, user_id, mute_until, role, profile:profiles(id, display_name, avatar_url, status)'
         )
         .in('conversation_id', conversationIds)
         .is('left_at', null),
@@ -271,6 +272,7 @@ export const getConversation = async (
     .from('conversations')
     .select('*')
     .eq('id', conversationId)
+    .or('is_deleted.is.null,is_deleted.eq.false')
     .single();
 
   if (error) throw error;
@@ -553,6 +555,54 @@ export const sendTextMessage = async (
       updated_at: new Date().toISOString()
     })
     .eq('id', conversationId);
+
+  // Create notifications for other participants
+  try {
+    // Get sender info
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('display_name, avatar_url')
+      .eq('id', senderId)
+      .single();
+
+    // Get conversation participants (excluding sender)
+    const { data: participants } = await supabase
+      .from('conversation_participants')
+      .select('user_id, mute_until')
+      .eq('conversation_id', conversationId)
+      .neq('user_id', senderId)
+      .is('left_at', null);
+
+    if (participants && participants.length > 0 && senderProfile) {
+      // Filter out muted participants
+      const now = new Date();
+      const unmutedParticipants = participants.filter((participant) => {
+        if (!participant.mute_until) return true;
+        return new Date(participant.mute_until) <= now;
+      });
+
+      if (unmutedParticipants.length > 0) {
+        const notifications = unmutedParticipants.map((participant) => ({
+          user_id: participant.user_id,
+          type: 'new_message',
+          data: {
+            sender_id: senderId,
+            sender_name: senderProfile.display_name,
+            sender_avatar: senderProfile.avatar_url,
+            conversation_id: conversationId,
+            message_id: data.id,
+            message: content,
+            preview: content.substring(0, 100)
+          }
+        }));
+
+        await supabase.from('notifications').insert(notifications);
+      }
+    }
+  } catch (notifError) {
+    console.error('Error creating notifications:', notifError);
+    // Don't throw error, message was sent successfully
+  }
 
   return data;
 };
@@ -2291,6 +2341,62 @@ export const promoteToAdmin = async (
     .eq('user_id', userId);
 
   if (error) throw error;
+};
+
+// Delete group (soft delete - only admin)
+export const deleteGroup = async (
+  conversationId: string,
+  adminId: string
+): Promise<void> => {
+  // Verify user is admin
+  const { data: participant, error: checkError } = await supabase
+    .from('conversation_participants')
+    .select('role')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', adminId)
+    .is('left_at', null)
+    .single();
+
+  if (checkError) throw checkError;
+  if (participant?.role !== 'admin') {
+    throw new Error('Chỉ admin mới có thể xóa nhóm');
+  }
+
+  // Verify it's a group conversation
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('type')
+    .eq('id', conversationId)
+    .single();
+
+  if (convError) throw convError;
+  if (conversation?.type !== 'group') {
+    throw new Error('Chỉ có thể xóa nhóm, không thể xóa cuộc trò chuyện 1-1');
+  }
+
+  // Soft delete: update is_deleted = true
+  const { error: updateError } = await supabase
+    .from('conversations')
+    .update({ is_deleted: true, updated_at: new Date().toISOString() })
+    .eq('id', conversationId);
+
+  if (updateError) throw updateError;
+
+  // Create system message
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', adminId)
+    .single();
+
+  if (profile) {
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: adminId,
+      type: 'system',
+      content_text: `${profile.display_name} đã xóa nhóm`
+    });
+  }
 };
 
 // ============================================

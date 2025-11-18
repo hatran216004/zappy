@@ -13,8 +13,9 @@ import {
   Unlock
 } from 'lucide-react';
 import { TooltipBtn } from '../TooltipBtn';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { useLocation } from 'react-router';
 import type { ConversationWithDetails } from '@/services/chatService';
 import type { PinnedMessage } from '@/services/chatService';
 import { InviteLinkModal } from '../modal/InviteLinkModal';
@@ -58,6 +59,7 @@ interface ChatHeaderProps {
   onUnpin?: (messageId: string) => void;
   onJumpTo?: (messageId: string) => void;
   onCreateThread?: () => void;
+  initialShowSearch?: boolean;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -74,14 +76,24 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   pinned,
   onUnpin,
   onJumpTo,
-  onCreateThread
+  onCreateThread,
+  initialShowSearch = false
 }) => {
   const { user } = useUser();
-  const [showSearch, setShowSearch] = useState(false);
+  const location = useLocation();
+  const [showSearch, setShowSearch] = useState(initialShowSearch);
   const [searchQuery, setSearchQuery] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
+
+  // Handle initial show search from location state or prop
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.openSearch || initialShowSearch) {
+      setShowSearch(true);
+    }
+  }, [location.pathname, location.state, initialShowSearch]);
 
   const updateBackgroundMutation = useUpdateConversationBackground();
 
@@ -98,6 +110,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const displayName = isGroupChat
     ? conversation?.title || 'Nhóm'
     : otherParticipant?.profile.display_name || 'Người dùng';
+
+  // Check if blocked (either direction)
+  const isBlocked = !isGroupChat && (isBlockedByMe === true || isBlockedByUser === true);
 
   const avatarUrl = isGroupChat
     ? `${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation?.photo_url}`
@@ -137,6 +152,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const handleUnblock = async () => {
     if (!otherUserId) return;
+
+    const confirmed = await confirm({
+      title: 'Bỏ chặn người dùng',
+      description: `Bạn có chắc muốn bỏ chặn ${displayName}? Bạn sẽ có thể nhắn tin và thấy bài viết của nhau.`,
+      confirmText: 'Bỏ chặn',
+      cancelText: 'Hủy'
+    });
+
+    if (!confirmed) return;
 
     try {
       await unblockUserMutation.mutateAsync(otherUserId);
@@ -257,7 +281,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               size="icon"
               className="rounded-full"
               onClick={() => onCall?.(otherParticipant.user_id, false)}
-              title="Gọi thoại"
+              title={isBlocked ? "Không thể gọi khi đã chặn" : "Gọi thoại"}
+              disabled={isBlocked}
             >
               <Phone className="size-5" />
             </Button>

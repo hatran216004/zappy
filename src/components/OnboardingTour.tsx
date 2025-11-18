@@ -59,7 +59,16 @@ export default function OnboardingTour({
       }
 
       if (!element) {
+        // Debug log cho chat-window
+        if (step.id === 'chat-window') {
+          console.log('[Onboarding] Chat-window element not found, selector:', step.target);
+        }
         return false;
+      }
+      
+      // Debug log khi tìm thấy chat-window
+      if (step.id === 'chat-window') {
+        console.log('[Onboarding] Chat-window element found:', element);
       }
 
       // Kiểm tra element có visible không
@@ -77,7 +86,16 @@ export default function OnboardingTour({
       const rect = element.getBoundingClientRect();
 
       // Nếu element có kích thước 0x0, đợi thêm một chút để element render xong
-      if (rect.width === 0 && rect.height === 0 && step.target !== 'body') {
+      // Đặc biệt cho chat-window: cho phép element có kích thước nhỏ hơn vì nó có thể là placeholder
+      if (rect.width === 0 && rect.height === 0 && step.target !== 'body' && step.id !== 'chat-window') {
+        return false;
+      }
+      
+      // Đối với chat-window, nếu có kích thước hợp lý (dù nhỏ) thì vẫn hiển thị
+      if (step.id === 'chat-window' && rect.width > 0 && rect.height > 0) {
+        // OK, element có kích thước
+      } else if (step.id === 'chat-window' && rect.width === 0 && rect.height === 0) {
+        // Vẫn retry nếu chưa có kích thước
         return false;
       }
 
@@ -86,19 +104,20 @@ export default function OnboardingTour({
         setHighlightRect(rect);
 
         // Tính toán vị trí tooltip
-        const position = calculateTooltipPosition(
-          rect,
-          step.position || 'bottom'
-        );
-        setTooltipPosition(position);
+        // Đặc biệt cho navbar: đặt tooltip ở dưới thay vì bên phải
+        const tooltipPosition = step.id === 'navbar' 
+          ? calculateTooltipPosition(rect, 'bottom')
+          : calculateTooltipPosition(rect, step.position || 'bottom');
+        setTooltipPosition(tooltipPosition);
       }
       return true;
     };
 
     // Retry logic: thử tìm element với delay
+    // Tăng retry cho chat-window vì nó có thể render chậm hơn
     let retryCount = 0;
-    const maxRetries = 20;
-    const retryDelay = 150;
+    const maxRetries = step.id === 'chat-window' ? 30 : 20;
+    const retryDelay = step.id === 'chat-window' ? 200 : 150;
 
     const tryUpdateHighlight = () => {
       if (!isMounted) return;
@@ -128,6 +147,20 @@ export default function OnboardingTour({
         updateHighlight();
       }
     };
+    
+    // Đặc biệt cho chat-window: kiểm tra lại element định kỳ để đảm bảo nó vẫn tồn tại
+    let checkInterval: NodeJS.Timeout | null = null;
+    if (step.id === 'chat-window') {
+      checkInterval = setInterval(() => {
+        if (!isMounted) return;
+        const element = document.querySelector(step.target);
+        if (!element) {
+          // Element bị mất, thử tìm lại
+          console.log('[Onboarding] Chat-window element lost, retrying...');
+          tryUpdateHighlight();
+        }
+      }, 500); // Check mỗi 500ms
+    }
 
     window.addEventListener('scroll', handleScroll, true);
     window.addEventListener('resize', handleResize);
@@ -136,6 +169,9 @@ export default function OnboardingTour({
       isMounted = false;
       if (retryTimeout) {
         clearTimeout(retryTimeout);
+      }
+      if (checkInterval) {
+        clearInterval(checkInterval);
       }
       window.removeEventListener('scroll', handleScroll, true);
       window.removeEventListener('resize', handleResize);
@@ -147,9 +183,83 @@ export default function OnboardingTour({
   useEffect(() => {
     if (!tooltipPosition || !tooltipRef.current || !step) return;
     if (step.target === 'body') return; // Không cần adjust cho welcome modal
+    
+    // Đặc biệt cho navbar: đảm bảo tooltip hiển thị dưới navbar và không bị che
+    if (step.id === 'navbar') {
+      const tooltip = tooltipRef.current;
+      if (!tooltip) return;
+      
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const navbarRect = document.querySelector('[data-tour-id="navbar"]')?.getBoundingClientRect();
+      
+      if (navbarRect) {
+        // Đảm bảo tooltip nằm dưới navbar với khoảng cách hợp lý
+        const minTop = navbarRect.bottom + 20; // 20px padding dưới navbar
+        const currentTop = parseFloat(tooltip.style.top) || tooltipPosition.top;
+        
+        if (currentTop < minTop) {
+          tooltip.style.top = `${minTop + tooltipRect.height / 2}px`;
+        }
+      }
+      return; // Không cần điều chỉnh thêm cho navbar
+    }
+    
+    // Đặc biệt cho chat-window: không điều chỉnh position quá mức, chỉ đảm bảo trong viewport
+    if (step.id === 'chat-window') {
+      const tooltip = tooltipRef.current;
+      if (!tooltip) return;
+      
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const padding = 20;
+      const halfWidth = tooltipRect.width / 2;
+      const halfHeight = tooltipRect.height / 2;
+      
+      const currentLeft = parseFloat(tooltip.style.left) || tooltipPosition.left;
+      const currentTop = parseFloat(tooltip.style.top) || tooltipPosition.top;
+      
+      let finalLeft = currentLeft;
+      let finalTop = currentTop;
+      let needsAdjustment = false;
+      
+      // Chỉ điều chỉnh nếu thực sự tràn ra ngoài viewport
+      if (currentLeft - halfWidth < padding) {
+        needsAdjustment = true;
+        finalLeft = padding + halfWidth;
+      } else if (currentLeft + halfWidth > viewportWidth - padding) {
+        needsAdjustment = true;
+        finalLeft = viewportWidth - padding - halfWidth;
+      }
+      
+      if (currentTop - halfHeight < padding) {
+        needsAdjustment = true;
+        finalTop = padding + halfHeight;
+      } else if (currentTop + halfHeight > viewportHeight - padding) {
+        needsAdjustment = true;
+        finalTop = viewportHeight - padding - halfHeight;
+      }
+      
+      // Chỉ update nếu thực sự cần và khác biệt đáng kể
+      if (needsAdjustment) {
+        const leftDiff = Math.abs(finalLeft - currentLeft);
+        const topDiff = Math.abs(finalTop - currentTop);
+        const threshold = 5;
+        
+        if (leftDiff > threshold || topDiff > threshold) {
+          tooltip.style.left = `${finalLeft}px`;
+          tooltip.style.top = `${finalTop}px`;
+        }
+      }
+      
+      return; // Không cần điều chỉnh thêm cho chat-window
+    }
 
     const adjustPosition = () => {
       if (!tooltipRef.current || !tooltipPosition || !step) return;
+      
+      // Đã xử lý riêng cho chat-window ở trên, không cần adjust thêm
+      if (step.id === 'chat-window') return;
 
       const tooltip = tooltipRef.current;
       const tooltipRect = tooltip.getBoundingClientRect();
@@ -165,7 +275,13 @@ export default function OnboardingTour({
 
       // Tìm element được highlight
       const targetElement = document.querySelector(step.target);
-      if (!targetElement) return;
+      if (!targetElement) {
+        // Debug log nếu không tìm thấy element
+        if (step.id === 'chat-window') {
+          console.log('[Onboarding] Target element not found in adjustPosition:', step.target);
+        }
+        return;
+      }
 
       const targetRect = targetElement.getBoundingClientRect();
 
@@ -469,9 +585,15 @@ export default function OnboardingTour({
 
       {/* Welcome modal (center) */}
       {step.target === 'body' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto z-[10000]">
+        <div 
+          className="absolute inset-0 flex items-center justify-center pointer-events-auto z-[10000]"
+          style={{
+            top: '56px', // Start below navbar
+            height: 'calc(100vh - 56px)' // Remaining viewport height
+          }}
+        >
           <div
-            className="rounded-lg shadow-2xl p-8 min-w-[400px] max-w-[500px]"
+            className="rounded-lg shadow-2xl p-8 min-w-[400px] max-w-[500px] mx-4"
             style={{
               backgroundColor: '#2B2D31',
               color: '#F2F3F5',

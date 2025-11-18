@@ -102,6 +102,7 @@ export default function MainLayout() {
 
   return (
     <>
+      <Navbar />
       <div className="h-[calc(100vh-56px)] flex dark:bg-gray-900">
         <div className="grid grid-cols-12 flex-1">
           <Outlet />
@@ -136,7 +137,6 @@ export default function MainLayout() {
           onDismissBanner={() => setShowCompletionBanner(false)}
         />
       </div>
-      <Navbar />
     </>
   );
 }

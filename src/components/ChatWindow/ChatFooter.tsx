@@ -344,12 +344,13 @@ export default function ChatFooter({
             size="icon"
             className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            onClick={() => !disabled && setShowEmojiPicker(!showEmojiPicker)}
+            disabled={disabled}
           >
             <Smile className="size-5 text-gray-500 dark:text-gray-300" />
           </Button>
 
-          {showEmojiPicker && (
+          {showEmojiPicker && !disabled && (
             <div className="absolute bottom-12 left-0 z-50">
               <Picker
                 data={data}

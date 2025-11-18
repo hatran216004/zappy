@@ -119,6 +119,15 @@ export default function FriendItem({
   };
 
   const handleUnblock = async () => {
+    const confirmed = await confirm({
+      title: 'Bỏ chặn người dùng',
+      description: `Bạn có chắc muốn bỏ chặn ${friend.display_name}? Bạn sẽ có thể nhắn tin và thấy bài viết của nhau.`,
+      confirmText: 'Bỏ chặn',
+      cancelText: 'Hủy'
+    });
+
+    if (!confirmed) return;
+
     try {
       await unblockUserMutation.mutateAsync(friend.id);
       toast.success(`Đã bỏ chặn ${friend.display_name}`);

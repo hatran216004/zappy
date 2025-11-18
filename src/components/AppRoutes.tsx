@@ -34,6 +34,7 @@ export default function AppRoutes() {
             <Route index element={<Navigate to="chat" replace />} />
 
             <Route path="chat" element={<ChatLayout />}>
+              <Route index element={<ChatPage />} />
               <Route path=":conversationId" element={<ChatPage />} />
             </Route>
 
