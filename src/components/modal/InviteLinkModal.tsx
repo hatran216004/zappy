@@ -26,6 +26,8 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import { QRCodeSVG } from 'qrcode.react';
+import { QrCode, X } from 'lucide-react';
 
 interface InviteLinkModalProps {
   open: boolean;
@@ -45,6 +47,7 @@ export const InviteLinkModal: React.FC<InviteLinkModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [expiresIn, setExpiresIn] = useState<string>('never');
   const [maxUses, setMaxUses] = useState<string>('unlimited');
+  const [showQRCodes, setShowQRCodes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open) {
@@ -119,6 +122,13 @@ export const InviteLinkModal: React.FC<InviteLinkModalProps> = ({
   const isMaxUsesReached = (invite: GroupInvite) => {
     if (!invite.max_uses) return false;
     return invite.used_count >= invite.max_uses;
+  };
+
+  const toggleQRCode = (inviteId: string) => {
+    setShowQRCodes((prev) => ({
+      ...prev,
+      [inviteId]: !prev[inviteId]
+    }));
   };
 
   return (
@@ -312,9 +322,38 @@ export const InviteLinkModal: React.FC<InviteLinkModalProps> = ({
                                dark:bg-[#313338] dark:border-[#1e1f22] dark:text-neutral-100"
                     onClick={(e) => e.currentTarget.select()}
                   />
+
+                  {/* QR Code */}
+                  {showQRCodes[invite.id] && (
+                    <div className="mt-3 flex justify-center p-3 rounded-lg bg-white dark:bg-[#1e1f22] border border-neutral-200 dark:border-[#1e1f22]">
+                      <QRCodeSVG
+                        value={getInviteLink(invite.invite_code)}
+                        size={200}
+                        level="M"
+                        includeMargin={true}
+                        className="rounded-lg"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => toggleQRCode(invite.id)}
+                    title={showQRCodes[invite.id] ? "Ẩn QR code" : "Hiển thị QR code"}
+                    className="h-9 border-neutral-200 text-neutral-700 hover:bg-neutral-100
+                               dark:border-[#1e1f22] dark:text-neutral-200 dark:hover:bg-[#3b3d42]
+                               focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-0"
+                  >
+                    {showQRCodes[invite.id] ? (
+                      <X className="h-4 w-4" />
+                    ) : (
+                      <QrCode className="h-4 w-4" />
+                    )}
+                  </Button>
+
                   <Button
                     size="sm"
                     variant="outline"

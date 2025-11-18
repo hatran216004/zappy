@@ -45,6 +45,7 @@ import {
   updateConversationBackground,
   removeGroupMember,
   toggleChatEnabled,
+  deleteGroup,
   supabase,
   // type ConversationWithDetails,
   // type MessageWithDetails,
@@ -1505,6 +1506,37 @@ export const useRemoveGroupMember = () => {
         predicate: (query) =>
           query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
       });
+    }
+  });
+};
+
+// Hook delete group (soft delete - only admin)
+export const useDeleteGroup = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      adminId
+    }: {
+      conversationId: string;
+      adminId: string;
+    }) => deleteGroup(conversationId, adminId),
+    onSuccess: (_, variables) => {
+      // Invalidate conversations queries
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({
+        queryKey: ['conversation', variables.conversationId]
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'chat' && query.queryKey[1] === 'conversations'
+      });
+      toast.success('Đã xóa nhóm');
+    },
+    onError: (error: Error) => {
+      console.error('Error deleting group:', error);
+      toast.error(error.message || 'Không thể xóa nhóm');
     }
   });
 };

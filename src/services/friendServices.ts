@@ -122,6 +122,20 @@ export const sendFriendRequest = async (
   const currentUser = (await supabase.auth.getUser()).data.user;
   const me = currentUser?.id;
 
+  // STEP 0: Check if target user has privacy mode enabled
+  const { data: targetProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('is_private')
+    .eq('id', toUserId)
+    .single();
+
+  if (profileError) {
+    console.error('Error checking privacy mode:', profileError);
+    // Continue anyway, let RPC handle it
+  } else if (targetProfile?.is_private) {
+    throw new Error('Người dùng này đã bật chế độ riêng tư và không nhận lời mời kết bạn');
+  }
+
   // STEP 1: Clean up any orphaned friendships BEFORE calling RPC
   // This prevents RPC from failing due to existing orphaned rows
   if (me) {

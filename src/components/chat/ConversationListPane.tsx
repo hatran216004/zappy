@@ -378,7 +378,7 @@ export default function ConversationListPane() {
       </div>
 
       {!collapsed && (
-        <div className="h-[calc(100vh-59px)] overflow-y-auto discord-scroll">
+        <div className="h-[calc(100vh-115px)] overflow-y-auto discord-scroll">
           {/* Avatar & quick actions */}
           <div
             className="
@@ -498,7 +498,7 @@ export default function ConversationListPane() {
             </SectionWrap>
 
             {/* Danger zone */}
-            <div className="p-4 pb-18">
+            <div className="p-4">
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-[#B5BAC1] mb-2">
                 Thiết lập bảo mật
               </h3>

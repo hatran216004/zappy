@@ -19,6 +19,8 @@ interface BackgroundPickerProps {
   };
   onSelect: (type: 'color' | 'gradient' | 'image', value: string) => void;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Predefined solid colors
@@ -121,10 +123,19 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
   currentBackground,
   onSelect,
   trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }) => {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [selectedType, setSelectedType] = useState(currentBackground.type);
   const [selectedValue, setSelectedValue] = useState(currentBackground.value);
+
+  // Use controlled or uncontrolled mode
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled
+    ? controlledOnOpenChange || (() => {})
+    : setInternalOpen;
 
   const handleSelect = (type: 'color' | 'gradient' | 'image', value: string) => {
     setSelectedType(type);

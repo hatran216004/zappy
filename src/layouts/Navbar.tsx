@@ -9,6 +9,8 @@ import {
   LogOut,
   Search
 } from 'lucide-react';
+import { NotificationButton } from '@/components/notification/NotificationButton';
+import { useNotificationsRealtime } from '@/hooks/useNotifications';
 import { useEffect, useState, type ElementType } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
@@ -103,6 +105,9 @@ export default function Navbar() {
   const { data: statusProfile } = useUserStatus(userId || '');
   useUserStatusRealtime(userId || '');
 
+  // Subscribe to notifications realtime
+  useNotificationsRealtime(userId || '');
+
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [searchUsersModalOpen, setSearchUsersModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -155,11 +160,11 @@ export default function Navbar() {
             className="
               flex h-10 w-10 items-center justify-center
               rounded-full bg-white/90
-              text-[#8A3BFF] text-xl font-bold
+              text-[#8A3BFF] text-sm font-bold
               shadow-sm
             "
           >
-            f
+            Z
           </button>
 
           {/* Ô search giả (mở modal tìm user) – nền trắng mờ, text trắng */}
@@ -176,7 +181,7 @@ export default function Navbar() {
             "
           >
             <Search className="mr-2 h-4 w-4 text-white/90" />
-            <span className="truncate">Tìm kiếm trên ChatApp</span>
+            <span className="truncate">Tìm kiếm trên Zappy</span>
           </button>
         </div>
 
@@ -217,6 +222,9 @@ export default function Navbar() {
           >
             <Search className="h-4 w-4" />
           </button>
+
+          {/* Nút thông báo */}
+          {userId && <NotificationButton userId={userId} />}
 
           {/* Nút đổi theme – icon trắng trên nền trắng mờ */}
           <button
