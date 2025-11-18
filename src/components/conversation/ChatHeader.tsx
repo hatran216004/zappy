@@ -53,6 +53,7 @@ interface ChatHeaderProps {
   currentUserId?: string;
   onCall?: (userId: string, isVideo: boolean) => void;
   onGroupCall?: (conversationId: string, isVideo: boolean) => void;
+  onCallWithParticipants?: (conversationId: string, isVideo: boolean, participants: string[]) => void;
   pinned?: PinnedMessage[];
   onUnpin?: (messageId: string) => void;
   onJumpTo?: (messageId: string) => void;
@@ -69,6 +70,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   currentUserId,
   onCall,
   onGroupCall,
+  onCallWithParticipants,
   pinned,
   onUnpin,
   onJumpTo,
@@ -267,7 +269,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               variant="ghost"
               size="icon"
               className="rounded-full"
-              onClick={() => onGroupCall?.(conversation.id, false)}
+              onClick={() => {
+                // Get all active participant IDs from the conversation
+                const participantIds = conversation.participants
+                  ?.filter(p => p.left_at === null)
+                  .map(p => p.user_id) || [];
+                
+                // Use new call with participants function (Zappy-main style)
+                if (onCallWithParticipants) {
+                  onCallWithParticipants(conversation.id, false, participantIds);
+                } else {
+                  // Fallback to old group call method
+                  onGroupCall?.(conversation.id, false);
+                }
+              }}
               title="Gọi thoại"
             >
               <Phone className="size-5" />
