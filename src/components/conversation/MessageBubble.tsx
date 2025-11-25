@@ -156,6 +156,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
     const [showReportModal, setShowReportModal] = useState(false);
     const [showEffect, setShowEffect] = useState(false);
+    const [isRecalling, setIsRecalling] = useState(false);
+    const [isDeletingForMe, setIsDeletingForMe] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(false);
+    const [wasRecalled, setWasRecalled] = useState(!!message.recalled_at);
+    const [wasDeletedForMe, setWasDeletedForMe] = useState(!!message.deleted_for_me);
     const confirm = useConfirm();
 
     // Get effect from message
@@ -199,6 +204,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
       }
     }, [messageEffect]);
 
+    // Detect when message is recalled or deleted from realtime update
+    useEffect(() => {
+      // If message was just recalled (wasn't recalled before, now is)
+      if (message.recalled_at && !wasRecalled && !isRecalling && !isAnimating) {
+        setIsRecalling(true);
+        setIsAnimating(true);
+        setWasRecalled(true);
+        // Reset after animation
+        setTimeout(() => {
+          setIsAnimating(false);
+        }, 1500);
+      } else if (message.recalled_at && !wasRecalled) {
+        setWasRecalled(true);
+      }
+      
+      // If message was just deleted for me (wasn't deleted before, now is)
+      if (message.deleted_for_me && !wasDeletedForMe && !isDeletingForMe && !isAnimating) {
+        setIsDeletingForMe(true);
+        setIsAnimating(true);
+        setWasDeletedForMe(true);
+        // Reset after animation
+        setTimeout(() => {
+          setIsAnimating(false);
+        }, 1000);
+      } else if (message.deleted_for_me && !wasDeletedForMe) {
+        setWasDeletedForMe(true);
+      }
+    }, [message.recalled_at, message.deleted_for_me, wasRecalled, wasDeletedForMe, isRecalling, isDeletingForMe, isAnimating]);
+
     const handleEdit = async () => {
       if (!editText.trim()) return;
 
@@ -235,15 +269,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
 
       if (!confirmed) return;
 
-      try {
-        await recallMutation.mutateAsync(message.id);
-        // Nếu tin nhắn đang được ghim, tự động hủy ghim
-        if (isPinned && onUnpin) {
-          onUnpin();
+      // Start dissolve animation (tan biến)
+      setIsRecalling(true);
+      setIsAnimating(true);
+      setWasRecalled(true); // Mark as recalled locally
+
+      // Wait for animation to complete (1.5 seconds)
+      setTimeout(async () => {
+        try {
+          await recallMutation.mutateAsync(message.id);
+          // Nếu tin nhắn đang được ghim, tự động hủy ghim
+          if (isPinned && onUnpin) {
+            onUnpin();
+          }
+          // Reset animation state after mutation completes
+          // The message.recalled_at will be updated via realtime
+          setIsAnimating(false);
+        } catch (error) {
+          console.error('Error recalling message:', error);
+          setIsRecalling(false);
+          setIsAnimating(false);
+          setWasRecalled(false); // Revert on error
         }
-      } catch (error) {
-        console.error('Error recalling message:', error);
-      }
+      }, 1500);
     };
 
     const handleDeleteForMe = async () => {
@@ -259,14 +307,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
 
       if (!confirmed) return;
 
-      try {
-        await deleteForMeMutation.mutateAsync({
-          messageId: message.id,
-          userId: currentUserId
-        });
-      } catch (error) {
-        console.error('Error deleting message for me:', error);
-      }
+      // Start fade-out animation
+      setIsDeletingForMe(true);
+      setIsAnimating(true);
+      setWasDeletedForMe(true); // Mark as deleted locally
+
+      // Wait for animation to complete (1 second)
+      setTimeout(async () => {
+        try {
+          await deleteForMeMutation.mutateAsync({
+            messageId: message.id,
+            userId: currentUserId
+          });
+          // Reset animation state after mutation completes
+          // The message.deleted_for_me will be updated via realtime
+          setIsAnimating(false);
+        } catch (error) {
+          console.error('Error deleting message for me:', error);
+          setIsDeletingForMe(false);
+          setIsAnimating(false);
+          setWasDeletedForMe(false); // Revert on error
+        }
+      }, 1000);
     };
 
     const handleDeleteAsAdmin = async () => {
@@ -366,7 +428,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     }
 
     // Hiển thị "Tin nhắn đã được thu hồi" nếu tin nhắn bị recalled hoặc deleted_for_me
-    if (message.recalled_at || message.deleted_for_me) {
+    // (nhưng không hiển thị nếu đang trong quá trình animation)
+    // Also check wasDeletedForMe/wasRecalled for local state tracking
+    const isDeleted = message.recalled_at || message.deleted_for_me || wasDeletedForMe || wasRecalled;
+    if (isDeleted && !isAnimating) {
       return (
         <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
           <div className="max-w-[70%] px-4 py-2 rounded-lg bg-gray-100 text-gray-500 italic dark:bg-[#2B2D31] dark:text-[#949BA4]">
@@ -390,7 +455,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
           <div
             className={`flex gap-2 max-w-[70%] ${
               isOwn ? 'flex-row-reverse' : ''
-            } ${isShaking ? 'animate-shake' : ''}`}
+            } ${isShaking ? 'animate-shake' : ''} ${
+              isDeletingForMe ? 'animate-fade-out' : ''
+            } ${isRecalling ? 'animate-dissolve' : ''}`}
           >
             <style>{`
               @keyframes shake {
@@ -400,6 +467,43 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
               }
               .animate-shake {
                 animation: shake 0.5s ease-in-out;
+              }
+              
+              /* Fade-out animation - Thu hồi ở phía tôi */
+              @keyframes fade-out {
+                0% {
+                  opacity: 1;
+                }
+                100% {
+                  opacity: 0;
+                }
+              }
+              .animate-fade-out {
+                animation: fade-out 1s ease-out forwards;
+                pointer-events: none;
+              }
+              
+              /* Dissolve animation - Thu hồi với mọi người (tan biến) */
+              @keyframes dissolve {
+                0% {
+                  opacity: 1;
+                  transform: scale(1);
+                  filter: blur(0px);
+                }
+                50% {
+                  opacity: 0.5;
+                  transform: scale(0.95);
+                  filter: blur(2px);
+                }
+                100% {
+                  opacity: 0;
+                  transform: scale(0.9);
+                  filter: blur(4px);
+                }
+              }
+              .animate-dissolve {
+                animation: dissolve 1.5s ease-out forwards;
+                pointer-events: none;
               }
             `}</style>
           {/* Avatar */}

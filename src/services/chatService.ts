@@ -4396,3 +4396,221 @@ export const getChatSummary24h = async (
     topKeywords
   };
 };
+
+// Get all messages from a conversation (for AI context)
+export const getAllMessagesForAI = async (
+  conversationId: string
+): Promise<Array<{
+  id: string;
+  content_text: string | null;
+  type: string;
+  created_at: string;
+  sender: {
+    display_name: string;
+    id: string;
+  };
+  attachments?: Array<{
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+  }>;
+}>> => {
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select(
+      `
+      id,
+      content_text,
+      type,
+      created_at,
+      sender:profiles!messages_sender_id_fkey(id, display_name),
+      attachments(storage_path, byte_size, mime_type)
+    `
+    )
+    .eq('conversation_id', conversationId)
+    .is('thread_id', null)
+    .is('recalled_at', null)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  return (messages || []).map((msg: any) => ({
+    id: msg.id,
+    content_text: msg.content_text,
+    type: msg.type,
+    created_at: msg.created_at,
+    sender: {
+      display_name: msg.sender?.display_name || 'Unknown',
+      id: msg.sender?.id || ''
+    },
+    attachments: (msg.attachments || []).map((att: any) => {
+      // Extract file name from storage_path
+      // storage_path format: "attachments/conversationId/timestamp_random.ext"
+      const fileName = att.storage_path?.split('/').pop() || 'unknown';
+      // Remove timestamp prefix if exists (format: timestamp_random.ext)
+      const cleanFileName = fileName.replace(/^\d+_[a-z0-9]+\./, '') || fileName;
+      
+      return {
+        file_name: cleanFileName,
+        file_size: att.byte_size || 0,
+        mime_type: att.mime_type || 'unknown'
+      };
+    })
+  }));
+};
+
+// Ask AI about chat history
+export const askAIAboutChat = async (
+  conversationId: string,
+  question: string
+): Promise<string> => {
+  // Get all messages for context
+  const messages = await getAllMessagesForAI(conversationId);
+
+  // Format messages for AI context
+  const chatHistory = messages
+    .map((msg) => {
+      const timestamp = new Date(msg.created_at).toLocaleString('vi-VN');
+      let content = `[${timestamp}] ${msg.sender.display_name}: `;
+      
+      if (msg.type === 'text' && msg.content_text) {
+        content += msg.content_text;
+      } else if (msg.type === 'image') {
+        content += '[Ảnh]';
+      } else if (msg.type === 'video') {
+        content += '[Video]';
+      } else if (msg.type === 'file' && msg.attachments?.length > 0) {
+        const fileNames = msg.attachments.map(a => a.file_name).join(', ');
+        content += `[File: ${fileNames}]`;
+      } else if (msg.type === 'audio') {
+        content += '[Audio]';
+      } else if (msg.type === 'location') {
+        content += '[Vị trí]';
+      } else if (msg.type === 'poll') {
+        content += '[Bình chọn]';
+      } else {
+        content += `[${msg.type}]`;
+      }
+      
+      return content;
+    })
+    .join('\n');
+
+  // Try to call AI API
+  // Option 1: Use Supabase Edge Function (preferred for production)
+  // Skip this if OpenAI API key is available (to avoid unnecessary CORS errors)
+  const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  
+  if (!openaiApiKey) {
+    // Only try Edge Function if no OpenAI key is configured
+    try {
+      const { data, error } = await supabase.functions.invoke('ask-ai-about-chat', {
+        body: {
+          question,
+          chatHistory,
+          conversationId
+        }
+      });
+
+      if (!error && data?.answer) {
+        return data.answer;
+      }
+      
+      if (error) {
+        console.warn('Edge function error:', error);
+        // If it's a CORS or function not found error, continue to fallback
+        if (
+          error.message?.includes('CORS') || 
+          error.message?.includes('404') || 
+          error.message?.includes('does not exist') ||
+          error.message?.includes('Failed to send a request') ||
+          error.name === 'FunctionsFetchError'
+        ) {
+          console.warn('Edge function not available, trying direct API call');
+        } else {
+          throw error;
+        }
+      }
+    } catch (edgeFunctionError: any) {
+      // Only continue to fallback if it's a CORS/404/network error
+      if (
+        edgeFunctionError?.message?.includes('CORS') ||
+        edgeFunctionError?.message?.includes('404') ||
+        edgeFunctionError?.message?.includes('does not exist') ||
+        edgeFunctionError?.message?.includes('Failed to send a request') ||
+        edgeFunctionError?.name === 'FunctionsFetchError' ||
+        edgeFunctionError?.code === 'FUNCTION_NOT_FOUND'
+      ) {
+        console.warn('Edge function not available, trying direct API call:', edgeFunctionError);
+      } else {
+        // Re-throw other errors
+        throw edgeFunctionError;
+      }
+    }
+  }
+
+  // Option 2: Direct OpenAI API call (fallback or primary if key is set)
+  // This requires VITE_OPENAI_API_KEY to be set in environment variables
+  
+  if (openaiApiKey) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // or 'gpt-3.5-turbo' for cheaper option
+          messages: [
+            {
+              role: 'system',
+              content: `Bạn là một trợ lý AI thông minh giúp người dùng tìm thông tin trong lịch sử cuộc trò chuyện. 
+Hãy trả lời câu hỏi dựa trên lịch sử chat được cung cấp. 
+Nếu không tìm thấy thông tin, hãy nói rõ ràng là không có thông tin trong lịch sử chat.
+Trả lời bằng tiếng Việt, ngắn gọn và chính xác.`
+            },
+            {
+              role: 'user',
+              content: `Lịch sử cuộc trò chuyện:\n\n${chatHistory}\n\nCâu hỏi: ${question}`
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        if (response.status === 429) {
+          throw new Error('Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.');
+        } else if (response.status === 401) {
+          throw new Error('API key không hợp lệ. Vui lòng kiểm tra lại cấu hình.');
+        } else if (response.status === 403) {
+          throw new Error('Không có quyền truy cập API. Vui lòng kiểm tra tài khoản OpenAI.');
+        } else {
+          throw new Error(`Lỗi API: ${errorData.error?.message || response.statusText}`);
+        }
+      }
+
+      const data = await response.json();
+      return data.choices[0]?.message?.content || 'Không thể tạo câu trả lời.';
+    } catch (openaiError: any) {
+      console.error('OpenAI API error:', openaiError);
+      
+      // If it's already a formatted error message, throw it
+      if (openaiError.message && !openaiError.message.includes('Failed to fetch')) {
+        throw openaiError;
+      }
+      
+      // Otherwise, provide a generic error
+      throw new Error('Không thể kết nối với AI. Vui lòng kiểm tra kết nối mạng và cấu hình API key.');
+    }
+  }
+
+  // If neither method works
+  throw new Error(
+    'AI service chưa được cấu hình. Vui lòng thiết lập Supabase Edge Function hoặc thêm VITE_OPENAI_API_KEY vào file .env'
+  );
+};

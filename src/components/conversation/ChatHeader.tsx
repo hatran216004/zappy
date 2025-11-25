@@ -12,7 +12,8 @@ import {
   Ban,
   Unlock,
   BarChart3,
-  MoreVertical
+  MoreVertical,
+  Sparkles
 } from 'lucide-react';
 import { TooltipBtn } from '../TooltipBtn';
 import { useState, useEffect } from 'react';
@@ -36,6 +37,7 @@ import { PinnedMessagesModal } from '../modal/PinnedMessagesModal';
 import { CreatePollModal } from '../modal/CreatePollModal';
 import { SelectCallParticipantsModal } from '../modal/SelectCallParticipantsModal';
 import { SummaryChatModal } from '../modal/SummaryChatModal';
+import { AskAIChatModal } from '../modal/AskAIChatModal';
 import useUser from '@/hooks/useUser';
 import {
   useBlockUser,
@@ -103,6 +105,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showSelectCallModal, setShowSelectCallModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showAskAIModal, setShowAskAIModal] = useState(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [callIsVideo, setCallIsVideo] = useState(false);
 
@@ -386,6 +389,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             </Button>
           )}
 
+          {/* Ask AI button */}
+          {conversation && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full text-xs px-2"
+              onClick={() => setShowAskAIModal(true)}
+              title="Hỏi AI về cuộc trò chuyện"
+            >
+              <Sparkles className="size-4 mr-1" />
+              Ask AI
+            </Button>
+          )}
+
           {/* Create Thread button (only for groups) */}
           {onCreateThread && isGroupChat && (
             <Button
@@ -565,6 +582,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onOpenChange={setShowSummaryModal}
           conversationId={conversation.id}
           conversationName={conversation.title || 'Nhóm'}
+        />
+      )}
+
+      {/* Ask AI Chat Modal */}
+      {conversation && (
+        <AskAIChatModal
+          open={showAskAIModal}
+          onOpenChange={setShowAskAIModal}
+          conversationId={conversation.id}
+          conversationName={
+            isGroupChat
+              ? conversation.title || 'Nhóm'
+              : otherParticipant?.profile.display_name || 'Cuộc trò chuyện'
+          }
         />
       )}
 
