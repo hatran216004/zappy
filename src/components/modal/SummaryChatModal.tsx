@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { getChatSummary24h, type ChatSummary } from '@/services/chatService';
 import { BarChart3, Users, MessageSquare, Clock, TrendingUp, Hash } from 'lucide-react';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface SummaryChatModalProps {
   open: boolean;
@@ -141,10 +142,12 @@ export function SummaryChatModal({
                       <div className="text-lg font-bold text-gray-400 w-6">
                         #{index + 1}
                       </div>
-                      <img
-                        src={user.avatar || '/default-avatar.png'}
-                        alt={user.userName}
-                        className="size-10 rounded-full"
+                      <UserAvatar
+                        avatarUrl={user.avatar}
+                        displayName={user.userName}
+                        size="sm"
+                        showStatus={false}
+                        className="w-10 h-10"
                       />
                       <div className="flex-1">
                         <p className="font-medium">{user.userName}</p>
