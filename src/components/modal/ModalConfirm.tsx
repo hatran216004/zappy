@@ -32,7 +32,7 @@ const defaultOptions: Required<
   cancelText: 'Cancel',
   destructive: false,
   autoFocusConfirm: true,
-  dismissible: false
+  dismissible: true
 };
 
 type ConfirmContextType = {
