@@ -105,7 +105,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center flex-1 text-gray-600 dark:text-[#B5BAC1]">
+      <div className="h-[calc(100vh-225px)] flex items-center justify-center flex-1 text-gray-600 dark:text-[#B5BAC1]">
         Đang tải...
       </div>
     );

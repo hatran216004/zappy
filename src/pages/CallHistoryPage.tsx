@@ -5,7 +5,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { supabaseUrl } from '@/lib/supabase';
+import { supabaseUrl, getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
 
 export default function CallHistoryPage() {
   const { user } = useAuth();

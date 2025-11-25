@@ -1,21 +1,21 @@
-import { useMemo, useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DialogTitle
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Search,
   ThumbsUp,
@@ -36,15 +36,15 @@ import {
   Edit,
   Trash2,
   Video,
-  AlertTriangle,
-} from "lucide-react";
-import { useAuth } from "@/stores/user";
-import { useProfile } from "@/hooks/useProfile";
-import { useFriends } from "@/hooks/useFriends";
-import { useConversations } from "@/hooks/useChat";
-import { useUserStatus } from "@/hooks/usePresence";
-import { useConfirm } from "@/components/modal/ModalConfirm";
-import toast from "react-hot-toast";
+  AlertTriangle
+} from 'lucide-react';
+import { useAuth } from '@/stores/user';
+import { useProfile } from '@/hooks/useProfile';
+import { useFriends } from '@/hooks/useFriends';
+import { useConversations } from '@/hooks/useChat';
+import { useUserStatus } from '@/hooks/usePresence';
+import { useConfirm } from '@/components/modal/ModalConfirm';
+import toast from 'react-hot-toast';
 import {
   usePostsByFriends,
   useCreatePost,
@@ -55,38 +55,33 @@ import {
   useAddPostComment,
   useUpdatePost,
   useDeletePost,
-  uploadPostImage,
-} from "@/hooks/usePosts";
-import { ReportPostModal } from "@/components/modal/ReportPostModal";
-import { uploadPostImages, uploadPostVideo } from "@/services/postService";
-import type { Post, PostReactionType } from "@/services/postService";
-import { getGroupPhotoUrl } from "@/lib/supabase";
+  uploadPostImage
+} from '@/hooks/usePosts';
+import { ReportPostModal } from '@/components/modal/ReportPostModal';
+import { uploadPostImages, uploadPostVideo } from '@/services/postService';
+import type { Post, PostReactionType } from '@/services/postService';
+import { getGroupPhotoUrl } from '@/lib/supabase';
 
 const REACTION_EMOJIS: Record<PostReactionType, string> = {
-  like: "👍",
-  love: "❤️",
-  haha: "😂",
-  wow: "😮",
-  sad: "😢",
-  angry: "😠",
+  like: '👍',
+  love: '❤️',
+  haha: '😂',
+  wow: '😮',
+  sad: '😢',
+  angry: '😠'
 };
 
 const REACTION_COLORS: Record<PostReactionType, string> = {
-  like: "bg-blue-500",
-  love: "bg-red-500",
-  haha: "bg-yellow-500",
-  wow: "bg-purple-500",
-  sad: "bg-blue-400",
-  angry: "bg-red-600",
+  like: 'bg-blue-500',
+  love: 'bg-red-500',
+  haha: 'bg-yellow-500',
+  wow: 'bg-purple-500',
+  sad: 'bg-blue-400',
+  angry: 'bg-red-600'
 };
 
-
-function Toolbar({
-  onSearch,
-}: {
-  onSearch: (q: string) => void;
-}) {
-  const [q, setQ] = useState("");
+function Toolbar({ onSearch }: { onSearch: (q: string) => void }) {
+  const [q, setQ] = useState('');
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2 flex-1">
@@ -98,37 +93,37 @@ function Toolbar({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") onSearch(q.trim());
+              if (e.key === 'Enter') onSearch(q.trim());
             }}
           />
         </div>
       </div>
-
     </div>
   );
 }
-
 
 function EditPostDialog({
   post,
   open,
   onOpenChange,
-  onSave,
+  onSave
 }: {
   post: Post;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (content: string, imageUrl?: string | null) => Promise<void>;
 }) {
-  const [content, setContent] = useState(post.content || "");
-  const [imagePreview, setImagePreview] = useState<string | null>(post.image_url || null);
+  const [content, setContent] = useState(post.content || '');
+  const [imagePreview, setImagePreview] = useState<string | null>(
+    post.image_url || null
+  );
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const updatePostMutation = useUpdatePost();
 
   useEffect(() => {
     if (open) {
-      setContent(post.content || "");
+      setContent(post.content || '');
       setImagePreview(post.image_url || null);
       setImageFile(null);
     }
@@ -136,7 +131,7 @@ function EditPostDialog({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith("image/")) {
+    if (file && file.type.startsWith('image/')) {
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -155,14 +150,14 @@ function EditPostDialog({
         try {
           imageUrl = await uploadPostImage(imageFile);
         } catch (error) {
-          console.error("Error uploading image:", error);
-          alert("Không thể upload ảnh. Vui lòng thử lại.");
+          console.error('Error uploading image:', error);
+          alert('Không thể upload ảnh. Vui lòng thử lại.');
           return;
         }
       }
       await onSave(content.trim(), imageUrl);
     } catch (error) {
-      console.error("Error updating post:", error);
+      console.error('Error updating post:', error);
     }
   };
 
@@ -196,8 +191,8 @@ function EditPostDialog({
                 }}
               >
                 <X className="h-4 w-4" />
-        </Button>
-      </div>
+              </Button>
+            </div>
           )}
           <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
@@ -216,7 +211,7 @@ function EditPostDialog({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <ImageIcon className="h-5 w-5 mr-2" />
-                {imagePreview ? "Thay đổi ảnh" : "Thêm ảnh"}
+                {imagePreview ? 'Thay đổi ảnh' : 'Thêm ảnh'}
               </Button>
             </div>
             <div className="flex gap-2">
@@ -229,10 +224,13 @@ function EditPostDialog({
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={(!content.trim() && !imagePreview) || updatePostMutation.isPending}
+                disabled={
+                  (!content.trim() && !imagePreview) ||
+                  updatePostMutation.isPending
+                }
                 size="sm"
               >
-                {updatePostMutation.isPending ? "Đang lưu..." : "Lưu"}
+                {updatePostMutation.isPending ? 'Đang lưu...' : 'Lưu'}
               </Button>
             </div>
           </div>
@@ -243,10 +241,16 @@ function EditPostDialog({
 }
 
 // --- Create Post Component --------------------------------------------------
-function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreated?: () => void }) {
+function CreatePostCard({
+  userId,
+  onPostCreated
+}: {
+  userId: string;
+  onPostCreated?: () => void;
+}) {
   const { data: profile } = useProfile(userId);
   const createPostMutation = useCreatePost();
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState('');
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
@@ -259,24 +263,26 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     // Validate file size
-    const invalidFiles = files.filter(file => file.size > MAX_IMAGE_SIZE);
+    const invalidFiles = files.filter((file) => file.size > MAX_IMAGE_SIZE);
     if (invalidFiles.length > 0) {
       toast.error(`Một số ảnh vượt quá 2MB. Vui lòng chọn ảnh nhỏ hơn.`);
       return;
     }
 
     // Validate file type
-    const invalidTypes = files.filter(file => !file.type.startsWith("image/"));
+    const invalidTypes = files.filter(
+      (file) => !file.type.startsWith('image/')
+    );
     if (invalidTypes.length > 0) {
-      toast.error("Chỉ được chọn file ảnh");
+      toast.error('Chỉ được chọn file ảnh');
       return;
     }
 
     // Nếu đã có video, không cho chọn ảnh
     if (videoFile) {
-      toast.error("Chỉ được chọn ảnh hoặc video, không thể chọn cả hai");
+      toast.error('Chỉ được chọn ảnh hoặc video, không thể chọn cả hai');
       return;
     }
 
@@ -303,19 +309,19 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
 
     // Validate file size
     if (file.size > MAX_VIDEO_SIZE) {
-      toast.error("Kích thước video không được vượt quá 20MB");
+      toast.error('Kích thước video không được vượt quá 20MB');
       return;
     }
 
     // Validate file type
-    if (!file.type.startsWith("video/")) {
-      toast.error("Chỉ được chọn file video");
+    if (!file.type.startsWith('video/')) {
+      toast.error('Chỉ được chọn file video');
       return;
     }
 
     // Nếu đã có ảnh, không cho chọn video
     if (imageFiles.length > 0) {
-      toast.error("Chỉ được chọn ảnh hoặc video, không thể chọn cả hai");
+      toast.error('Chỉ được chọn ảnh hoặc video, không thể chọn cả hai');
       return;
     }
 
@@ -350,8 +356,8 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
         try {
           imageUrls = await uploadPostImages(imageFiles);
         } catch (error: any) {
-          console.error("Error uploading images:", error);
-          toast.error(error?.message || "Lỗi khi upload ảnh");
+          console.error('Error uploading images:', error);
+          toast.error(error?.message || 'Lỗi khi upload ảnh');
           return;
         }
       }
@@ -360,25 +366,25 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
         try {
           videoUrl = await uploadPostVideo(videoFile);
         } catch (error: any) {
-          console.error("Error uploading video:", error);
-          toast.error(error?.message || "Lỗi khi upload video");
+          console.error('Error uploading video:', error);
+          toast.error(error?.message || 'Lỗi khi upload video');
           return;
         }
       }
-      
+
       await createPostMutation.mutateAsync({
         content: content.trim(),
         image_urls: imageUrls,
-        video_url: videoUrl,
+        video_url: videoUrl
       });
-      setContent("");
+      setContent('');
       setImagePreviews([]);
       setImageFiles([]);
       setVideoPreview(null);
       setVideoFile(null);
       onPostCreated?.();
     } catch (error) {
-      console.error("Error creating post:", error);
+      console.error('Error creating post:', error);
     }
   };
 
@@ -388,7 +394,7 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
         <Avatar className="h-10 w-10">
           <AvatarImage src={profile?.avatar_url} />
           <AvatarFallback className="bg-blue-500 text-white">
-            {profile?.display_name?.[0] || "U"}
+            {profile?.display_name?.[0] || 'U'}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
@@ -398,7 +404,7 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[100px] resize-none bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
           />
-          
+
           {/* Multiple Images Preview */}
           {imagePreviews.length > 0 && (
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -483,10 +489,13 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
             </div>
             <Button
               onClick={handleSubmit}
-              disabled={(!content.trim() && imageFiles.length === 0 && !videoFile) || createPostMutation.isPending}
+              disabled={
+                (!content.trim() && imageFiles.length === 0 && !videoFile) ||
+                createPostMutation.isPending
+              }
               size="sm"
             >
-              {createPostMutation.isPending ? "Đang đăng..." : "Đăng"}
+              {createPostMutation.isPending ? 'Đang đăng...' : 'Đăng'}
             </Button>
           </div>
         </div>
@@ -499,7 +508,7 @@ function CreatePostCard({ userId, onPostCreated }: { userId: string; onPostCreat
 function CommentModal({
   post,
   open,
-  onOpenChange,
+  onOpenChange
 }: {
   post: Post;
   open: boolean;
@@ -508,7 +517,7 @@ function CommentModal({
   const { user } = useAuth();
   const { data: comments } = usePostComments(post.id);
   const addCommentMutation = useAddPostComment();
-  const [commentText, setCommentText] = useState("");
+  const [commentText, setCommentText] = useState('');
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
@@ -516,13 +525,14 @@ function CommentModal({
     try {
       await addCommentMutation.mutateAsync({
         postId: post.id,
-        content: commentText.trim(),
+        content: commentText.trim()
       });
-      setCommentText("");
+      setCommentText('');
     } catch (error: any) {
-      console.error("Error adding comment:", error);
+      console.error('Error adding comment:', error);
       // Hiển thị toast thông báo lỗi
-      const errorMessage = error?.message || "Không thể thêm bình luận. Vui lòng thử lại.";
+      const errorMessage =
+        error?.message || 'Không thể thêm bình luận. Vui lòng thử lại.';
       toast.error(errorMessage);
     }
   };
@@ -533,12 +543,9 @@ function CommentModal({
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle>Bình luận</DialogTitle>
         </DialogHeader>
-        
+
         {/* Scrollable content area */}
-        <div 
-          className="flex-1 overflow-y-auto"
-          style={{ minHeight: 0 }}
-        >
+        <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
           <div className="px-6 py-4 space-y-4">
             {/* Post content - có thể scroll qua */}
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
@@ -546,13 +553,15 @@ function CommentModal({
                 <Avatar className="h-10 w-10 flex-shrink-0">
                   <AvatarImage src={post.author?.avatar_url || undefined} />
                   <AvatarFallback>
-                    {post.author?.display_name?.[0] || "?"}
+                    {post.author?.display_name?.[0] || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-sm">{post.author?.display_name || "Người dùng"}</h4>
+                  <h4 className="font-semibold text-sm">
+                    {post.author?.display_name || 'Người dùng'}
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-                    {post.content || ""}
+                    {post.content || ''}
                   </p>
                   {post.image_urls && post.image_urls.length > 0 && (
                     <div className="mt-2 grid grid-cols-2 gap-1">
@@ -566,13 +575,14 @@ function CommentModal({
                       ))}
                     </div>
                   )}
-                  {(!post.image_urls || post.image_urls.length === 0) && post.image_url && (
-                    <img
-                      src={post.image_url}
-                      alt="Post"
-                      className="mt-2 rounded-lg max-h-64 object-cover w-full"
-                    />
-                  )}
+                  {(!post.image_urls || post.image_urls.length === 0) &&
+                    post.image_url && (
+                      <img
+                        src={post.image_url}
+                        alt="Post"
+                        className="mt-2 rounded-lg max-h-64 object-cover w-full"
+                      />
+                    )}
                   {post.video_url && (
                     <video
                       src={post.video_url}
@@ -590,7 +600,7 @@ function CommentModal({
                 <Avatar className="h-8 w-8 flex-shrink-0">
                   <AvatarImage src={comment.user?.avatar_url || undefined} />
                   <AvatarFallback>
-                    {comment.user?.display_name?.[0] || "?"}
+                    {comment.user?.display_name?.[0] || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
@@ -603,12 +613,13 @@ function CommentModal({
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {timeAgo(comment.created_at)}
-                      {comment.updated_at && comment.updated_at !== comment.created_at && (
-                        <>
-                          <span className="mx-1">•</span>
-                          <span className="italic">Đã chỉnh sửa</span>
-                        </>
-                      )}
+                      {comment.updated_at &&
+                        comment.updated_at !== comment.created_at && (
+                          <>
+                            <span className="mx-1">•</span>
+                            <span className="italic">Đã chỉnh sửa</span>
+                          </>
+                        )}
                     </p>
                   </div>
                 </div>
@@ -621,8 +632,14 @@ function CommentModal({
         <div className="px-6 pb-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex gap-2">
             <Avatar className="h-8 w-8 flex-shrink-0">
-              <AvatarImage src={user?.user_metadata?.avatar_url ? String(user.user_metadata.avatar_url) : undefined} />
-              <AvatarFallback>{user?.email?.[0] || "U"}</AvatarFallback>
+              <AvatarImage
+                src={
+                  user?.user_metadata?.avatar_url
+                    ? String(user.user_metadata.avatar_url)
+                    : undefined
+                }
+              />
+              <AvatarFallback>{user?.email?.[0] || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex-1 flex gap-2 min-w-0">
               <Input
@@ -630,7 +647,7 @@ function CommentModal({
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleAddComment();
                   }
@@ -654,7 +671,13 @@ function CommentModal({
 }
 
 // --- Post Card -------------------------------------------------------------
-function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }) {
+function PostCard({
+  post,
+  currentUserId
+}: {
+  post: Post;
+  currentUserId: string;
+}) {
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -664,19 +687,23 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
   const updatePostMutation = useUpdatePost();
   const deletePostMutation = useDeletePost();
   const confirm = useConfirm();
-  
+
   const isOwner = post.author_id === currentUserId;
-  
+
   const userReaction = reactions?.find((r: any) => r.user_id === currentUserId);
   const reactionsCount = reactions?.length || 0;
-  
+
   // Group reactions by type
-  const reactionsByType = reactions?.reduce((acc: Partial<Record<PostReactionType, any[]>>, r: any) => {
-    const type = r.reaction_type as PostReactionType;
-    if (!acc[type]) acc[type] = [];
-    acc[type]!.push(r);
-    return acc;
-  }, {} as Partial<Record<PostReactionType, any[]>>) || {};
+  const reactionsByType =
+    reactions?.reduce(
+      (acc: Partial<Record<PostReactionType, any[]>>, r: any) => {
+        const type = r.reaction_type as PostReactionType;
+        if (!acc[type]) acc[type] = [];
+        acc[type]!.push(r);
+        return acc;
+      },
+      {} as Partial<Record<PostReactionType, any[]>>
+    ) || {};
 
   const handleReactionClick = async () => {
     if (userReaction) {
@@ -684,12 +711,19 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
     } else {
       await addReactionMutation.mutateAsync({
         postId: post.id,
-        reactionType: "like",
+        reactionType: 'like'
       });
     }
   };
 
-  const reactionEmojis: PostReactionType[] = ["like", "love", "haha", "wow", "sad", "angry"];
+  const reactionEmojis: PostReactionType[] = [
+    'like',
+    'love',
+    'haha',
+    'wow',
+    'sad',
+    'angry'
+  ];
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const hideReactionPickerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -722,24 +756,27 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
     try {
       await deletePostMutation.mutateAsync(post.id);
     } catch (error) {
-      console.error("Error deleting post:", error);
-      alert("Không thể xóa bài viết. Vui lòng thử lại.");
+      console.error('Error deleting post:', error);
+      alert('Không thể xóa bài viết. Vui lòng thử lại.');
     }
   };
 
-  const handleUpdatePost = async (content: string, imageUrl?: string | null) => {
+  const handleUpdatePost = async (
+    content: string,
+    imageUrl?: string | null
+  ) => {
     try {
       await updatePostMutation.mutateAsync({
         postId: post.id,
         data: {
           content,
-          image_url: imageUrl,
-        },
+          image_url: imageUrl
+        }
       });
       setShowEditDialog(false);
     } catch (error) {
-      console.error("Error updating post:", error);
-      alert("Không thể cập nhật bài viết. Vui lòng thử lại.");
+      console.error('Error updating post:', error);
+      alert('Không thể cập nhật bài viết. Vui lòng thử lại.');
     }
   };
 
@@ -749,18 +786,18 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
         {/* Header */}
         <div className="p-3 pb-0">
           <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={post.author?.avatar_url || undefined} />
-            <AvatarFallback className="bg-blue-500 text-white text-sm font-semibold">
-              {post.author?.display_name?.[0] || "?"}
-          </AvatarFallback>
-        </Avatar>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={post.author?.avatar_url || undefined} />
+              <AvatarFallback className="bg-blue-500 text-white text-sm font-semibold">
+                {post.author?.display_name?.[0] || '?'}
+              </AvatarFallback>
+            </Avatar>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-900 dark:text-white text-[15px] hover:underline cursor-pointer">
-                  {post.author?.display_name || "Người dùng"}
+                  {post.author?.display_name || 'Người dùng'}
                 </h3>
-        </div>
+              </div>
               <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                 <span>{timeAgo(post.created_at)}</span>
                 {post.updated_at && post.updated_at !== post.created_at && (
@@ -770,7 +807,7 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                   </>
                 )}
               </div>
-        </div>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -797,11 +834,12 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                       onSelect={async (e) => {
                         e.preventDefault();
                         const confirmed = await confirm({
-                          title: "Xóa bài viết",
-                          description: "Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.",
-                          confirmText: "Xóa",
-                          cancelText: "Hủy",
-                          destructive: true,
+                          title: 'Xóa bài viết',
+                          description:
+                            'Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.',
+                          confirmText: 'Xóa',
+                          cancelText: 'Hủy',
+                          destructive: true
                         });
                         if (confirmed) {
                           handleDeletePost();
@@ -826,7 +864,7 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-        </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -847,19 +885,26 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                 loading="lazy"
               />
             ) : (
-              <div className={`grid gap-1 ${
-                post.image_urls.length === 2 ? 'grid-cols-2' :
-                post.image_urls.length === 3 ? 'grid-cols-2' :
-                post.image_urls.length === 4 ? 'grid-cols-2' :
-                'grid-cols-3'
-              }`}>
+              <div
+                className={`grid gap-1 ${
+                  post.image_urls.length === 2
+                    ? 'grid-cols-2'
+                    : post.image_urls.length === 3
+                    ? 'grid-cols-2'
+                    : post.image_urls.length === 4
+                    ? 'grid-cols-2'
+                    : 'grid-cols-3'
+                }`}
+              >
                 {post.image_urls.slice(0, 4).map((url, index) => (
                   <div key={index} className="relative">
                     <img
                       src={url}
                       alt={`Post ${index + 1}`}
                       className={`w-full h-64 object-cover ${
-                        post.image_urls.length === 3 && index === 0 ? 'row-span-2' : ''
+                        post.image_urls.length === 3 && index === 0
+                          ? 'row-span-2'
+                          : ''
                       }`}
                       loading="lazy"
                     />
@@ -876,18 +921,19 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
             )}
           </div>
         )}
-        
+
         {/* Fallback to old image_url for backward compatibility */}
-        {(!post.image_urls || post.image_urls.length === 0) && post.image_url && (
-          <div className="w-full">
-            <img
-              src={post.image_url}
-              alt="Post"
-              className="w-full h-auto object-cover"
-              loading="lazy"
-            />
-          </div>
-        )}
+        {(!post.image_urls || post.image_urls.length === 0) &&
+          post.image_url && (
+            <div className="w-full">
+              <img
+                src={post.image_url}
+                alt="Post"
+                className="w-full h-auto object-cover"
+                loading="lazy"
+              />
+            </div>
+          )}
 
         {/* Video */}
         {post.video_url && (
@@ -907,20 +953,24 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
               {reactionsCount > 0 && (
                 <div className="flex items-center gap-1">
                   <div className="flex -space-x-1">
-                    {Object.keys(reactionsByType).slice(0, 3).map((type) => {
-                      const reactionType = type as PostReactionType;
-                      if (!reactionsByType[reactionType]) return null;
-                      const color = REACTION_COLORS[reactionType] || "bg-gray-500";
-                      const emoji = REACTION_EMOJIS[reactionType] || "👍";
-                      return (
-                        <div
-                          key={type}
-                          className={`w-5 h-5 rounded-full ${color} flex items-center justify-center border-2 border-white dark:border-[#242526] text-xs`}
-                        >
-                          {emoji}
-                        </div>
-                      );
-                    }).filter(Boolean)}
+                    {Object.keys(reactionsByType)
+                      .slice(0, 3)
+                      .map((type) => {
+                        const reactionType = type as PostReactionType;
+                        if (!reactionsByType[reactionType]) return null;
+                        const color =
+                          REACTION_COLORS[reactionType] || 'bg-gray-500';
+                        const emoji = REACTION_EMOJIS[reactionType] || '👍';
+                        return (
+                          <div
+                            key={type}
+                            className={`w-5 h-5 rounded-full ${color} flex items-center justify-center border-2 border-white dark:border-[#242526] text-xs`}
+                          >
+                            {emoji}
+                          </div>
+                        );
+                      })
+                      .filter(Boolean)}
                   </div>
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     {reactionsCount}
@@ -949,17 +999,27 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                 onMouseEnter={handleShowReactionPicker}
                 onMouseLeave={handleHideReactionPicker}
                 className={`w-full h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 font-medium text-sm ${
-                  userReaction ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"
+                  userReaction
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
                 {userReaction ? (
                   <>
-                    <span className="mr-2">{REACTION_EMOJIS[userReaction.reaction_type]}</span>
-                    {userReaction.reaction_type === "like" ? "Thích" : 
-                     userReaction.reaction_type === "love" ? "Yêu thích" :
-                     userReaction.reaction_type === "haha" ? "Haha" :
-                     userReaction.reaction_type === "wow" ? "Wow" :
-                     userReaction.reaction_type === "sad" ? "Buồn" : "Tức giận"}
+                    <span className="mr-2">
+                      {REACTION_EMOJIS[userReaction.reaction_type]}
+                    </span>
+                    {userReaction.reaction_type === 'like'
+                      ? 'Thích'
+                      : userReaction.reaction_type === 'love'
+                      ? 'Yêu thích'
+                      : userReaction.reaction_type === 'haha'
+                      ? 'Haha'
+                      : userReaction.reaction_type === 'wow'
+                      ? 'Wow'
+                      : userReaction.reaction_type === 'sad'
+                      ? 'Buồn'
+                      : 'Tức giận'}
                   </>
                 ) : (
                   <>
@@ -967,7 +1027,7 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                     Thích
                   </>
                 )}
-          </Button>
+              </Button>
               {showReactionPicker && (
                 <div
                   className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 p-1 flex gap-1 z-10"
@@ -980,7 +1040,7 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                       onClick={async () => {
                         await addReactionMutation.mutateAsync({
                           postId: post.id,
-                          reactionType: type,
+                          reactionType: type
                         });
                         setShowReactionPicker(false);
                       }}
@@ -989,7 +1049,7 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
                       {REACTION_EMOJIS[type]}
                     </button>
                   ))}
-        </div>
+                </div>
               )}
             </div>
             <Button
@@ -999,8 +1059,8 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
             >
               <MessageSquare className="h-5 w-5 mr-2" />
               Bình luận
-          </Button>
-        </div>
+            </Button>
+          </div>
         </div>
       </div>
       <CommentModal
@@ -1034,7 +1094,7 @@ function PostSkeleton() {
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-[40%]" />
             <Skeleton className="h-3 w-[30%]" />
-        </div>
+          </div>
         </div>
       </div>
       <div className="px-4 pb-3 space-y-2">
@@ -1053,7 +1113,7 @@ function PostSkeleton() {
   );
 }
 
-function EmptyState({ label = "Không tìm thấy bài viết nào." }) {
+function EmptyState({ label = 'Không tìm thấy bài viết nào.' }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 gap-3 bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700">
       <div className="rounded-full p-4 bg-gray-100 dark:bg-gray-700">
@@ -1068,7 +1128,7 @@ function EmptyState({ label = "Không tìm thấy bài viết nào." }) {
 function timeAgo(iso: string): string {
   const diff = Date.now() - +new Date(iso);
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "vừa xong";
+  if (m < 1) return 'vừa xong';
   if (m < 60) return `${m} phút`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} giờ`;
@@ -1082,7 +1142,6 @@ function timeAgo(iso: string): string {
   return `${y} năm`;
 }
 
-
 // --- Left Sidebar ---------------------------------------------------------
 function LeftSidebar() {
   const { user } = useAuth();
@@ -1090,16 +1149,16 @@ function LeftSidebar() {
   const { data: profile } = useProfile(userId as string);
 
   const shortcuts = [
-    { icon: Home, label: "Trang chủ", active: true },
-    { icon: Users, label: "Nhóm", active: false },
-    { icon: Bookmark, label: "Đã lưu", active: false },
-    { icon: Clock, label: "Gần đây", active: false },
-    { icon: Video, label: "Video", active: false },
-    { icon: Calendar, label: "Sự kiện", active: false },
+    { icon: Home, label: 'Trang chủ', active: true },
+    { icon: Users, label: 'Nhóm', active: false },
+    { icon: Bookmark, label: 'Đã lưu', active: false },
+    { icon: Clock, label: 'Gần đây', active: false },
+    { icon: Video, label: 'Video', active: false },
+    { icon: Calendar, label: 'Sự kiện', active: false }
   ];
 
   return (
-    <aside className="flex-1 flex-shrink-0 sticky top-0 h-screen overflow-y-auto pt-6 px-3">
+    <aside className="flex-1 flex-shrink-0 sticky top-0 h-full overflow-y-auto pt-6 px-3">
       <div className="space-y-4">
         {/* User Profile Card */}
         <div className="bg-white dark:bg-[#242526] rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -1107,12 +1166,12 @@ function LeftSidebar() {
             <Avatar className="h-10 w-10">
               <AvatarImage src={profile?.avatar_url} />
               <AvatarFallback className="bg-blue-500 text-white">
-                {profile?.display_name?.[0] || user?.email?.[0] || "U"}
+                {profile?.display_name?.[0] || user?.email?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white truncate">
-                {profile?.display_name || user?.email || "Người dùng"}
+                {profile?.display_name || user?.email || 'Người dùng'}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {user?.email}
@@ -1143,8 +1202,8 @@ function LeftSidebar() {
                     key={idx}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
                       item.active
-                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -1157,7 +1216,7 @@ function LeftSidebar() {
         </div>
 
         {/* Groups */}
-        <GroupsSection userId={userId || ""} />
+        <GroupsSection userId={userId || ''} />
       </div>
     </aside>
   );
@@ -1166,7 +1225,7 @@ function LeftSidebar() {
 // --- Contact Item ---------------------------------------------------------
 function ContactItem({ friend }: { friend: any }) {
   const { data: statusProfile } = useUserStatus(friend.id);
-  const isOnline = statusProfile?.status === "online";
+  const isOnline = statusProfile?.status === 'online';
 
   // Simple: count mutual friends (could be improved with actual query)
   const mutualCount = Math.floor(Math.random() * 15); // TODO: Calculate real mutual friends
@@ -1177,7 +1236,7 @@ function ContactItem({ friend }: { friend: any }) {
         <Avatar className="h-9 w-9">
           <AvatarImage src={friend.avatar_url} />
           <AvatarFallback className="bg-blue-500 text-white">
-            {friend.display_name?.[0] || friend.username?.[0] || "?"}
+            {friend.display_name?.[0] || friend.username?.[0] || '?'}
           </AvatarFallback>
         </Avatar>
         {isOnline && (
@@ -1186,7 +1245,7 @@ function ContactItem({ friend }: { friend: any }) {
       </div>
       <div className="flex-1 min-w-0 text-left">
         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-          {friend.display_name || friend.username || "Người dùng"}
+          {friend.display_name || friend.username || 'Người dùng'}
         </p>
         {mutualCount > 0 && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -1201,7 +1260,7 @@ function ContactItem({ friend }: { friend: any }) {
 // --- Groups Section -------------------------------------------------------
 function GroupsSection({ userId }: { userId: string }) {
   const { data: conversations } = useConversations(userId);
-  const groups = conversations?.filter((c) => c.type === "group") || [];
+  const groups = conversations?.filter((c) => c.type === 'group') || [];
 
   return (
     <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1227,8 +1286,10 @@ function GroupsSection({ userId }: { userId: string }) {
               >
                 {group.photo_url ? (
                   <img
-                    src={getGroupPhotoUrl(group.photo_url) || '/default-image.png'}
-                    alt={group.title || "Group"}
+                    src={
+                      getGroupPhotoUrl(group.photo_url) || '/default-image.png'
+                    }
+                    alt={group.title || 'Group'}
                     className="h-9 w-9 rounded-full object-cover"
                   />
                 ) : (
@@ -1237,7 +1298,7 @@ function GroupsSection({ userId }: { userId: string }) {
                   </div>
                 )}
                 <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 text-left">
-                  {group.title || "Nhóm không tên"}
+                  {group.title || 'Nhóm không tên'}
                 </span>
               </button>
             ))
@@ -1253,7 +1314,7 @@ function RightSidebar({ userId }: { userId: string }) {
   const { data: friends, isLoading: friendsLoading } = useFriends(userId);
 
   return (
-    <aside className="flex-1 flex-shrink-0 sticky top-0 h-screen overflow-y-auto pt-6 px-3">
+    <aside className="flex-1 flex-shrink-0 sticky top-0 h-full overflow-y-auto pt-6 px-3">
       <div className="space-y-4">
         {/* Sponsored */}
         <div className="bg-white dark:bg-[#242526] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1292,7 +1353,8 @@ function RightSidebar({ userId }: { userId: string }) {
               </h3>
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Hôm nay là sinh nhật của <span className="font-semibold">Nguyễn Văn A</span> và{" "}
+              Hôm nay là sinh nhật của{' '}
+              <span className="font-semibold">Nguyễn Văn A</span> và{' '}
               <span className="font-semibold">Trần Thị B</span>
             </p>
             <Button
@@ -1338,9 +1400,11 @@ function RightSidebar({ userId }: { userId: string }) {
                   ))}
                 </div>
               ) : friends && friends.length > 0 ? (
-                friends.slice(0, 8).map((friend) => (
-                  <ContactItem key={friend.id} friend={friend} />
-                ))
+                friends
+                  .slice(0, 8)
+                  .map((friend) => (
+                    <ContactItem key={friend.id} friend={friend} />
+                  ))
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
                   Chưa có bạn bè
@@ -1360,22 +1424,24 @@ function RightSidebar({ userId }: { userId: string }) {
               </h3>
             </div>
             <div className="space-y-2">
-              {["Thiết kế nội thất", "Kiến trúc", "Nội thất nhỏ"].map((topic, idx) => (
-                <button
-                  key={idx}
-                  className="w-full flex items-start gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
-                >
-                  <TrendingUp className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {topic}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {Math.floor(Math.random() * 100 + 50)}K bài viết
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {['Thiết kế nội thất', 'Kiến trúc', 'Nội thất nhỏ'].map(
+                (topic, idx) => (
+                  <button
+                    key={idx}
+                    className="w-full flex items-start gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                  >
+                    <TrendingUp className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {topic}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {Math.floor(Math.random() * 100 + 50)}K bài viết
+                      </p>
+                    </div>
+                  </button>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -1389,8 +1455,12 @@ export default function PostsPage() {
   const { user } = useAuth();
   const userId = user?.id as string;
   const { data: friends } = useFriends(userId);
-  const { data: posts, isLoading: postsLoading, refetch } = usePostsByFriends(userId || "");
-  const [search, setSearch] = useState("");
+  const {
+    data: posts,
+    isLoading: postsLoading,
+    refetch
+  } = usePostsByFriends(userId || '');
+  const [search, setSearch] = useState('');
 
   const filteredPosts = useMemo(() => {
     if (!posts) return [];
@@ -1403,17 +1473,20 @@ export default function PostsPage() {
           p.author?.display_name?.toLowerCase().includes(q)
       );
     }
-    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   }, [posts, search]);
 
   const handleSearch = (q: string) => {
-      setSearch(q);
+    setSearch(q);
   };
 
   // Hiển thị message nếu không có bạn bè
   if (friends && friends.length === 0) {
-  return (
-      <div className="col-span-12 bg-gray-100 dark:bg-[#18191a] h-screen overflow-y-auto">
+    return (
+      <div className="col-span-12 bg-gray-100 dark:bg-[#18191a] h-full overflow-y-auto">
         <div className="max-w-[680px] mx-auto px-4 py-6">
           <div className="bg-white dark:bg-[#242526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
             <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
@@ -1421,16 +1494,17 @@ export default function PostsPage() {
               Chưa có bạn bè
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Bạn cần kết bạn để thấy các bài viết. Hãy tìm kiếm và thêm bạn bè để bắt đầu!
+              Bạn cần kết bạn để thấy các bài viết. Hãy tìm kiếm và thêm bạn bè
+              để bắt đầu!
             </p>
-        </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="col-span-12 bg-gray-100 dark:bg-[#18191a] h-screen overflow-hidden">
+    <div className="col-span-12 bg-gray-100 dark:bg-[#18191a] h-full overflow-hidden">
       <div className="flex gap-4 h-full max-w-[1920px] mx-auto px-4">
         {/* Left Sidebar */}
         <LeftSidebar />
@@ -1440,38 +1514,48 @@ export default function PostsPage() {
           <div className="max-w-[680px] mx-auto px-4">
             {/* Header */}
             <div className="mb-4">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Bài viết</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Khám phá các bài viết mới nhất</p>
-        </div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                Bài viết
+              </h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Khám phá các bài viết mới nhất
+              </p>
+            </div>
 
             {/* Create Post */}
-            {userId && <CreatePostCard userId={userId} onPostCreated={() => refetch()} />}
+            {userId && (
+              <CreatePostCard userId={userId} onPostCreated={() => refetch()} />
+            )}
 
             {/* Search */}
             <div className="mb-4">
               <Toolbar onSearch={handleSearch} />
-        </div>
+            </div>
 
             {/* Posts List */}
-            <PostList posts={filteredPosts} loading={postsLoading} currentUserId={userId || ""} />
+            <PostList
+              posts={filteredPosts}
+              loading={postsLoading}
+              currentUserId={userId || ''}
+            />
           </div>
         </main>
 
         {/* Right Sidebar */}
-        <RightSidebar userId={userId || ""} />
+        <RightSidebar userId={userId || ''} />
       </div>
     </div>
   );
 }
 
-function PostList({ 
-  posts, 
-  loading, 
-  emptyLabel = "Chưa có bài viết nào.",
-  currentUserId 
-}: { 
-  posts: Post[]; 
-  loading?: boolean; 
+function PostList({
+  posts,
+  loading,
+  emptyLabel = 'Chưa có bài viết nào.',
+  currentUserId
+}: {
+  posts: Post[];
+  loading?: boolean;
   emptyLabel?: string;
   currentUserId: string;
 }) {
@@ -1486,11 +1570,11 @@ function PostList({
       ) : posts.length === 0 ? (
         <EmptyState label={emptyLabel} />
       ) : (
-          <div className="space-y-4">
-            {posts.map((p) => (
+        <div className="space-y-4">
+          {posts.map((p) => (
             <PostCard key={p.id} post={p} currentUserId={currentUserId} />
-            ))}
-          </div>
+          ))}
+        </div>
       )}
     </div>
   );

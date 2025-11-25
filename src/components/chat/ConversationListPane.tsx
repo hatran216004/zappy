@@ -28,6 +28,7 @@ import { ReportConversationModal } from '@/components/modal/ReportConversationMo
 import { TransferAdminModal } from '@/components/modal/TransferAdminModal';
 import { PinnedMessagesModal } from '@/components/modal/PinnedMessagesModal';
 import { GroupInfoModal } from '@/components/modal/GroupInfoModal';
+import { MediaViewerModal } from '@/components/modal/MediaViewerModal';
 import { useConfirm } from '@/components/modal/ModalConfirm';
 import toast from 'react-hot-toast';
 
@@ -53,6 +54,8 @@ export default function ConversationListPane() {
   const [showTransferAdminModal, setShowTransferAdminModal] = useState(false);
   const [showPinnedModal, setShowPinnedModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [showMediaViewer, setShowMediaViewer] = useState(false);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof document !== 'undefined')
       return document.documentElement.classList.contains('dark');
@@ -211,11 +214,18 @@ export default function ConversationListPane() {
   // data maps (unchanged)
   const mediaItems = useMemo(() => {
     const items =
-      mediaData
-        ?.slice(0, 16)
-        .map((m) => ({ src: mediaUrls[m.id] || '/default-image.png' })) || [];
+      mediaData?.slice(0, 16).map((m) => ({
+        src: mediaUrls[m.id] || '/default-image.png',
+        kind: m.kind as 'image' | 'video',
+        id: m.id
+      })) || [];
     return items;
   }, [mediaData, mediaUrls]);
+
+  const handleMediaClick = (index: number) => {
+    setSelectedMediaIndex(index);
+    setShowMediaViewer(true);
+  };
 
   const fileItems = useMemo(() => {
     const items =
@@ -429,6 +439,7 @@ export default function ConversationListPane() {
                 type="media"
                 title={`Ảnh & Video (${mediaData?.length || 0})`}
                 items={mediaItems}
+                onMediaClick={handleMediaClick}
               />
             )}
 
@@ -559,6 +570,14 @@ export default function ConversationListPane() {
           currentUserId={user.id}
         />
       )}
+
+      {/* Media Viewer Modal */}
+      <MediaViewerModal
+        open={showMediaViewer}
+        onOpenChange={setShowMediaViewer}
+        mediaItems={mediaItems}
+        initialIndex={selectedMediaIndex}
+      />
     </div>
   );
 }

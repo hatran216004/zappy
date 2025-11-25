@@ -7,7 +7,7 @@ import {
 import { Link as LinkIcon } from "lucide-react";
 import { Button } from "../ui/button";
 
-type MediaItem = { src: string };
+type MediaItem = { src: string; kind?: 'image' | 'video'; id?: string };
 type FileItem = { name: string; size: string; time: string; icon?: string };
 type LinkItem = { title: string; url: string; time: string };
 type ListItem = { icon: React.ReactNode; label: string };
@@ -16,12 +16,14 @@ type SidebarAccordionSectionProps = {
   type: "media" | "file" | "link" | "list";
   title: string;
   items?: MediaItem[] | FileItem[] | LinkItem[] | ListItem[];
+  onMediaClick?: (index: number) => void;
 };
 
 export function SidebarAccordionSection({
   type,
   title,
   items = [],
+  onMediaClick,
 }: SidebarAccordionSectionProps) {
   return (
     <Accordion
@@ -54,14 +56,41 @@ export function SidebarAccordionSection({
           {type === "media" && (
             <>
               <div className="grid grid-cols-4 gap-2 mb-3">
-                {(items as MediaItem[]).map((m, i) => (
-                  <img
-                    key={i}
-                    src={m.src}
-                    alt={`Media ${i + 1}`}
-                    className="rounded-md object-cover w-full h-16 hover:opacity-90 transition cursor-pointer"
-                  />
-                ))}
+                {(items as MediaItem[]).map((m, i) => {
+                  const isVideo = m.kind === 'video';
+                  return (
+                    <div
+                      key={m.id || i}
+                      onClick={() => onMediaClick?.(i)}
+                      className="relative rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition group"
+                    >
+                      {isVideo ? (
+                        <video
+                          src={m.src}
+                          className="w-full h-16 object-cover"
+                          muted
+                        />
+                      ) : (
+                        <img
+                          src={m.src}
+                          alt={`Media ${i + 1}`}
+                          className="rounded-md object-cover w-full h-16"
+                        />
+                      )}
+                      {isVideo && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition">
+                          <svg
+                            className="w-6 h-6 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               {items.length === 0 && (
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">

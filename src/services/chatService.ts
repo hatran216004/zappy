@@ -2991,7 +2991,7 @@ export const startChatWithUser = async (
   return data[0];
 };
 
-// Search users by username or display name
+// Search users by username, display name, or email
 export const searchUsers = async (
   query: string,
   currentUserId: string
@@ -3008,21 +3008,81 @@ export const searchUsers = async (
     return [];
   }
 
-  const searchTerm = `%${query}%`;
+  const term = query.trim();
+  const searchTerm = `%${term}%`;
 
-  const { data, error } = await supabase
+  // 1) Profile search by username/display_name
+  const { data: byProfile, error: profileErr } = await supabase
     .from('profiles')
     .select('id, username, display_name, avatar_url, status')
     .or(`username.ilike.${searchTerm},display_name.ilike.${searchTerm}`)
     .neq('id', currentUserId)
+    .eq('is_disabled', false)
     .limit(20);
 
-  if (error) {
-    console.error('Error searching users:', error);
-    throw error;
+  if (profileErr) {
+    console.error('Error searching users by profile:', profileErr);
+    throw profileErr;
   }
 
-  return data || [];
+  // 2) Email search via SQL function (auth.users)
+  let byEmail: Array<{
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_url: string;
+    status: string;
+  }> = [];
+
+  const rpcClient = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  };
+
+  const { data: emailData, error: emailErr } = await rpcClient.rpc(
+    'search_users_by_email',
+    {
+      _term: term,
+      _current_user_id: currentUserId
+    }
+  );
+
+  if (!emailErr && emailData) {
+    // Map email results to the expected format
+    byEmail = (emailData as Array<{
+      id: string;
+      username: string;
+      display_name: string;
+      avatar_url: string | null;
+      status: string | null;
+    }>).map((p) => ({
+      id: p.id,
+      username: p.username,
+      display_name: p.display_name,
+      avatar_url: p.avatar_url || '',
+      status: p.status || ''
+    }));
+  } else if (emailErr) {
+    console.warn('Email search RPC error:', emailErr.message);
+  }
+
+  // Combine unique by id, prioritize profile search order
+  const map = new Map<string, {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_url: string;
+    status: string;
+  }>();
+  
+  (byProfile || []).forEach((p) => map.set(p.id, p));
+  byEmail.forEach((p) => {
+    if (!map.has(p.id)) map.set(p.id, p);
+  });
+
+  return Array.from(map.values());
 };
 
 // ============================================

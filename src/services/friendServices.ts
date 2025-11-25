@@ -33,27 +33,25 @@ export const searchUsersByUsername = async (
 
   if (profileErr) throw profileErr;
 
-  // 2) Email search via SQL function (auth.users), if term likely email or contains '@'
+  // 2) Email search via SQL function (auth.users) - always search by email
   let byEmail: Profile[] = [];
-  if (term.includes('@')) {
-    const rpcClient = supabase as unknown as {
-      rpc: (
-        fn: string,
-        args: Record<string, unknown>
-      ) => Promise<{ data: unknown; error: { message?: string } | null }>;
-    };
-    const { data: emailData, error: emailErr } = await rpcClient.rpc(
-      'search_users_by_email',
-      {
-        _term: term,
-        _current_user_id: currentUserId
-      }
-    );
-    if (!emailErr && emailData) {
-      byEmail = emailData as Profile[];
-    } else if (emailErr) {
-      console.warn('Email search RPC error:', emailErr.message);
+  const rpcClient = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  };
+  const { data: emailData, error: emailErr } = await rpcClient.rpc(
+    'search_users_by_email',
+    {
+      _term: term,
+      _current_user_id: currentUserId
     }
+  );
+  if (!emailErr && emailData) {
+    byEmail = emailData as Profile[];
+  } else if (emailErr) {
+    console.warn('Email search RPC error:', emailErr.message);
   }
 
   // Combine unique by id, prioritize profile search order

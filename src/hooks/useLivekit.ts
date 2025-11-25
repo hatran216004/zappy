@@ -44,28 +44,6 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
     audioEls.current.clear();
   };
 
-  const handleTrackSubscribed = useCallback(
-    (track: AudioTrack | any, _publication: any, participant: RemoteParticipant | Participant) => {
-      if (track.kind !== 'audio') return;
-      const id = `${participant.sid}-${track.sid || 'audio'}`;
-      let audio = audioEls.current.get(id);
-      if (!audio) {
-        audio = new Audio();
-        audio.autoplay = true;
-        audio.playsInline = true;
-        audio.controls = false;
-        audio.muted = false;
-        audioEls.current.set(id, audio);
-      }
-      track.attach(audio);
-      // Attempt autoplay; may require a user gesture depending on browser policy
-      audio.play().catch(() => {
-        // ignored; UI interactions will kick it
-      });
-    },
-    []
-  );
-
   const updateParticipants = useCallback((room: Room) => {
     const remotes = Array.from(room.remoteParticipants.values());
     // Sort by speaking status and audio level
@@ -81,6 +59,33 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
     setRemoteParticipants(remotes);
     setLocalParticipant(room.localParticipant as LocalParticipant);
   }, []);
+
+  const handleTrackSubscribed = useCallback(
+    (track: AudioTrack | any, publication: any, participant: RemoteParticipant | Participant) => {
+      if (track.kind === 'audio') {
+        const id = `${participant.sid}-${track.sid || 'audio'}`;
+        let audio = audioEls.current.get(id);
+        if (!audio) {
+          audio = new Audio();
+          audio.autoplay = true;
+          audio.playsInline = true;
+          audio.controls = false;
+          audio.muted = false;
+          audioEls.current.set(id, audio);
+        }
+        track.attach(audio);
+        // Attempt autoplay; may require a user gesture depending on browser policy
+        audio.play().catch(() => {
+          // ignored; UI interactions will kick it
+        });
+      } else if (track.kind === 'video' && !publication.isScreenShare) {
+        // Video track subscribed - update participants to trigger re-render
+        console.log('📹 Video track subscribed from remote participant:', participant.identity);
+        // Note: updateParticipants will be called through room events
+      }
+    },
+    []
+  );
 
   const handleParticipantConnected = useCallback((participant: RemoteParticipant, room: Room) => {
     console.log('👤 Participant connected:', participant.identity);
@@ -114,7 +119,13 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
       }
       const r = new Room({ ...roomOptions });
       r
-        .on(RoomEvent.TrackSubscribed, handleTrackSubscribed)
+        .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          handleTrackSubscribed(track, publication, participant);
+          // Update participants when video track is subscribed
+          if (track.kind === 'video' && !publication.isScreenShare) {
+            updateParticipants(r);
+          }
+        })
         .on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) =>
           handleParticipantConnected(participant, r)
         )
@@ -123,8 +134,50 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
         )
         .on(RoomEvent.TrackMuted, handleTrackMuted)
         .on(RoomEvent.TrackUnmuted, handleTrackMuted)
-        .on(RoomEvent.LocalTrackPublished, handleTrackMuted)
-        .on(RoomEvent.LocalTrackUnpublished, handleTrackMuted)
+        .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+          console.log('📹 Track unsubscribed:', track.kind, 'from', participant.identity);
+          if (track.kind === 'video' && !publication.isScreenShare) {
+            // Update participants when video track is unsubscribed
+            updateParticipants(r);
+          }
+        })
+        .on(RoomEvent.LocalTrackPublished, (publication, participant) => {
+          console.log('📹 Local track published:', publication.kind);
+          handleTrackMuted();
+          // Update camera state when video track is published
+          if (publication.kind === 'video' && !publication.isScreenShare) {
+            setCameraEnabled(true);
+          }
+        })
+        .on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
+          console.log('📹 Local track unpublished:', publication.kind);
+          handleTrackMuted();
+          // Update camera state when video track is unpublished
+          if (publication.kind === 'video' && !publication.isScreenShare) {
+            setCameraEnabled(false);
+          }
+        })
+        .on(RoomEvent.TrackPublished, (publication, participant) => {
+          // Remote participant published a track
+          if (publication.kind === 'video' && !publication.isScreenShare && participant instanceof RemoteParticipant) {
+            console.log('📹 Remote participant published video track:', participant.identity);
+            // Subscribe to the video track automatically
+            const remotePub = publication as any;
+            if (remotePub.setSubscribed && !remotePub.isSubscribed) {
+              remotePub.setSubscribed(true);
+            }
+            // Update participants to trigger re-render
+            updateParticipants(r);
+          }
+        })
+        .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+          // Remote participant unpublished a track
+          if (publication.kind === 'video' && !publication.isScreenShare) {
+            console.log('📹 Remote participant unpublished video track:', participant.identity);
+            // Update participants to trigger re-render
+            updateParticipants(r);
+          }
+        })
         .on(RoomEvent.ActiveSpeakersChanged, () => updateParticipants(r))
         .on(RoomEvent.Connected, () => {
           console.log('🔗 Room connected, updating participants...');
@@ -200,11 +253,14 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
     }
     
     // Check current camera state by looking at video track publications
-    // A camera is enabled if there's at least one video track that's not a screen share
+    // A camera is enabled if there's at least one video track that's not a screen share and is not muted
     const hasVideoTrack = Array.from(local.videoTrackPublications.values()).some(
-      (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track
+      (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track && !pub.track.isMuted
     );
-    const current = hasVideoTrack || cameraEnabled;
+    
+    // Use the actual video track state as source of truth, not the cameraEnabled state
+    // This ensures we always toggle from the actual current state
+    const current = hasVideoTrack;
     const next = !current;
     
     console.log('📹 Local participant check:', {
@@ -212,6 +268,7 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
       hasSetCameraEnabled: typeof local?.setCameraEnabled === 'function',
       videoTracks: local.videoTrackPublications.size,
       hasVideoTrack,
+      cameraEnabledState: cameraEnabled,
       currentState: current,
       nextState: next
     });
@@ -228,11 +285,11 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
       await local.setCameraEnabled(next);
       
       // Wait a bit for the state to update
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Verify the state by checking video tracks again
       const newHasVideoTrack = Array.from(local.videoTrackPublications.values()).some(
-        (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track
+        (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track && !pub.track.isMuted
       );
       
       console.log('📹 Camera state after toggle:', {
@@ -256,11 +313,11 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
       });
       // Revert state on error - check actual state
       const actualHasVideoTrack = Array.from(local.videoTrackPublications.values()).some(
-        (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track
+        (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track && !pub.track.isMuted
       );
       setCameraEnabled(actualHasVideoTrack);
     }
-  }, [cameraEnabled, room, updateParticipants]);
+  }, [room, updateParticipants]);
 
   useEffect(() => {
     return () => {

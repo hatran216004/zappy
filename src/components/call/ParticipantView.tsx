@@ -27,21 +27,84 @@ export function ParticipantView({
 
   // Attach video track
   useEffect(() => {
+    if (!videoRef.current) return;
+
     const videoPublication = Array.from(participant.videoTrackPublications.values()).find(
       (pub) => pub.kind === Track.Kind.Video && !pub.isScreenShare
     );
 
-    if (!videoPublication || !videoRef.current) return;
+    if (!videoPublication) {
+      // No video track, detach any existing track
+      if (videoRef.current.srcObject) {
+        videoRef.current.srcObject = null;
+      }
+      return;
+    }
 
     const track = (videoPublication as RemoteTrackPublication | LocalTrackPublication).track;
-    if (track && !track.isMuted) {
-      track.attach(videoRef.current);
+    if (track) {
+      console.log('📹 Attaching video track:', {
+        participant: participant.identity,
+        trackId: track.sid,
+        isMuted: track.isMuted,
+        isSubscribed: videoPublication.isSubscribed
+      });
+      
+      // Subscribe to the track if it's a remote track and not subscribed
+      if (!isLocal && videoPublication instanceof RemoteTrackPublication && !videoPublication.isSubscribed) {
+        console.log('📹 Subscribing to remote video track:', participant.identity);
+        videoPublication.setSubscribed(true);
+      }
+      
+      // Attach track if available and not muted
+      if (track && !track.isMuted) {
+        track.attach(videoRef.current);
+      }
+      
+      // Listen for track state changes
+      const handleTrackMuted = () => {
+        if (!videoRef.current) return;
+        if (track.isMuted) {
+          track.detach(videoRef.current);
+        } else {
+          track.attach(videoRef.current);
+        }
+      };
+      
+      // Listen for subscription changes (for remote tracks)
+      const handleSubscriptionChanged = () => {
+        if (!videoRef.current || isLocal) return;
+        if (videoPublication instanceof RemoteTrackPublication) {
+          if (videoPublication.isSubscribed && videoPublication.track && !videoPublication.track.isMuted) {
+            console.log('📹 Video track subscribed, attaching:', participant.identity);
+            videoPublication.track.attach(videoRef.current);
+          } else if (!videoPublication.isSubscribed) {
+            if (videoRef.current.srcObject) {
+              videoRef.current.srcObject = null;
+            }
+          }
+        }
+      };
+      
+      track.on('muted', handleTrackMuted);
+      track.on('unmuted', handleTrackMuted);
+      
+      if (videoPublication instanceof RemoteTrackPublication) {
+        videoPublication.on('subscribed', handleSubscriptionChanged);
+        videoPublication.on('unsubscribed', handleSubscriptionChanged);
+      }
       
       return () => {
+        track.off('muted', handleTrackMuted);
+        track.off('unmuted', handleTrackMuted);
+        if (videoPublication instanceof RemoteTrackPublication) {
+          videoPublication.off('subscribed', handleSubscriptionChanged);
+          videoPublication.off('unsubscribed', handleSubscriptionChanged);
+        }
         track.detach(videoRef.current!);
       };
     }
-  }, [participant]);
+  }, [participant, isLocal]);
 
   // Attach audio track (only for remote participants)
   useEffect(() => {
@@ -63,12 +126,16 @@ export function ParticipantView({
     }
   }, [participant, isLocal]);
 
-  const hasVideo = participant.isCameraEnabled;
+  // Check if participant has an active video track (more reliable than isCameraEnabled)
+  const hasVideoTrack = Array.from(participant.videoTrackPublications.values()).some(
+    (pub) => pub.kind === Track.Kind.Video && !pub.isScreenShare && pub.track && !pub.track.isMuted
+  );
+  const hasVideo = hasVideoTrack || participant.isCameraEnabled;
   const isMicEnabled = participant.isMicrophoneEnabled;
   const isSpeaking = participant.isSpeaking;
 
   return (
-    <div className={cn('relative bg-gray-900 rounded-lg overflow-hidden', className)}>
+    <div className={cn('relative bg-gray-900 rounded-lg overflow-hidden min-w-0 min-h-0', className)}>
       {/* Video element */}
       {hasVideo ? (
         <video
@@ -76,7 +143,7 @@ export function ParticipantView({
           autoPlay
           playsInline
           muted={isLocal} // Mute local video to prevent echo
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain bg-black"
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gray-800">
