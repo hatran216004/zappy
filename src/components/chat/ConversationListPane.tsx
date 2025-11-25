@@ -1,11 +1,14 @@
 import {
   Users,
-  Clock,
-  FileText,
   AlertTriangle,
   LogOut,
   Sun,
-  Moon
+  Moon,
+  Star,
+  Image,
+  FolderOpen,
+  Info,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useParams, useNavigate } from 'react-router';
@@ -18,14 +21,13 @@ import {
 } from '@/hooks/useChat';
 import { getAttachmentUrl, leaveGroup } from '@/services/chatService';
 import { useEffect, useState, useMemo } from 'react';
-
-import SidebarDangerItem from '@/components/sidebar/SidebarDangerItem';
-import { TooltipBtn } from '@/components/TooltipBtn';
 import { SidebarAccordionSection } from '../sidebar/SidebarAccordionSection';
 import { twMerge } from 'tailwind-merge';
-import { supabaseUrl } from '@/lib/supabase';
+import { getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
 import { ReportConversationModal } from '@/components/modal/ReportConversationModal';
 import { TransferAdminModal } from '@/components/modal/TransferAdminModal';
+import { PinnedMessagesModal } from '@/components/modal/PinnedMessagesModal';
+import { GroupInfoModal } from '@/components/modal/GroupInfoModal';
 import { useConfirm } from '@/components/modal/ModalConfirm';
 import toast from 'react-hot-toast';
 
@@ -49,6 +51,8 @@ export default function ConversationListPane() {
   const [mediaUrls, setMediaUrls] = useState<{ [key: string]: string }>({});
   const [showReportModal, setShowReportModal] = useState(false);
   const [showTransferAdminModal, setShowTransferAdminModal] = useState(false);
+  const [showPinnedModal, setShowPinnedModal] = useState(false);
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof document !== 'undefined')
       return document.documentElement.classList.contains('dark');
@@ -123,10 +127,8 @@ export default function ConversationListPane() {
 
   const avatarUrl =
     conversation?.type === 'direct'
-      ? otherParticipant?.profile.avatar_url
-      : `${supabaseUrl}/storage/v1/object/public/chat-attachments/${
-          conversation?.photo_url || 'default-group-photo.png'
-        }`;
+      ? getAvatarUrl(otherParticipant?.profile.avatar_url)
+      : getGroupPhotoUrl(conversation?.photo_url);
 
   const participantsCount = conversation?.participants.length || 0;
 
@@ -220,10 +222,13 @@ export default function ConversationListPane() {
       filesData?.map((file) => {
         const fileName = file.storage_path.split('/').pop() || 'Unknown';
         const cleanName = fileName.replace(/^\d+_[a-z0-9]+\./, '');
+        const fileWithMessages = file as typeof file & {
+          messages: { created_at: string };
+        };
         return {
           name: cleanName || fileName,
           size: formatFileSize(file.byte_size),
-          time: formatTime((file as any).messages.created_at)
+          time: formatTime(fileWithMessages.messages.created_at)
         };
       }) || [];
     return items;
@@ -359,8 +364,8 @@ export default function ConversationListPane() {
               </h2>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-[#B5BAC1] truncate">
                 {conversation?.type === 'direct'
-                  ? 'Direct message'
-                  : 'Group details'}
+                  ? 'Tin nhắn trực tiếp'
+                  : 'Tin nhắn nhóm'}
               </p>
             </div>
             <button
@@ -379,145 +384,127 @@ export default function ConversationListPane() {
 
       {!collapsed && (
         <div className="h-[calc(100vh-115px)] overflow-y-auto discord-scroll">
-          {/* Avatar & quick actions */}
-          <div
-            className="
-            flex flex-col items-center py-3 gap-3
-            border-b border-gray-100/70
-            dark:border-[#3F4246]
-            bg-white dark:bg-[#2B2D31]
-          "
-          >
-            <div className="relative">
-              <Avatar className="h-16 w-16 ring-2 ring-white shadow-sm shadow-black/5 dark:ring-[#2B2D31]">
-                <AvatarImage src={avatarUrl || '/default_user.jpg'} />
-                <AvatarFallback className="bg-gray-300 text-gray-700 dark:bg-[#404249] dark:text-white">
-                  {displayName?.charAt(0).toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              {/* Presence dot (visual only) */}
-              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#2B2D31] bg-emerald-500 shadow" />
-            </div>
+          {/* Avatar & Info */}
+          <div className="flex flex-col items-center py-6 gap-2 border-b border-gray-200 dark:border-[#3F4246]">
+            <Avatar className="h-20 w-20 ring-4 ring-white dark:ring-[#2B2D31] shadow-lg">
+              <AvatarImage src={avatarUrl || '/default_user.jpg'} />
+              <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-semibold">
+                {displayName?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
 
-            <div className="text-center px-6">
-              <p className="font-medium text-gray-900 dark:text-[#F2F3F5] truncate max-w-[220px]">
+            <div className="text-center px-4">
+              <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
                 {displayName}
-              </p>
-              {conversation?.type === 'group' && (
-                <div className="mt-0.5 text-xs text-gray-500 dark:text-[#B5BAC1]">
+              </h3>
+              {conversation?.type === 'direct' ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Người dùng
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   {participantsCount} thành viên
-                </div>
+                </p>
               )}
             </div>
           </div>
 
           {/* Sections */}
-          <div className="flex-1">
-            {/* Thành viên nhóm */}
-            {conversation?.type === 'group' && (
-              <SectionWrap>
-                <SectionHeader>Thành viên</SectionHeader>
-                <SidebarAccordionSection
-                  type="list"
-                  title="Thành viên nhóm"
-                  items={[
-                    {
-                      label: `${participantsCount} thành viên`,
-                      icon: <Users className="size-5" />
-                    }
-                  ]}
-                />
-              </SectionWrap>
+          <div className="flex-1 py-2">
+            {/* Tin nhắn đã ghim */}
+            <SimpleSection
+              icon={<Star className="w-5 h-5 text-amber-500" />}
+              label="Tin nhắn đã ghim"
+              onClick={() => setShowPinnedModal(true)}
+            />
+
+            {/* Media */}
+            {mediaLoading ? (
+              <SimpleSection
+                icon={<Image className="w-5 h-5 text-pink-500" />}
+                label="Đang tải..."
+              />
+            ) : (
+              <SidebarAccordionSection
+                type="media"
+                title={`Ảnh & Video (${mediaData?.length || 0})`}
+                items={mediaItems}
+              />
             )}
 
-            {/* Bảng tin nhóm */}
-            <SectionWrap>
-              <SectionHeader>Bảng tin</SectionHeader>
-              <SidebarAccordionSection
-                type="list"
-                title="Bảng tin nhóm"
-                items={[
-                  {
-                    label: 'Danh sách nhắc hẹn',
-                    icon: <Clock className="size-5" />
-                  },
-                  {
-                    label: 'Ghi chú, ghim, bình chọn',
-                    icon: <FileText className="size-5" />
-                  }
-                ]}
+            {/* Files & Docs */}
+            {filesLoading ? (
+              <SimpleSection
+                icon={<FolderOpen className="w-5 h-5 text-blue-500" />}
+                label="Đang tải..."
               />
-            </SectionWrap>
-
-            {/* Ảnh/Video */}
-            <SectionWrap>
-              <SectionHeader>Phương tiện</SectionHeader>
-              {mediaLoading ? (
-                <RowLoading label="Đang tải ảnh/video..." />
-              ) : mediaItems.length > 0 ? (
-                <SidebarAccordionSection
-                  type="media"
-                  title={`Ảnh/Video (${mediaData?.length || 0})`}
-                  items={mediaItems}
-                />
-              ) : (
-                <EmptyRow label="Chưa có ảnh/video" />
-              )}
-            </SectionWrap>
-
-            {/* Files */}
-            <SectionWrap>
-              <SectionHeader>Tệp đính kèm</SectionHeader>
-              {filesLoading ? (
-                <RowLoading label="Đang tải files..." />
-              ) : fileItems.length > 0 ? (
-                <SidebarAccordionSection
-                  type="file"
-                  title={`File (${filesData?.length || 0})`}
-                  items={fileItems}
-                />
-              ) : (
-                <EmptyRow label="Chưa có tệp" />
-              )}
-            </SectionWrap>
+            ) : fileItems.length > 0 ? (
+              <SidebarAccordionSection
+                type="file"
+                title={`Tệp & Tài liệu (${filesData?.length || 0})`}
+                items={fileItems}
+              />
+            ) : (
+              <SimpleSection
+                icon={<FolderOpen className="w-5 h-5 text-blue-500" />}
+                label={`Tệp & Tài liệu (0)`}
+              />
+            )}
 
             {/* Links */}
-            <SectionWrap>
-              <SectionHeader>Liên kết</SectionHeader>
-              {linksLoading ? (
-                <RowLoading label="Đang tải links..." />
-              ) : linkItems.length > 0 ? (
-                <SidebarAccordionSection
-                  type="link"
-                  title={`Link (${linkItems.length})`}
-                  items={linkItems}
-                />
-              ) : (
-                <EmptyRow label="Chưa có liên kết" />
-              )}
-            </SectionWrap>
+            {linksLoading ? (
+              <SimpleSection
+                icon={<LinkIcon className="w-5 h-5 text-indigo-500" />}
+                label="Đang tải..."
+              />
+            ) : linkItems.length > 0 ? (
+              <SidebarAccordionSection
+                type="link"
+                title={`Liên kết (${linkItems.length})`}
+                items={linkItems}
+              />
+            ) : (
+              <SimpleSection
+                icon={<LinkIcon className="w-5 h-5 text-indigo-500" />}
+                label={`Liên kết (0)`}
+              />
+            )}
+
+            {/* Thành viên nhóm */}
+            {conversation?.type === 'group' && (
+              <SimpleSection
+                icon={<Users className="w-5 h-5 text-green-500" />}
+                label={`Thành viên (${participantsCount})`}
+              />
+            )}
+
+            {/* Thông tin */}
+            <SimpleSection
+              icon={<Info className="w-5 h-5 text-gray-500" />}
+              label="Thông tin"
+              onClick={() => setShowGroupInfoModal(true)}
+            />
 
             {/* Danger zone */}
-            <div className="p-4">
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-[#B5BAC1] mb-2">
-                Thiết lập bảo mật
-              </h3>
-              <div className="flex flex-col gap-2">
-                <SidebarDangerItem
-                  icon={AlertTriangle}
-                  label="Báo xấu"
-                  onClick={() => {
-                    if (conversation?.type === 'group') {
-                      setShowReportModal(true);
-                    }
-                  }}
-                />
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#3F4246]">
+              <div className="px-3 space-y-1">
                 {conversation?.type === 'group' && (
-                  <SidebarDangerItem
-                    icon={LogOut}
-                    label="Rời nhóm"
-                    onClick={handleLeaveGroup}
-                  />
+                  <>
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+                    >
+                      <AlertTriangle className="w-5 h-5" />
+                      <span>Báo cáo nhóm</span>
+                    </button>
+                    <button
+                      onClick={handleLeaveGroup}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      <span>Rời khỏi nhóm</span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -546,86 +533,72 @@ export default function ConversationListPane() {
           onSuccess={handleTransferAdminSuccess}
         />
       )}
+
+      {/* Pinned Messages Modal */}
+      {conversation && (
+        <PinnedMessagesModal
+          open={showPinnedModal}
+          onOpenChange={setShowPinnedModal}
+          conversationId={conversation.id}
+          onUnpin={() => {
+            // Refresh handled by modal's realtime subscription
+          }}
+          onJumpTo={() => {
+            // Jump to message not needed in this context
+            setShowPinnedModal(false);
+          }}
+        />
+      )}
+
+      {/* Group Info Modal */}
+      {conversation && user?.id && (
+        <GroupInfoModal
+          open={showGroupInfoModal}
+          onOpenChange={setShowGroupInfoModal}
+          conversation={conversation}
+          currentUserId={user.id}
+        />
+      )}
     </div>
   );
 }
 
 /** ---------- UI helpers (UI-only) ---------- */
 
-function SectionWrap({ children }: { children: React.ReactNode }) {
+function SimpleSection({
+  icon,
+  label,
+  onClick
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+}) {
   return (
-    <div
-      className={twMerge(
-        'border-b border-gray-200/70 bg-white',
-        'dark:border-[#2B2D31] dark:bg-[#313338]'
-      )}
+    <button
+      onClick={onClick}
+      disabled={!onClick}
+      className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#313338] transition-colors disabled:cursor-default"
     >
-      {children}
-    </div>
-  );
-}
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="px-6 pt-3">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-transparent bg-gray-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:bg-[#2B2D31] dark:text-[#B5BAC1]">
-        {children}
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {label}
+        </span>
       </div>
-    </div>
-  );
-}
-
-function RowLoading({ label }: { label: string }) {
-  return (
-    <div className="px-6 py-4">
-      <p className="text-sm text-gray-500 dark:text-[#B5BAC1] flex items-center gap-2">
-        <svg
-          className="h-4 w-4 animate-spin"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          ></circle>
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-          ></path>
-        </svg>
-        {label}
-      </p>
-    </div>
-  );
-}
-
-function EmptyRow({ label }: { label: string }) {
-  return (
-    <div className="px-6 pb-4 pt-2">
-      <p className="text-sm text-gray-400 dark:text-[#7A7D84]">{label}</p>
-    </div>
-  );
-}
-
-function ToolIcon({ icon: Icon, label }: { icon: any; label: string }) {
-  return (
-    <TooltipBtn
-      icon={Icon}
-      label={label}
-      tooltipSide="bottom"
-      className={twMerge(
-        'discord-icon-btn text-gray-600 hover:text-gray-900',
-        'dark:text-[#B5BAC1] dark:hover:text-white',
-        // subtle surface for Discord-like feel
-        'rounded-lg p-2 hover:bg-gray-100 active:scale-[.98]',
-        'dark:hover:bg-[#313338]'
-      )}
-    />
+      <svg
+        className="w-4 h-4 text-gray-400"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 5l7 7-7 7"
+        />
+      </svg>
+    </button>
   );
 }

@@ -41,20 +41,25 @@ const profileServices = {
     if (!user) throw new Error("Không tìm thấy người dùng");
 
     const fileExt = file.name.split(".").pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+    const timestamp = Date.now();
+    // Format: userId.jpg?ts=timestamp
+    const fileName = `${user.id}.${fileExt}?ts=${timestamp}`;
+    // Upload path: userId.jpg (without query string)
+    const filePath = `${user.id}.${fileExt}`;
 
+    // Delete old avatar if exists (optional - to save storage)
+    // We can list files with prefix user.id and delete them
+    
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        upsert: true, // Overwrite if exists
+      });
 
     if (uploadError) throw uploadError;
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
-    return publicUrl;
+    // Return path in format: userId.jpg?ts=timestamp
+    return fileName;
   },
 
   // Đổi mật khẩu

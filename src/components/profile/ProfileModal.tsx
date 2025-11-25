@@ -20,7 +20,7 @@ import {
 import useUser from "@/hooks/useUser";
 import toast from "react-hot-toast";
 import { Profile } from "@/services/friendServices";
-import { supabaseUrl } from "@/lib/supabase";
+import { getAvatarUrl } from "@/lib/supabase";
 
 interface ProfileModalProps {
   open: boolean;
@@ -185,9 +185,13 @@ const ProfileModal = ({ open, onOpenChange }: ProfileModalProps) => {
                     <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
                       {profile?.avatar_url ? (
                         <img
-                          src={`${supabaseUrl}/${profile.avatar_url}`}
+                          src={getAvatarUrl(profile.avatar_url) || '/default-avatar.png'}
                           alt="Avatar"
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = '/default-avatar.png';
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">

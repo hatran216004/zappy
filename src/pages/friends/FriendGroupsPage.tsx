@@ -3,7 +3,7 @@ import { useGroupConversations } from '@/hooks/useChat';
 import useUser from '@/hooks/useUser';
 import { Users } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { supabaseUrl } from '@/lib/supabase';
+import { getGroupPhotoUrl } from '@/lib/supabase';
 import type { ConversationWithDetails } from '@/services/chatService';
 
 export default function FriendGroupsPage() {
@@ -87,7 +87,7 @@ export default function FriendGroupsPage() {
                   {/* Group Avatar */}
                   <div className="relative flex-shrink-0">
                     <img
-                      src={`${supabaseUrl}/storage/v1/object/public/chat-attachments/${group.photo_url}`}
+                      src={getGroupPhotoUrl(group.photo_url) || '/default-image.png'}
                       alt={group.title || 'Group'}
                       className="w-14 h-14 rounded-full object-cover"
                       onError={(e) => {

@@ -7,7 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { ConversationWithDetails } from '@/services/chatService';
 import { Link, useParams } from 'react-router';
 import { UserAvatar } from '../UserAvatar';
-import { supabaseUrl } from '@/lib/supabase';
+import { getGroupPhotoUrl } from '@/lib/supabase';
 import { useUserStatus, useUserStatusRealtime } from '@/hooks/usePresence';
 import { ConversationOptionsMenu } from './ConversationOptionsMenu';
 import { isConversationMuted } from '@/services/muteService';
@@ -123,7 +123,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         {isGroupChat ? (
           <div className="relative inline-block">
             <img
-              src={`${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation.photo_url}`}
+              src={getGroupPhotoUrl(conversation.photo_url) || '/default-image.png'}
               alt={conversation.title || 'Group'}
               className="w-12 h-12 rounded-full object-cover"
               onError={(e) => {

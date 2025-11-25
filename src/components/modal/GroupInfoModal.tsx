@@ -20,7 +20,7 @@ import {
 } from '@/services/chatService';
 import { useFriends } from '@/hooks/useFriends';
 import { useRemoveGroupMember, useToggleChatEnabled } from '@/hooks/useChat';
-import { supabase, supabaseUrl } from '@/lib/supabase';
+import { supabase, getGroupPhotoUrl } from '@/lib/supabase';
 import { useConfirm } from './ModalConfirm';
 import { UserAvatar } from '../UserAvatar';
 import {
@@ -114,19 +114,26 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
     const uploadToast = toast.loading('Đang tải ảnh lên...');
 
     try {
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage - avatars bucket
       const fileExt = file.name.split('.').pop();
-      const fileName = `group-${conversation.id}-${Date.now()}.${fileExt}`;
-      const filePath = `group-photos/${fileName}`;
+      const timestamp = Date.now();
+      // Format: groups\groupId.jpg?ts=timestamp
+      const fileName = `${conversation.id}.${fileExt}?ts=${timestamp}`;
+      // Upload path: groups/groupId.jpg (with forward slash for storage)
+      const filePath = `groups/${conversation.id}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('chat-attachments')
-        .upload(filePath, file);
+        .from('avatars')
+        .upload(filePath, file, {
+          upsert: true, // Overwrite if exists
+        });
 
       if (uploadError) throw uploadError;
 
-      // Update group photo
-      await updateGroupInfo(conversation.id, { photo_url: filePath });
+      // Update group photo with format: groups\groupId.jpg?ts=timestamp
+      // Use backslash for database storage
+      const dbPath = `groups\\${conversation.id}.${fileExt}?ts=${timestamp}`;
+      await updateGroupInfo(conversation.id, { photo_url: dbPath });
 
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({
@@ -294,7 +301,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <img
-                  src={`${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation.photo_url}`}
+                  src={getGroupPhotoUrl(conversation.photo_url) || '/default-image.png'}
                   alt={conversation.title || 'Group'}
                   className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700"
                 />

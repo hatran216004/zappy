@@ -13,6 +13,9 @@ import { CallInfo, CallParticipant } from '@/services/callService';
 import { UserAvatar } from './UserAvatar';
 import { ParticipantView } from './call/ParticipantView';
 import { LocalParticipant, RemoteParticipant } from 'livekit-client';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { getAvatarUrl } from '@/lib/supabase';
 
 interface VideoCallProps {
   callInfo: CallInfo;
@@ -26,6 +29,7 @@ interface VideoCallProps {
   cameraEnabled?: boolean;
   remoteParticipants?: RemoteParticipant[];
   localParticipant?: LocalParticipant | null;
+  isConnected?: boolean;
 }
 
 export default function VideoCall({
@@ -39,10 +43,46 @@ export default function VideoCall({
   micEnabled,
   cameraEnabled,
   remoteParticipants = [],
-  localParticipant
+  localParticipant,
+  isConnected = false
 }: VideoCallProps) {
   const { user } = useAuth();
   const isVideoCall = callInfo.is_video_enabled;
+  
+  // Map to store participant profiles (userId -> { display_name, avatar_url })
+  const [participantProfiles, setParticipantProfiles] = useState<Record<string, { display_name: string; avatar_url: string | null }>>({});
+
+  // Fetch profiles for remote participants
+  useEffect(() => {
+    if (remoteParticipants.length === 0) return;
+
+    const fetchProfiles = async () => {
+      const userIds = remoteParticipants.map(p => p.identity).filter(Boolean);
+      if (userIds.length === 0) return;
+
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+
+      if (error) {
+        console.error('Error fetching participant profiles:', error);
+        return;
+      }
+
+      const profilesMap: Record<string, { display_name: string; avatar_url: string | null }> = {};
+      profiles?.forEach(profile => {
+        profilesMap[profile.id] = {
+          display_name: profile.display_name || 'User',
+          avatar_url: profile.avatar_url
+        };
+      });
+
+      setParticipantProfiles(profilesMap);
+    };
+
+    fetchProfiles();
+  }, [remoteParticipants]);
 
   // Get the first remote participant to show in main view
   const mainRemoteParticipant = remoteParticipants[0];
@@ -53,7 +93,10 @@ export default function VideoCall({
     remoteParticipantsCount: remoteParticipants.length,
     hasMainRemote: !!mainRemoteParticipant,
     hasLocal: !!localParticipant,
-    remoteIdentities: remoteParticipants.map((p) => p.identity)
+    remoteIdentities: remoteParticipants.map((p) => p.identity),
+    hasToggleCamera: !!onToggleCamera,
+    cameraEnabled,
+    micEnabled
   });
 
   return (
@@ -62,24 +105,58 @@ export default function VideoCall({
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between bg-black/50">
           <div className="flex items-center gap-3">
-            <UserAvatar
-              avatarUrl={callInfo.photo_url || callInfo.avatar_url}
-              displayName={callInfo.display_name}
-              size="md"
-              showStatus={false}
-            />
-            <div>
-              <h3 className="text-white font-semibold">
-                {callInfo.display_name}
-              </h3>
-              <p className="text-gray-400 text-sm">
-                {status === 'incoming'
-                  ? 'Cuộc gọi đến'
-                  : isVideoCall
-                  ? 'Cuộc gọi video'
-                  : 'Cuộc gọi thoại'}
-              </p>
-            </div>
+            {remoteParticipants.length > 0 ? (
+              // Show first remote participant info in header
+              (() => {
+                const firstRemote = remoteParticipants[0];
+                const userId = firstRemote.identity;
+                const profile = participantProfiles[userId] || { display_name: callInfo.display_name, avatar_url: callInfo.photo_url || callInfo.avatar_url };
+                return (
+                  <>
+                    <UserAvatar
+                      avatarUrl={profile.avatar_url}
+                      displayName={profile.display_name}
+                      size="md"
+                      showStatus={false}
+                    />
+                    <div>
+                      <h3 className="text-white font-semibold">
+                        {profile.display_name}
+                      </h3>
+                      <p className="text-gray-400 text-sm">
+                        {status === 'incoming'
+                          ? 'Cuộc gọi đến'
+                          : cameraEnabled || isVideoCall
+                          ? 'Cuộc gọi video'
+                          : 'Cuộc gọi thoại'}
+                      </p>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
+              // Show call info (for group calls or when no participants yet)
+              <>
+                <UserAvatar
+                  avatarUrl={callInfo.photo_url || callInfo.avatar_url}
+                  displayName={callInfo.display_name}
+                  size="md"
+                  showStatus={false}
+                />
+                <div>
+                  <h3 className="text-white font-semibold">
+                    {callInfo.display_name}
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    {status === 'incoming'
+                      ? 'Cuộc gọi đến'
+                      : cameraEnabled || isVideoCall
+                      ? 'Cuộc gọi video'
+                      : 'Cuộc gọi thoại'}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -93,40 +170,90 @@ export default function VideoCall({
 
         {/* Video Area */}
         <div className="flex-1 flex items-center justify-center relative p-4">
-          {status === 'connected' && remoteParticipants.length > 0 ? (
+          {status === 'connected' && (remoteParticipants.length > 0 || (localParticipant && cameraEnabled)) ? (
             /* Grid layout for multiple participants */
             <div className={`
               w-full h-full grid gap-2
-              ${remoteParticipants.length === 1 ? 'grid-cols-1' : 
-                remoteParticipants.length === 2 ? 'grid-cols-2' :
-                remoteParticipants.length <= 4 ? 'grid-cols-2 grid-rows-2' :
-                remoteParticipants.length <= 6 ? 'grid-cols-3 grid-rows-2' :
+              ${remoteParticipants.length === 0 && localParticipant ? 'grid-cols-1' :
+                remoteParticipants.length === 1 && !localParticipant ? 'grid-cols-1' :
+                (remoteParticipants.length + (localParticipant && cameraEnabled ? 1 : 0)) === 1 ? 'grid-cols-1' : 
+                (remoteParticipants.length + (localParticipant && cameraEnabled ? 1 : 0)) === 2 ? 'grid-cols-2' :
+                (remoteParticipants.length + (localParticipant && cameraEnabled ? 1 : 0)) <= 4 ? 'grid-cols-2 grid-rows-2' :
+                (remoteParticipants.length + (localParticipant && cameraEnabled ? 1 : 0)) <= 6 ? 'grid-cols-3 grid-rows-2' :
                 'grid-cols-3 grid-rows-3'}
             `}>
-              {remoteParticipants.map((participant, index) => (
-                <ParticipantView
-                  key={participant.sid}
-                  participant={participant}
-                  displayName={`User ${index + 1}`}
-                  avatarUrl={callInfo.photo_url || callInfo.avatar_url}
-                  className="w-full h-full"
-                  showStats
-                />
-              ))}
+              {remoteParticipants.map((participant) => {
+                const userId = participant.identity;
+                const profile = participantProfiles[userId] || { display_name: 'User', avatar_url: null };
+                return (
+                  <ParticipantView
+                    key={participant.sid}
+                    participant={participant}
+                    displayName={profile.display_name}
+                    avatarUrl={profile.avatar_url}
+                    className="w-full h-full"
+                    showStats
+                  />
+                );
+              })}
               
-              {/* Local participant in grid */}
-              {localParticipant && (
+              {/* Local participant in grid - only show if camera is enabled */}
+              {localParticipant && cameraEnabled && (
                 <ParticipantView
                   participant={localParticipant}
                   displayName={user?.user_metadata?.display_name || 'You'}
-                  avatarUrl={user?.user_metadata?.avatar_url}
+                  avatarUrl={user?.user_metadata?.avatar_url || null}
                   className="w-full h-full"
                   isLocal
                 />
               )}
             </div>
+          ) : status === 'connected' && localParticipant && !cameraEnabled ? (
+            /* Connected but camera off - show avatar with hint */
+            <div className="flex flex-col items-center gap-4">
+              {remoteParticipants.length > 0 ? (
+                (() => {
+                  const firstRemote = remoteParticipants[0];
+                  const userId = firstRemote.identity;
+                  const profile = participantProfiles[userId] || { display_name: callInfo.display_name, avatar_url: callInfo.photo_url || callInfo.avatar_url };
+                  return (
+                    <>
+                      <UserAvatar
+                        avatarUrl={profile.avatar_url}
+                        displayName={profile.display_name}
+                        size="xl"
+                        showStatus={false}
+                        className="w-32 h-32"
+                      />
+                      <h2 className="text-white text-2xl font-semibold">
+                        {profile.display_name}
+                      </h2>
+                    </>
+                  );
+                })()
+              ) : (
+                <>
+                  <UserAvatar
+                    avatarUrl={callInfo.photo_url || callInfo.avatar_url}
+                    displayName={callInfo.display_name}
+                    size="xl"
+                    showStatus={false}
+                    className="w-32 h-32"
+                  />
+                  <h2 className="text-white text-2xl font-semibold">
+                    {callInfo.display_name}
+                  </h2>
+                </>
+              )}
+              <p className="text-gray-400">
+                Đang chờ người khác tham gia...
+              </p>
+              <p className="text-gray-500 text-sm">
+                Bạn có thể bật camera để người khác thấy bạn
+              </p>
+            </div>
           ) : (
-            /* Waiting state */
+            /* Waiting state (incoming or not connected) */
             <div className="flex flex-col items-center gap-4">
               <UserAvatar
                 avatarUrl={callInfo.photo_url || callInfo.avatar_url}
@@ -178,13 +305,21 @@ export default function VideoCall({
               </Button>
             )}
 
-            {/* Camera Toggle (video call only) */}
-            {isVideoCall && status === 'connected' && (
+            {/* Camera Toggle - Only show when room is connected and ready */}
+            {status === 'connected' && onToggleCamera && isConnected && localParticipant && (
               <Button
                 variant="secondary"
                 size="icon"
-                onClick={onToggleCamera}
+                onClick={() => {
+                  console.log('📹 Camera button clicked, current state:', cameraEnabled, 'isConnected:', isConnected);
+                  if (onToggleCamera) {
+                    onToggleCamera();
+                  } else {
+                    console.warn('⚠️ onToggleCamera is not defined');
+                  }
+                }}
                 className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600"
+                title={cameraEnabled ? 'Tắt camera' : 'Bật camera'}
               >
                 {cameraEnabled ? (
                   <VideoIcon className="h-6 w-6" />

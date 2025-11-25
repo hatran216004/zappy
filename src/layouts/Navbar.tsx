@@ -7,7 +7,8 @@ import {
   Sun,
   User,
   LogOut,
-  Search
+  Search,
+  Phone
 } from 'lucide-react';
 import { NotificationButton } from '@/components/notification/NotificationButton';
 import { useNotificationsRealtime } from '@/hooks/useNotifications';
@@ -135,6 +136,7 @@ export default function Navbar() {
   const isChat = pathname.includes('chat') || pathname === '/';
   const isFriends = pathname.includes('friends');
   const isPost = pathname.includes('posts');
+  const isCallHistory = pathname.includes('call-history');
 
   const currentStatus = statusProfile?.status ?? profile?.status;
 
@@ -205,6 +207,12 @@ export default function Navbar() {
             icon={Globe}
             label="Posts"
             onClick={() => navigate('/posts')}
+          />
+          <CenterNavItem
+            active={isCallHistory}
+            icon={Phone}
+            label="Cuộc gọi"
+            onClick={() => navigate('/call-history')}
           />
         </div>
 

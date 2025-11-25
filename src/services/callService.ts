@@ -108,6 +108,118 @@ export const acceptCall = async (callId: string): Promise<void> => {
   console.log('✅ Call accepted, joined_at updated');
 };
 
+// Create a call message in chat after call ends
+export const createCallMessage = async (
+  callId: string,
+  conversationId: string
+): Promise<void> => {
+  try {
+    console.log('📞 Creating call message for call:', callId, 'conversation:', conversationId);
+    
+    // Get call details from database
+    const { data: call, error: callError } = await supabase
+      .from('calls')
+      .select('id, started_at, ended_at, type, started_by')
+      .eq('id', callId)
+      .single();
+
+    if (callError) {
+      console.error('❌ Error getting call details:', callError);
+      return;
+    }
+
+    if (!call) {
+      console.error('❌ Call not found:', callId);
+      return;
+    }
+
+    if (!call.ended_at) {
+      console.log('⚠️ Call not ended yet, will be handled by subscription');
+      // Don't retry here - subscription will handle it when ended_at is set
+      return;
+    }
+
+    // Calculate duration
+    const startedAt = new Date(call.started_at);
+    const endedAt = new Date(call.ended_at);
+    const durationSeconds = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000);
+    
+    if (durationSeconds < 0) {
+      console.error('❌ Invalid duration:', durationSeconds);
+      return;
+    }
+
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    const durationText = minutes > 0 
+      ? `${minutes} phút ${seconds} giây`
+      : `${seconds} giây`;
+
+    // Get call participants who actually joined
+    const { data: participants } = await supabase
+      .from('call_participants')
+      .select('user_id, joined_at')
+      .eq('call_id', callId)
+      .not('joined_at', 'is', null);
+
+    const participantCount = participants?.length || 0;
+    const callType = call.type === 'video' ? 'video' : 'audio';
+    const callTypeText = callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+
+    // Create message content
+    const messageContent = `${callTypeText} • ${durationText}${participantCount > 0 ? ` • ${participantCount} người tham gia` : ''}`;
+
+    console.log('📝 Creating message with content:', messageContent);
+
+    // Check if message already exists (avoid duplicates)
+    const { data: existingMessages } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('type', 'system')
+      .eq('content_text', messageContent)
+      .gte('created_at', new Date(Date.now() - 5000).toISOString()) // Within last 5 seconds
+      .limit(1);
+
+    if (existingMessages && existingMessages.length > 0) {
+      console.log('⚠️ Call message already exists, skipping');
+      return;
+    }
+
+    // Create system message
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        sender_id: call.started_by,
+        type: 'system',
+        content_text: messageContent,
+      })
+      .select()
+      .single();
+
+    if (messageError) {
+      console.error('❌ Error creating call message:', messageError);
+      return;
+    }
+
+    console.log('✅ Call message created successfully:', message.id);
+
+    // Update conversation's updated_at and last_message_id
+    await supabase
+      .from('conversations')
+      .update({
+        last_message_id: message.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', conversationId);
+
+    console.log('✅ Conversation updated with call message');
+  } catch (error) {
+    console.error('❌ Error creating call message:', error);
+  }
+};
+
 // Subscribe to call_participants changes cho user hiện tại
 export const subscribeCallParticipants = (
   userId: string,
@@ -130,6 +242,19 @@ export const subscribeCallParticipants = (
       },
       async (payload: PostgresChangeEvent<CallParticipant>) => {
         const participant = payload.new;
+        
+        // Check if call has ended by querying calls table directly
+        const { data: callData } = await supabase
+          .from('calls')
+          .select('ended_at')
+          .eq('id', participant.call_id)
+          .single();
+        
+        if (callData?.ended_at) {
+          console.log('🚫 Ignoring INSERT event - call already ended:', participant.call_id);
+          return;
+        }
+        
         const callInfo = await getCallInfo(participant.call_id);
         if (!callInfo) return;
 
@@ -142,6 +267,12 @@ export const subscribeCallParticipants = (
           .single();
 
         if (error || !updatedParticipant) return;
+
+        // Ignore if participant has left
+        if (updatedParticipant.left_at) {
+          console.log('🚫 Ignoring INSERT event - participant already left:', participant.call_id);
+          return;
+        }
 
         if (updatedParticipant.joined_at) {
           handlers.onJoined(callInfo, updatedParticipant);
@@ -163,19 +294,39 @@ export const subscribeCallParticipants = (
         const participant = payload.new;
         const oldParticipant = payload.old;
         
+        // Check if left_at was just set (from null to non-null)
+        if (!oldParticipant.left_at && participant.left_at) {
+          console.log('👋 Participant left call');
+          handlers.onLeft(participant);
+          return;
+        }
+        
         // Check if joined_at was just set (from null to non-null)
         if (!oldParticipant.joined_at && participant.joined_at) {
+          // Ignore if participant has left
+          if (participant.left_at) {
+            console.log('🚫 Ignoring UPDATE event - participant already left:', participant.call_id);
+            return;
+          }
+          
+          // Check if call has ended by querying calls table directly
+          const { data: callData } = await supabase
+            .from('calls')
+            .select('ended_at')
+            .eq('id', participant.call_id)
+            .single();
+          
+          if (callData?.ended_at) {
+            console.log('🚫 Ignoring UPDATE event - call already ended:', participant.call_id);
+            return;
+          }
+          
           console.log('🎉 Participant accepted call, joining room...');
           const callInfo = await getCallInfo(participant.call_id);
           if (callInfo) {
             handlers.onJoined(callInfo, participant);
           }
           return;
-        }
-        
-        // Check if left_at was set
-        if (participant.left_at) {
-          handlers.onLeft(participant);
         }
       }
     )
@@ -184,5 +335,195 @@ export const subscribeCallParticipants = (
   return () => {
     supabase.removeChannel(channel);
   };
+};
+
+// Subscribe to calls table to detect when call ends
+export const subscribeCallEnd = (
+  conversationId: string,
+  onCallEnd: (callId: string) => void
+) => {
+  const channel = supabase
+    .channel(`calls:${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'calls',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload: any) => {
+        const call = payload.new;
+        const oldCall = payload.old;
+        
+        // Check if ended_at was just set (from null to non-null)
+        if (!oldCall.ended_at && call.ended_at) {
+          console.log('📞 Call ended detected via subscription:', call.id);
+          onCallEnd(call.id);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+// Lấy lịch sử cuộc gọi của user
+export type CallHistoryItem = {
+  id: string;
+  conversation_id: string;
+  started_by: string;
+  started_at: string;
+  ended_at: string | null;
+  type: 'audio' | 'video';
+  participants: string[];
+  duration: number | null; // seconds
+  conversation_type: 'direct' | 'group';
+  conversation_title: string | null;
+  conversation_photo_url: string | null;
+  other_user_id?: string;
+  other_user_name?: string;
+  other_user_avatar?: string;
+  started_by_name?: string;
+  started_by_avatar?: string;
+};
+
+export const getCallHistory = async (
+  userId: string,
+  limit: number = 50
+): Promise<CallHistoryItem[]> => {
+  // Get all calls where user is a participant
+  const { data: callParticipants, error: participantsError } = await supabase
+    .from('call_participants')
+    .select('call_id')
+    .eq('user_id', userId);
+
+  if (participantsError) {
+    console.error('Error fetching call participants:', participantsError);
+    throw participantsError;
+  }
+
+  if (!callParticipants || callParticipants.length === 0) {
+    return [];
+  }
+
+  const callIds = [...new Set(callParticipants.map((cp) => cp.call_id))];
+
+  // Get calls with conversation info
+  const { data: calls, error: callsError } = await supabase
+    .from('calls')
+    .select(
+      `
+      id,
+      conversation_id,
+      started_by,
+      started_at,
+      ended_at,
+      type,
+      participants,
+      conversation:conversations(
+        type,
+        title,
+        photo_url
+      ),
+      starter:profiles!calls_started_by_fkey(
+        display_name,
+        avatar_url
+      )
+    `
+    )
+    .in('id', callIds)
+    .order('started_at', { ascending: false })
+    .limit(limit);
+
+  if (callsError) {
+    console.error('Error fetching calls:', callsError);
+    throw callsError;
+  }
+
+  if (!calls || calls.length === 0) {
+    return [];
+  }
+
+  // Get direct pairs for direct conversations
+  const directConversationIds = calls
+    .filter((c) => (c.conversation as any)?.type === 'direct')
+    .map((c) => c.conversation_id);
+
+  let directPairsMap = new Map<string, { user_a: string; user_b: string }>();
+  if (directConversationIds.length > 0) {
+    const { data: directPairs } = await supabase
+      .from('direct_pairs')
+      .select('conversation_id, user_a, user_b')
+      .in('conversation_id', directConversationIds);
+
+    directPairsMap = new Map(
+      directPairs?.map((dp) => [dp.conversation_id, dp]) || []
+    );
+  }
+
+  // Get other user profiles for direct calls
+  const otherUserIds = new Set<string>();
+  directPairsMap.forEach((pair) => {
+    if (pair.user_a === userId) {
+      otherUserIds.add(pair.user_b);
+    } else if (pair.user_b === userId) {
+      otherUserIds.add(pair.user_a);
+    }
+  });
+
+  let otherUsersMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+  if (otherUserIds.size > 0) {
+    const { data: otherUsers } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', Array.from(otherUserIds));
+
+    otherUsersMap = new Map(
+      otherUsers?.map((u) => [u.id, u]) || []
+    );
+  }
+
+  // Transform to CallHistoryItem
+  return calls.map((call) => {
+    const conversation = call.conversation as any;
+    const starter = call.starter as any;
+    const directPair = directPairsMap.get(call.conversation_id);
+    
+    let otherUserId: string | undefined;
+    let otherUser: { display_name: string; avatar_url: string | null } | undefined;
+    
+    if (conversation?.type === 'direct' && directPair) {
+      otherUserId = directPair.user_a === userId ? directPair.user_b : directPair.user_a;
+      otherUser = otherUsersMap.get(otherUserId);
+    }
+
+    const startedAt = new Date(call.started_at);
+    const endedAt = call.ended_at ? new Date(call.ended_at) : null;
+    const duration = endedAt
+      ? Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000)
+      : null;
+
+    return {
+      id: call.id,
+      conversation_id: call.conversation_id,
+      started_by: call.started_by,
+      started_at: call.started_at,
+      ended_at: call.ended_at,
+      type: call.type as 'audio' | 'video',
+      participants: call.participants || [],
+      duration,
+      conversation_type: conversation?.type || 'direct',
+      conversation_title: conversation?.title || null,
+      conversation_photo_url: conversation?.photo_url || null,
+      other_user_id: otherUserId,
+      other_user_name: otherUser?.display_name,
+      other_user_avatar: otherUser?.avatar_url || null,
+      started_by_name: starter?.display_name,
+      started_by_avatar: starter?.avatar_url || null
+    };
+  });
 };
 

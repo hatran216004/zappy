@@ -7,6 +7,7 @@ import SearchBar from '@/components/SearchBar';
 import { MoreVertical, SquarePen } from 'lucide-react';
 import { useState } from 'react';
 import { CreateGroupModal } from '@/components/modal/CreateGroupModal';
+import AddFriendModal from '@/components/modal/AddFriendModal';
 
 const tabs = [
   { value: 'all', label: 'Tất cả' },
@@ -40,6 +41,7 @@ export default function ChatSidebar() {
             Đoạn chat
           </h2>
           <div className="flex items-center gap-2">
+            <AddFriendModal />
             <button
               type="button"
               aria-label="Tùy chọn"

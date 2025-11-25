@@ -45,8 +45,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ThreadList } from '@/components/thread/ThreadList';
 import { ThreadView } from '@/components/thread/ThreadView';
 import { CreateThreadModal } from '@/components/modal/CreateThreadModal';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, MapPin } from 'lucide-react';
 import type { ThreadWithDetails } from '@/services/chatService';
+import { MapPanel } from '@/components/map/MapPanel';
+import { supabase } from '@/lib/supabase';
 
 interface ChatWindowProps {
   userId: string;
@@ -82,6 +84,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     preview: string;
   } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -292,6 +295,52 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     },
     [conversationId, sendTyping]
   );
+
+  // Auto open map when new location message arrives
+  useEffect(() => {
+    if (!conversationId) return;
+
+    console.log('🗺️ Setting up location message listener for:', conversationId);
+
+    const channel = supabase
+      .channel(`location-messages-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const newMessage = payload.new as any;
+          const hasLocation = !!(newMessage.location_latitude && newMessage.location_longitude);
+          
+          console.log('📬 New message received:', {
+            type: newMessage.type,
+            sender: newMessage.sender_id,
+            currentUser: userId,
+            hasLocation,
+            latitude: newMessage.location_latitude,
+            longitude: newMessage.location_longitude
+          });
+
+          // Auto open map when message has location data (regardless of type)
+          if (hasLocation) {
+            console.log('🗺️ Opening map panel for location message');
+            setIsMapOpen(true);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔌 Location listener status:', status);
+      });
+
+    return () => {
+      console.log('🧹 Cleaning up location listener');
+      void supabase.removeChannel(channel);
+    };
+  }, [conversationId, userId]);
 
   // ✅ 5. Handle typing indicator
   const handleInputChange = useCallback(
@@ -1270,6 +1319,33 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           userId={userId}
           currentConversationId={conversationId}
         />
+      )}
+
+      {/* Map Panel */}
+      <MapPanel
+        conversationId={conversationId}
+        isOpen={isMapOpen}
+        onClose={() => {
+          console.log('🗺️ Closing map panel');
+          setIsMapOpen(false);
+        }}
+        onMessageClick={(messageId) => {
+          void jumpToMessage(messageId);
+        }}
+      />
+
+      {/* Debug: Manual Map Toggle (for testing) */}
+      {conversation?.type === 'group' && (
+        <button
+          onClick={() => {
+            console.log('🗺️ Manual toggle map:', !isMapOpen);
+            setIsMapOpen(!isMapOpen);
+          }}
+          className="fixed bottom-24 right-4 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg z-50"
+          title="Toggle Map (Debug)"
+        >
+          <MapPin className="w-5 h-5" />
+        </button>
       )}
     </div>
   );

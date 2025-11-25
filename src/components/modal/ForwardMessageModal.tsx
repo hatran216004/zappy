@@ -15,7 +15,7 @@ import { useConversations } from '@/hooks/useChat';
 import { chatKeys } from '@/hooks/useChat';
 import toast from 'react-hot-toast';
 import { Search, Send } from 'lucide-react';
-import { supabaseUrl } from '@/lib/supabase';
+import { getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
 
 interface ForwardMessageModalProps {
   open: boolean;
@@ -128,8 +128,8 @@ export function ForwardMessageModal({
               filteredConversations.map((conv) => {
                 const isGroup = conv.type === 'group';
                 const photoUrl = isGroup
-                  ? `${supabaseUrl}/storage/v1/object/public/chat-attachments/${conv.photo_url}`
-                  : conv.photo_url;
+                  ? getGroupPhotoUrl(conv.photo_url)
+                  : getAvatarUrl(conv.photo_url);
                 const displayName = isGroup ? conv.title : conv.display_name;
                 const isSelected = selected.includes(conv.id);
 

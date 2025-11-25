@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Phone, Video, Users } from 'lucide-react';
 import { getConversation, type ConversationWithDetails } from '@/services/chatService';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface SelectCallParticipantsModalProps {
   open: boolean;
@@ -142,13 +143,17 @@ export function SelectCallParticipantsModal({
                     disabled={true}
                     className="cursor-not-allowed"
                   />
-                  <img
-                    src={
+                  <UserAvatar
+                    avatarUrl={
                       conversation.participants.find((p) => p.user_id === currentUserId)
-                        ?.profile.avatar_url || '/default-avatar.png'
+                        ?.profile.avatar_url || null
                     }
-                    alt="Bạn"
-                    className="size-10 rounded-full"
+                    displayName={
+                      conversation.participants.find((p) => p.user_id === currentUserId)
+                        ?.profile.display_name || 'Bạn'
+                    }
+                    size="md"
+                    showStatus={false}
                   />
                   <div className="flex-1">
                     <div className="font-medium">
@@ -182,10 +187,11 @@ export function SelectCallParticipantsModal({
                         onChange={() => toggleParticipant(participant.user_id)}
                         className="cursor-pointer"
                       />
-                      <img
-                        src={participant.profile.avatar_url || '/default-avatar.png'}
-                        alt={participant.profile.display_name}
-                        className="size-10 rounded-full"
+                      <UserAvatar
+                        avatarUrl={participant.profile.avatar_url || null}
+                        displayName={participant.profile.display_name}
+                        size="md"
+                        showStatus={false}
                       />
                       <div className="flex-1">
                         <div className="font-medium">{participant.profile.display_name}</div>

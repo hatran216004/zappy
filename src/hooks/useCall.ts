@@ -1,6 +1,13 @@
 // hooks/useCall.ts
 import { useEffect, useState, useRef } from 'react';
-import { subscribeCallParticipants, CallInfo, CallParticipant, acceptCall as acceptCallService } from '@/services/callService';
+import {
+  subscribeCallParticipants,
+  CallInfo,
+  CallParticipant,
+  acceptCall as acceptCallService,
+  createCallMessage,
+  subscribeCallEnd
+} from '@/services/callService';
 import { useLivekitRoom } from './useLivekit';
 
 interface ActiveCall {
@@ -15,7 +22,7 @@ export const useCall = (userId: string | undefined) => {
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasJoinedRef = useRef(false);
-  
+
   const {
     connect,
     disconnect,
@@ -25,6 +32,7 @@ export const useCall = (userId: string | undefined) => {
     cameraEnabled,
     remoteParticipants,
     localParticipant,
+    isConnected
   } = useLivekitRoom({ autoMic: true, autoCamera: false });
 
   useEffect(() => {
@@ -32,10 +40,28 @@ export const useCall = (userId: string | undefined) => {
 
     const unsubscribe = subscribeCallParticipants(userId, {
       onIncoming: (callInfo: CallInfo, participant: CallParticipant) => {
+        // Double check: ignore if participant has left
+        if (participant.left_at) {
+          console.log('🚫 Ignoring incoming call - participant already left:', {
+            callId: participant.call_id,
+            left_at: participant.left_at
+          });
+          return;
+        }
+
         console.log('📥 Incoming call:', { callInfo, participant });
         setActiveCall({ callInfo, participant, status: 'incoming' });
       },
       onJoined: (callInfo: CallInfo, participant: CallParticipant) => {
+        // Double check: ignore if participant has left
+        if (participant.left_at) {
+          console.log('🚫 Ignoring joined call - participant already left:', {
+            callId: participant.call_id,
+            left_at: participant.left_at
+          });
+          return;
+        }
+
         console.log('✅ Joined call:', { callInfo, participant });
         console.log('🔑 LiveKit credentials:', {
           hasUrl: !!participant.url,
@@ -43,49 +69,85 @@ export const useCall = (userId: string | undefined) => {
           url: participant.url,
           tokenPreview: participant.token?.substring(0, 20) + '...'
         });
-        
+
         setActiveCall({ callInfo, participant, status: 'connected' });
-        
+
         // Connect to LiveKit when we (this user) are joined
         // Backend must supply valid url/token in call_participants
         const hasValidUrl = participant.url && participant.url.trim() !== '';
-        const hasValidToken = participant.token && participant.token.trim() !== '';
-        
+        const hasValidToken =
+          participant.token && participant.token.trim() !== '';
+
         if (hasValidUrl && hasValidToken) {
           console.log('🎬 Connecting to LiveKit room...');
-          connect(participant.url as unknown as string, participant.token as unknown as string, {
-            mic: true,
-            camera: !!callInfo.is_video_enabled,
-          }).then(() => {
-            console.log('✅ LiveKit connection established!');
-          }).catch((e) => {
-            console.error('❌ LiveKit connect error:', e);
-            console.error('Error details:', {
-              message: e.message,
-              stack: e.stack,
-              url: participant.url,
+          // Connect with mic enabled, but camera can be toggled later
+          // This allows upgrading audio call to video call
+          connect(
+            participant.url as unknown as string,
+            participant.token as unknown as string,
+            {
+              mic: true,
+              camera: !!callInfo.is_video_enabled // Start with video if call was created as video call
+            }
+          )
+            .then(() => {
+              console.log('✅ LiveKit connection established!');
+              console.log('📹 Video can be toggled on/off during the call');
+            })
+            .catch((e) => {
+              console.error('❌ LiveKit connect error:', e);
+              console.error('Error details:', {
+                message: e.message,
+                stack: e.stack,
+                url: participant.url
+              });
             });
-          });
         } else {
           console.warn('⚠️ Missing or invalid LiveKit credentials!');
           console.warn('URL valid:', hasValidUrl, '→', participant.url);
-          console.warn('Token valid:', hasValidToken, '→', participant.token?.substring(0, 30));
+          console.warn(
+            'Token valid:',
+            hasValidToken,
+            '→',
+            participant.token?.substring(0, 30)
+          );
           console.warn('');
-          console.warn('📌 This is EXPECTED if using the OLD function (initiate_direct_call).');
+          console.warn(
+            '📌 This is EXPECTED if using the OLD function (initiate_direct_call).'
+          );
           console.warn('📌 Video/audio will NOT work with placeholder tokens.');
           console.warn('📌 To enable real video calls:');
           console.warn('   1. Setup LiveKit server');
           console.warn('   2. Run migration: fix_livekit_tokens.sql');
-          console.warn('   3. Set USE_NEW_CALL_FUNCTION = true in callService.ts');
+          console.warn(
+            '   3. Set USE_NEW_CALL_FUNCTION = true in callService.ts'
+          );
           console.warn('');
-          console.warn('💡 For now, you can test the UI flow without real video/audio.');
+          console.warn(
+            '💡 For now, you can test the UI flow without real video/audio.'
+          );
         }
       },
-      onLeft: (_participant: CallParticipant) => {
-        console.log('👋 Left call');
+      onLeft: (participant: CallParticipant) => {
+        console.log('👋 Left call:', participant.call_id);
+        const callId = participant.call_id;
+        // Get conversationId from activeCall before clearing it
+        const conversationId = activeCall?.callInfo.conversation_id;
+
         setActiveCall(null);
         disconnect();
-      },
+
+        // Create call message after a delay to ensure call is ended in database
+        if (callId && conversationId) {
+          setTimeout(async () => {
+            try {
+              await createCallMessage(callId, conversationId);
+            } catch (error) {
+              console.error('Error creating call message:', error);
+            }
+          }, 2000);
+        }
+      }
     });
 
     return () => {
@@ -96,7 +158,27 @@ export const useCall = (userId: string | undefined) => {
         timeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  // Subscribe to call end events for active call
+  useEffect(() => {
+    if (!activeCall) return;
+
+    const conversationId = activeCall.callInfo.conversation_id;
+    const unsubscribeCallEnd = subscribeCallEnd(conversationId, async (callId) => {
+      console.log('📞 Call ended event received:', callId);
+      try {
+        await createCallMessage(callId, conversationId);
+      } catch (error) {
+        console.error('Error creating call message:', error);
+      }
+    });
+
+    return () => {
+      unsubscribeCallEnd();
+    };
+  }, [activeCall]);
 
   // Auto-disconnect on timeout if no participants join
   useEffect(() => {
@@ -124,7 +206,11 @@ export const useCall = (userId: string | undefined) => {
     }
 
     // If everyone left after joining, start a shorter timeout
-    if (hasJoinedRef.current && remoteParticipants.length === 0 && !timeoutRef.current) {
+    if (
+      hasJoinedRef.current &&
+      remoteParticipants.length === 0 &&
+      !timeoutRef.current
+    ) {
       console.log('⏰ All participants left, starting disconnect timer');
       timeoutRef.current = setTimeout(() => {
         console.log('⏰ Call ended - all participants left');
@@ -138,9 +224,13 @@ export const useCall = (userId: string | undefined) => {
         timeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCall, remoteParticipants]);
 
   const endCall = () => {
+    const callId = activeCall?.participant.call_id;
+    const conversationId = activeCall?.callInfo.conversation_id;
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -148,16 +238,27 @@ export const useCall = (userId: string | undefined) => {
     hasJoinedRef.current = false;
     setActiveCall(null);
     disconnect();
+
+    // Create call message after a delay to ensure call is ended in database
+    if (callId && conversationId) {
+      setTimeout(async () => {
+        try {
+          await createCallMessage(callId, conversationId);
+        } catch (error) {
+          console.error('Error creating call message:', error);
+        }
+      }, 2000);
+    }
   };
 
   const acceptCall = async () => {
     if (!activeCall) return;
-    
+
     try {
       // Update joined_at in database first
       await acceptCallService(activeCall.participant.call_id);
       console.log('📞 Call accepted in database, waiting for UPDATE event...');
-      
+
       // The UPDATE event will trigger onJoined handler, which will connect to LiveKit
       // So we just need to update the UI status here
       setActiveCall((prev) => {
@@ -179,7 +280,7 @@ export const useCall = (userId: string | undefined) => {
     cameraEnabled,
     remoteParticipants,
     localParticipant,
-    isInCall: activeCall !== null
+    isInCall: activeCall !== null,
+    isConnected
   };
 };
-

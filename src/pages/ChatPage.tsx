@@ -39,7 +39,7 @@ function ChatPage() {
                 Chào mừng đến với Zappy
               </h2>
               <p className="text-base text-gray-600 dark:text-[#B5BAC1] mb-2">
-                Chọn một cuộc trò chuyện từ danh sách bên phải
+                Chọn một cuộc trò chuyện từ danh sách bên trái
               </p>
               <p className="text-sm text-gray-500 dark:text-[#80838A]">
                 hoặc tìm kiếm bạn bè để bắt đầu trò chuyện mới

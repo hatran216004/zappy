@@ -10,22 +10,32 @@ import {
   Link as LinkIcon,
   Palette,
   Ban,
-  Unlock
+  Unlock,
+  BarChart3,
+  MoreVertical
 } from 'lucide-react';
 import { TooltipBtn } from '../TooltipBtn';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { useLocation } from 'react-router';
 import type { ConversationWithDetails } from '@/services/chatService';
 import type { PinnedMessage } from '@/services/chatService';
 import { InviteLinkModal } from '../modal/InviteLinkModal';
 import { GroupInfoModal } from '../modal/GroupInfoModal';
-import { supabaseUrl } from '@/lib/supabase';
+import { supabaseUrl, getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
 import { BackgroundPicker } from './BackgroundPicker';
 import { useUpdateConversationBackground } from '@/hooks/useChat';
 import { PinnedMessagesModal } from '../modal/PinnedMessagesModal';
 import { CreatePollModal } from '../modal/CreatePollModal';
 import { SelectCallParticipantsModal } from '../modal/SelectCallParticipantsModal';
+import { SummaryChatModal } from '../modal/SummaryChatModal';
 import useUser from '@/hooks/useUser';
 import {
   useBlockUser,
@@ -55,7 +65,11 @@ interface ChatHeaderProps {
   currentUserId?: string;
   onCall?: (userId: string, isVideo: boolean) => void;
   onGroupCall?: (conversationId: string, isVideo: boolean) => void;
-  onCallWithParticipants?: (conversationId: string, isVideo: boolean, participants: string[]) => void;
+  onCallWithParticipants?: (
+    conversationId: string,
+    isVideo: boolean,
+    participants: string[]
+  ) => void;
   pinned?: PinnedMessage[];
   onUnpin?: (messageId: string) => void;
   onJumpTo?: (messageId: string) => void;
@@ -88,6 +102,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showSelectCallModal, setShowSelectCallModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [callIsVideo, setCallIsVideo] = useState(false);
 
   // Handle initial show search from location state or prop
@@ -115,11 +131,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     : otherParticipant?.profile.display_name || 'Người dùng';
 
   // Check if blocked (either direction)
-  const isBlocked = !isGroupChat && (isBlockedByMe === true || isBlockedByUser === true);
+  const isBlocked =
+    !isGroupChat && (isBlockedByMe === true || isBlockedByUser === true);
 
   const avatarUrl = isGroupChat
-    ? `${supabaseUrl}/storage/v1/object/public/chat-attachments/${conversation?.photo_url}`
-    : otherParticipant?.profile.avatar_url || '/default-avatar.png';
+    ? getGroupPhotoUrl(conversation?.photo_url) || '/default-avatar.png'
+    : getAvatarUrl(otherParticipant?.profile.avatar_url) || '/default-avatar.png';
 
   const statusText = isGroupChat
     ? `${conversation?.participants?.length || 0} thành viên`
@@ -231,108 +248,96 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 sm:gap-3 text-gray-600 dark:text-gray-300">
-          {/* Background Picker */}
-          {conversation && (
-            <BackgroundPicker
-              currentBackground={{
-                type: (conversation.background_type || 'color') as
-                  | 'color'
-                  | 'gradient'
-                  | 'image',
-                value: conversation.background_value || '#FFFFFF'
-              }}
-              onSelect={handleBackgroundChange}
-              trigger={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full"
-                  title="Đổi background"
-                >
-                  <Palette className="size-5" />
-                </Button>
-              }
-            />
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            <Search className="size-5" />
-          </Button>
-
-          {/* Show invite button for group admins */}
-          {isGroupChat && isAdmin && conversation && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={() => setShowInviteModal(true)}
-              title="Tạo link mời"
-            >
-              <LinkIcon className="size-5" />
-            </Button>
-          )}
-
-          {/* Call buttons for direct chat */}
-          {!isGroupChat && otherParticipant && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={() => onCall?.(otherParticipant.user_id, false)}
-              title={isBlocked ? "Không thể gọi khi đã chặn" : "Gọi thoại"}
-              disabled={isBlocked}
-            >
-              <Phone className="size-5" />
-            </Button>
-          )}
-
-          {/* Call buttons for group chat */}
-          {isGroupChat && conversation && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={() => {
-                  setCallIsVideo(false);
-                  setShowSelectCallModal(true);
-                }}
-                title="Gọi thoại"
+          {/* Menu Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+                title="Tùy chọn"
               >
-                <Phone className="size-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={() => {
-                  setCallIsVideo(true);
-                  setShowSelectCallModal(true);
-                }}
-                title="Gọi video"
-              >
-                <Video className="size-5" />
-              </Button>
-            </>
-          )}
+                <MoreVertical className="size-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
+              {/* Background Picker */}
+              {conversation && (
+                <DropdownMenuItem onClick={() => setShowBackgroundPicker(true)}>
+                  <Palette className="size-4" />
+                  <span>Đổi background</span>
+                </DropdownMenuItem>
+              )}
 
-          {/* Group Info Button */}
-          {isGroupChat ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={() => setShowGroupInfoModal(true)}
-              title="Thông tin nhóm"
-            >
-              <Info className="size-5" />
-            </Button>
-          ) : (
+              <DropdownMenuItem onClick={() => setShowSearch(!showSearch)}>
+                <Search className="size-4" />
+                <span>Tìm kiếm</span>
+              </DropdownMenuItem>
+
+              {/* Show invite button for group admins */}
+              {isGroupChat && isAdmin && conversation && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowInviteModal(true)}>
+                    <LinkIcon className="size-4" />
+                    <span>Tạo link mời</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {/* Call buttons for direct chat */}
+              {!isGroupChat && otherParticipant && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onCall?.(otherParticipant.user_id, false)}
+                    disabled={isBlocked}
+                  >
+                    <Phone className="size-4" />
+                    <span>Gọi thoại</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {/* Call buttons for group chat */}
+              {isGroupChat && conversation && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setCallIsVideo(false);
+                      setShowSelectCallModal(true);
+                    }}
+                  >
+                    <Phone className="size-4" />
+                    <span>Gọi thoại</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setCallIsVideo(true);
+                      setShowSelectCallModal(true);
+                    }}
+                  >
+                    <Video className="size-4" />
+                    <span>Gọi video</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {/* Group Info Button */}
+              {isGroupChat && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowGroupInfoModal(true)}>
+                    <Info className="size-4" />
+                    <span>Thông tin nhóm</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Direct chat info and block buttons (outside menu) */}
+          {!isGroupChat && (
             <>
               <TooltipBtn icon={Info} label="Thông tin" />
               {/* Block/Unblock button for direct chat */}
@@ -365,6 +370,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                 </Button>
               }
             />
+          )}
+
+          {/* Summary button (only for groups) */}
+          {isGroupChat && conversation && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full text-xs px-2"
+              onClick={() => setShowSummaryModal(true)}
+              title="Tóm tắt cuộc trò chuyện"
+            >
+              <BarChart3 className="size-4 mr-1" />
+              Summary
+            </Button>
           )}
 
           {/* Create Thread button (only for groups) */}
@@ -526,12 +545,42 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           isVideo={callIsVideo}
           onStartCall={(participantIds) => {
             if (onCallWithParticipants) {
-              onCallWithParticipants(conversation.id, callIsVideo, participantIds);
+              onCallWithParticipants(
+                conversation.id,
+                callIsVideo,
+                participantIds
+              );
             } else {
               // Fallback to old method if callback not provided
               onGroupCall?.(conversation.id, callIsVideo);
             }
           }}
+        />
+      )}
+
+      {/* Summary Chat Modal */}
+      {isGroupChat && conversation && (
+        <SummaryChatModal
+          open={showSummaryModal}
+          onOpenChange={setShowSummaryModal}
+          conversationId={conversation.id}
+          conversationName={conversation.title || 'Nhóm'}
+        />
+      )}
+
+      {/* Background Picker Modal */}
+      {conversation && (
+        <BackgroundPicker
+          currentBackground={{
+            type: (conversation.background_type || 'color') as
+              | 'color'
+              | 'gradient'
+              | 'image',
+            value: conversation.background_value || '#FFFFFF'
+          }}
+          onSelect={handleBackgroundChange}
+          open={showBackgroundPicker}
+          onOpenChange={setShowBackgroundPicker}
         />
       )}
     </div>

@@ -7,6 +7,8 @@ import {
   Room,
   RoomEvent,
   RoomOptions,
+  createLocalVideoTrack,
+  Track,
 } from 'livekit-client';
 
 type UseLivekitOptions = {
@@ -179,12 +181,86 @@ export function useLivekitRoom(options?: UseLivekitOptions) {
   }, [micEnabled, room]);
 
   const toggleCamera = useCallback(async () => {
-    if (!room) return;
+    console.log('📹 toggleCamera called', { 
+      hasRoom: !!room, 
+      cameraEnabled,
+      roomState: room?.state,
+      hasLocalParticipant: !!room?.localParticipant
+    });
+    
+    if (!room) {
+      console.warn('⚠️ Cannot toggle camera: room not connected');
+      return;
+    }
+    
     const local = room.localParticipant as LocalParticipant;
-    const next = !(local.isCameraEnabled?.() ?? cameraEnabled);
-    await local.setCameraEnabled(next);
-    setCameraEnabled(next);
-  }, [cameraEnabled, room]);
+    if (!local) {
+      console.warn('⚠️ Cannot toggle camera: local participant not found');
+      return;
+    }
+    
+    // Check current camera state by looking at video track publications
+    // A camera is enabled if there's at least one video track that's not a screen share
+    const hasVideoTrack = Array.from(local.videoTrackPublications.values()).some(
+      (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track
+    );
+    const current = hasVideoTrack || cameraEnabled;
+    const next = !current;
+    
+    console.log('📹 Local participant check:', {
+      exists: !!local,
+      hasSetCameraEnabled: typeof local?.setCameraEnabled === 'function',
+      videoTracks: local.videoTrackPublications.size,
+      hasVideoTrack,
+      currentState: current,
+      nextState: next
+    });
+    
+    try {
+      console.log(`📹 Toggling camera: ${current ? 'OFF' : 'ON'}`, {
+        current,
+        next,
+        localParticipantExists: !!local,
+        videoTracks: local.videoTrackPublications.size
+      });
+      
+      // Use setCameraEnabled method
+      await local.setCameraEnabled(next);
+      
+      // Wait a bit for the state to update
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Verify the state by checking video tracks again
+      const newHasVideoTrack = Array.from(local.videoTrackPublications.values()).some(
+        (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track
+      );
+      
+      console.log('📹 Camera state after toggle:', {
+        expected: next,
+        actual: newHasVideoTrack,
+        videoTracks: local.videoTrackPublications.size
+      });
+      
+      // Update state based on actual video tracks
+      setCameraEnabled(newHasVideoTrack);
+      console.log(`✅ Camera ${newHasVideoTrack ? 'enabled' : 'disabled'} successfully`);
+      
+      // Update participants to reflect camera state change
+      updateParticipants(room);
+    } catch (error) {
+      console.error('❌ Error toggling camera:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      });
+      // Revert state on error - check actual state
+      const actualHasVideoTrack = Array.from(local.videoTrackPublications.values()).some(
+        (pub) => pub.kind === 'video' && !pub.isScreenShare && pub.track
+      );
+      setCameraEnabled(actualHasVideoTrack);
+    }
+  }, [cameraEnabled, room, updateParticipants]);
 
   useEffect(() => {
     return () => {

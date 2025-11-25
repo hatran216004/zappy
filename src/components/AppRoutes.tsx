@@ -14,6 +14,7 @@ import { JoinGroupPage } from '@/pages/JoinGroupPage';
 import { useAuth } from '@/stores/user';
 import { BrowserRouter, Outlet, Route, Routes, Navigate } from 'react-router';
 import PostsPage from '@/pages/posts/PostsPage';
+import CallHistoryPage from '@/pages/CallHistoryPage';
 
 const ProtectedRoutes = () => {
   const { isAuthenticated } = useAuth();
@@ -48,6 +49,8 @@ export default function AppRoutes() {
               <Route index element={<PostsPage />} />
               <Route path=":postId" element={<PostsPage />} />
             </Route>
+
+            <Route path="call-history" element={<CallHistoryPage />} />
           </Route>
         </Route>
 

@@ -298,13 +298,47 @@ export const getConversation = async (
 // MESSAGES
 // ============================================
 
-// Lấy messages - OPTIMIZED với batch queries
+// Helper: Get other user ID from direct_pairs
+export const getDirectPairInfo = async (
+  conversationId: string,
+  currentUserId: string
+): Promise<{ otherUserId: string; isDirectChat: boolean }> => {
+  const { data: directPair } = await supabase
+    .from('direct_pairs')
+    .select('user_a, user_b')
+    .eq('conversation_id', conversationId)
+    .maybeSingle();
+
+  if (!directPair) {
+    return { otherUserId: '', isDirectChat: false };
+  }
+
+  const otherUserId =
+    directPair.user_a === currentUserId
+      ? directPair.user_b
+      : directPair.user_a;
+
+  return { otherUserId, isDirectChat: true };
+};
+
+// Lấy messages - OPTIMIZED với batch queries và direct_pairs optimization
 export const getMessages = async (
   conversationId: string,
   limit: number = 50,
   before?: string,
   currentUserId?: string
 ): Promise<MessageWithDetails[]> => {
+  // Get direct pair info for optimization (parallel with message query)
+  const directPairPromise = currentUserId
+    ? getDirectPairInfo(conversationId, currentUserId)
+    : Promise.resolve({ otherUserId: '', isDirectChat: false });
+  
+  console.log('📬 getMessages called:', {
+    conversationId,
+    limit,
+    before: before ? 'yes' : 'no',
+    currentUserId
+  });
   // --- STEP 1: lấy messages cơ bản ---
   let query = supabase
     .from('messages')
@@ -350,6 +384,18 @@ export const getMessages = async (
   }
 
   if (!messages || messages.length === 0) return [];
+
+  // Get direct pair info
+  const { otherUserId, isDirectChat } = await directPairPromise;
+  
+  if (isDirectChat && otherUserId) {
+    console.log('📬 Direct chat detected:', {
+      conversationId,
+      currentUser: currentUserId,
+      otherUser: otherUserId,
+      messageCount: messages.length
+    });
+  }
 
   // --- STEP 1.5: Mark messages deleted by current user ---
   let deletedMessageIds = new Set<string>();
@@ -964,7 +1010,7 @@ export const sendLocationMessage = async (
     .insert({
       conversation_id: conversationId,
       sender_id: senderId,
-      type: 'text',
+      type: 'location',
       content_text:
         address || `📍 Vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
       location_latitude: latitude,
@@ -4077,4 +4123,216 @@ export const getThreadParticipants = async (
 
   if (error) throw error;
   return data || [];
+};
+
+// ============================================
+// CHAT SUMMARY
+// ============================================
+
+export interface ChatSummary {
+  totalMessages: number;
+  totalParticipants: number;
+  messagesByUser: Array<{
+    userId: string;
+    userName: string;
+    avatar: string;
+    count: number;
+  }>;
+  messagesByType: {
+    text: number;
+    image: number;
+    video: number;
+    file: number;
+    audio: number;
+    location: number;
+    poll: number;
+  };
+  mostActiveHour: number;
+  timeRange: {
+    from: string;
+    to: string;
+  };
+  topKeywords: string[];
+}
+
+// Get location messages from conversation
+export const getLocationMessages = async (
+  conversationId: string,
+  hours: number = 24
+): Promise<Array<{
+  id: string;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  createdAt: string;
+}>> => {
+  const since = new Date();
+  since.setHours(since.getHours() - hours);
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select(
+      `
+      id,
+      location_latitude,
+      location_longitude,
+      location_address,
+      created_at,
+      sender_id,
+      sender:profiles!messages_sender_id_fkey(display_name, avatar_url)
+    `
+    )
+    .eq('conversation_id', conversationId)
+    .gte('created_at', since.toISOString())
+    .not('location_latitude', 'is', null)
+    .not('location_longitude', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ Error fetching location messages:', error);
+    throw error;
+  }
+
+  console.log('📍 Raw location messages from DB:', data?.length || 0, 'items');
+  data?.forEach((msg: any) => {
+    console.log('  -', msg.id, ':', msg.location_latitude, msg.location_longitude, msg.location_address);
+  });
+
+  return (data || []).map((msg: any) => ({
+    id: msg.id,
+    latitude: msg.location_latitude,
+    longitude: msg.location_longitude,
+    address: msg.location_address,
+    senderId: msg.sender_id,
+    senderName: msg.sender?.display_name || 'Unknown',
+    senderAvatar: msg.sender?.avatar_url || '',
+    createdAt: msg.created_at
+  }));
+};
+
+export const getChatSummary24h = async (
+  conversationId: string
+): Promise<ChatSummary> => {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  // Get messages from last 24 hours
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select(
+      `
+      id,
+      content_text,
+      type,
+      created_at,
+      sender_id,
+      sender:profiles!messages_sender_id_fkey(id, display_name, avatar_url)
+    `
+    )
+    .eq('conversation_id', conversationId)
+    .gte('created_at', yesterday.toISOString())
+    .is('recalled_at', null)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const messagesData = messages || [];
+
+  // Calculate statistics
+  const totalMessages = messagesData.length;
+
+  // Count messages by user
+  const userMessageCount = new Map<string, { name: string; avatar: string; count: number }>();
+  messagesData.forEach((msg: any) => {
+    const userId = msg.sender_id;
+    const userName = msg.sender?.display_name || 'Unknown';
+    const avatar = msg.sender?.avatar_url || '';
+    
+    if (userMessageCount.has(userId)) {
+      userMessageCount.get(userId)!.count++;
+    } else {
+      userMessageCount.set(userId, { name: userName, avatar, count: 1 });
+    }
+  });
+
+  const messagesByUser = Array.from(userMessageCount.entries())
+    .map(([userId, data]) => ({
+      userId,
+      userName: data.name,
+      avatar: data.avatar,
+      count: data.count
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  // Count messages by type
+  const messagesByType = {
+    text: 0,
+    image: 0,
+    video: 0,
+    file: 0,
+    audio: 0,
+    location: 0,
+    poll: 0
+  };
+
+  messagesData.forEach((msg: any) => {
+    const type = msg.type as keyof typeof messagesByType;
+    if (type in messagesByType) {
+      messagesByType[type]++;
+    }
+  });
+
+  // Find most active hour
+  const hourCounts = new Map<number, number>();
+  messagesData.forEach((msg: any) => {
+    const hour = new Date(msg.created_at).getHours();
+    hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+  });
+
+  let mostActiveHour = 0;
+  let maxCount = 0;
+  hourCounts.forEach((count, hour) => {
+    if (count > maxCount) {
+      maxCount = count;
+      mostActiveHour = hour;
+    }
+  });
+
+  // Extract top keywords from text messages
+  const allText = messagesData
+    .filter((msg: any) => msg.type === 'text' && msg.content_text)
+    .map((msg: any) => msg.content_text)
+    .join(' ');
+
+  const words = allText
+    .toLowerCase()
+    .replace(/[^\w\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/g, '')
+    .split(/\s+/)
+    .filter(word => word.length > 3); // Only words with more than 3 characters
+
+  const wordCount = new Map<string, number>();
+  words.forEach(word => {
+    wordCount.set(word, (wordCount.get(word) || 0) + 1);
+  });
+
+  const topKeywords = Array.from(wordCount.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([word]) => word);
+
+  return {
+    totalMessages,
+    totalParticipants: messagesByUser.length,
+    messagesByUser,
+    messagesByType,
+    mostActiveHour,
+    timeRange: {
+      from: yesterday.toISOString(),
+      to: now.toISOString()
+    },
+    topKeywords
+  };
 };

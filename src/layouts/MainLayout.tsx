@@ -85,7 +85,8 @@ export default function MainLayout() {
     micEnabled,
     cameraEnabled,
     remoteParticipants,
-    localParticipant
+    localParticipant,
+    isConnected
   } = useCall(user?.id);
 
   // Onboarding tour
@@ -122,6 +123,7 @@ export default function MainLayout() {
             cameraEnabled={cameraEnabled}
             remoteParticipants={remoteParticipants}
             localParticipant={localParticipant}
+            isConnected={isConnected}
           />
         )}
 

@@ -60,7 +60,7 @@ import {
 import { ReportPostModal } from "@/components/modal/ReportPostModal";
 import { uploadPostImages, uploadPostVideo } from "@/services/postService";
 import type { Post, PostReactionType } from "@/services/postService";
-import { supabaseUrl } from "@/lib/supabase";
+import { getGroupPhotoUrl } from "@/lib/supabase";
 
 const REACTION_EMOJIS: Record<PostReactionType, string> = {
   like: "👍",
@@ -1227,7 +1227,7 @@ function GroupsSection({ userId }: { userId: string }) {
               >
                 {group.photo_url ? (
                   <img
-                    src={`${supabaseUrl}/storage/v1/object/public/chat-attachments/${group.photo_url}`}
+                    src={getGroupPhotoUrl(group.photo_url) || '/default-image.png'}
                     alt={group.title || "Group"}
                     className="h-9 w-9 rounded-full object-cover"
                   />

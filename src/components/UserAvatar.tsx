@@ -1,5 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { getAvatarUrl } from "@/lib/supabase";
 
 interface UserAvatarProps {
   avatarUrl?: string | null;
@@ -41,10 +42,13 @@ export function UserAvatar({
     xl: "bottom-1 right-1",
   };
 
+  // Get full avatar URL from avatars bucket
+  const fullAvatarUrl = getAvatarUrl(avatarUrl);
+
   return (
     <div className={cn("relative flex justify-center items-center", className)}>
       <Avatar className={sizeClasses[size]}>
-        <AvatarImage src={avatarUrl || undefined} />
+        <AvatarImage src={fullAvatarUrl || undefined} />
         <AvatarFallback className="bg-zinc-300">
           {displayName?.[0]?.toUpperCase() || "U"}
         </AvatarFallback>
