@@ -28,6 +28,7 @@ import { UserAvatar } from '../UserAvatar';
 import { LocationMessage } from './LocationMessage';
 import { PollMessage } from './PollMessage';
 import { ReportMessageModal } from '../modal/ReportMessageModal';
+import { MessageEffectManager, useShakeEffect } from '../effects/MessageEffects';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -154,7 +155,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     const [editText, setEditText] = useState(message.content_text || '');
     const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
     const [showReportModal, setShowReportModal] = useState(false);
+    const [showEffect, setShowEffect] = useState(false);
     const confirm = useConfirm();
+
+    // Get effect from message
+    const messageEffect = (message as any).effect;
+    const isShaking = useShakeEffect(showEffect && messageEffect === 'fire');
 
     const editMutation = useEditMessage();
     const recallMutation = useRecallMessage();
@@ -185,6 +191,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
 
       loadAttachments();
     }, [message.attachments]);
+
+    // Show effect on mount if message has effect
+    useEffect(() => {
+      if (messageEffect) {
+        setShowEffect(true);
+      }
+    }, [messageEffect]);
 
     const handleEdit = async () => {
       if (!editText.trim()) return;
@@ -364,12 +377,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
     }
 
     return (
-      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}>
-        <div
-          className={`flex gap-2 max-w-[70%] ${
-            isOwn ? 'flex-row-reverse' : ''
-          }`}
-        >
+      <>
+        {/* Show effect animation if message has effect */}
+        {showEffect && messageEffect && (
+          <MessageEffectManager
+            effect={messageEffect}
+            onComplete={() => setShowEffect(false)}
+          />
+        )}
+
+        <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}>
+          <div
+            className={`flex gap-2 max-w-[70%] ${
+              isOwn ? 'flex-row-reverse' : ''
+            } ${isShaking ? 'animate-shake' : ''}`}
+          >
+            <style>{`
+              @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+                20%, 40%, 60%, 80% { transform: translateX(3px); }
+              }
+              .animate-shake {
+                animation: shake 0.5s ease-in-out;
+              }
+            `}</style>
           {/* Avatar */}
           {showAvatar && !isOwn && message?.sender && (
             <UserAvatar
@@ -771,14 +803,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
           </div>
         </div>
 
-        {/* Report Message Modal */}
-        <ReportMessageModal
-          open={showReportModal}
-          onClose={() => setShowReportModal(false)}
-          messageId={message.id}
-          reportedBy={currentUserId}
-        />
-      </div>
+          {/* Report Message Modal */}
+          <ReportMessageModal
+            open={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            messageId={message.id}
+            reportedBy={currentUserId}
+          />
+        </div>
+      </>
     );
   }
 );

@@ -25,6 +25,7 @@ import { BackgroundPicker } from './BackgroundPicker';
 import { useUpdateConversationBackground } from '@/hooks/useChat';
 import { PinnedMessagesModal } from '../modal/PinnedMessagesModal';
 import { CreatePollModal } from '../modal/CreatePollModal';
+import { SelectCallParticipantsModal } from '../modal/SelectCallParticipantsModal';
 import useUser from '@/hooks/useUser';
 import {
   useBlockUser,
@@ -86,6 +87,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
+  const [showSelectCallModal, setShowSelectCallModal] = useState(false);
+  const [callIsVideo, setCallIsVideo] = useState(false);
 
   // Handle initial show search from location state or prop
   useEffect(() => {
@@ -290,28 +293,32 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
           {/* Call buttons for group chat */}
           {isGroupChat && conversation && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={() => {
-                // Get all active participant IDs from the conversation
-                const participantIds = conversation.participants
-                  ?.filter(p => p.left_at === null)
-                  .map(p => p.user_id) || [];
-                
-                // Use new call with participants function (Zappy-main style)
-                if (onCallWithParticipants) {
-                  onCallWithParticipants(conversation.id, false, participantIds);
-                } else {
-                  // Fallback to old group call method
-                  onGroupCall?.(conversation.id, false);
-                }
-              }}
-              title="Gọi thoại"
-            >
-              <Phone className="size-5" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={() => {
+                  setCallIsVideo(false);
+                  setShowSelectCallModal(true);
+                }}
+                title="Gọi thoại"
+              >
+                <Phone className="size-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={() => {
+                  setCallIsVideo(true);
+                  setShowSelectCallModal(true);
+                }}
+                title="Gọi video"
+              >
+                <Video className="size-5" />
+              </Button>
+            </>
           )}
 
           {/* Group Info Button */}
@@ -506,6 +513,25 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           conversationId={conversation.id}
           onUnpin={(id) => onUnpin?.(id)}
           onJumpTo={(id) => onJumpTo?.(id)}
+        />
+      )}
+
+      {/* Select Call Participants Modal */}
+      {isGroupChat && conversation && currentUserId && (
+        <SelectCallParticipantsModal
+          open={showSelectCallModal}
+          onOpenChange={setShowSelectCallModal}
+          conversationId={conversation.id}
+          currentUserId={currentUserId}
+          isVideo={callIsVideo}
+          onStartCall={(participantIds) => {
+            if (onCallWithParticipants) {
+              onCallWithParticipants(conversation.id, callIsVideo, participantIds);
+            } else {
+              // Fallback to old method if callback not provided
+              onGroupCall?.(conversation.id, callIsVideo);
+            }
+          }}
         />
       )}
     </div>

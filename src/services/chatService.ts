@@ -511,6 +511,28 @@ const checkCanSendMessage = async (
   // For group conversations, allow (group admins can manage)
 };
 
+// Detect and replace special effects from message content
+const detectMessageEffect = (content: string): { effect: string | null; cleanContent: string } => {
+  const effects: Record<string, { effect: string; emoji: string }> = {
+    ':fire:': { effect: 'fire', emoji: '🔥' },
+    ':clap:': { effect: 'clap', emoji: '👏' }
+  };
+  
+  let cleanContent = content;
+  let detectedEffect: string | null = null;
+  
+  for (const [shortcode, { effect, emoji }] of Object.entries(effects)) {
+    if (content.includes(shortcode)) {
+      // Replace shortcode with emoji
+      cleanContent = cleanContent.replace(new RegExp(shortcode, 'g'), emoji);
+      detectedEffect = effect;
+      break; // Only one effect per message
+    }
+  }
+  
+  return { effect: detectedEffect, cleanContent };
+};
+
 export const sendTextMessage = async (
   conversationId: string,
   senderId: string,
@@ -521,14 +543,18 @@ export const sendTextMessage = async (
   // Check if message can be sent (block strangers check)
   await checkCanSendMessage(conversationId, senderId);
 
+  // Detect special effects and replace shortcodes with emojis
+  const { effect, cleanContent } = detectMessageEffect(content);
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
       sender_id: senderId,
       type: 'text',
-      content_text: content,
-      reply_to_id: replyToId
+      content_text: cleanContent, // Use cleaned content with emojis
+      reply_to_id: replyToId,
+      effect: effect
     })
     .select()
     .single();
@@ -2563,6 +2589,8 @@ export type PollOption = {
 export type PollWithOptions = Poll & {
   options: (PollOption & { votes_count: number })[];
   my_votes?: string[]; // option_ids
+  allowed_participants?: string[]; // user_ids who can vote (empty = all can vote)
+  can_vote?: boolean; // whether current user can vote
 };
 
 export const createPoll = async (
@@ -2570,7 +2598,8 @@ export const createPoll = async (
   creatorId: string,
   question: string,
   options: string[],
-  multiple: boolean
+  multiple: boolean,
+  participantIds?: string[] // Optional: if provided, only these users can vote
 ): Promise<{ message: Message; poll: PollWithOptions }> => {
   const { data: msg, error: msgErr } = await supabase
     .from('messages')
@@ -2613,6 +2642,18 @@ export const createPoll = async (
     .insert(optionRows);
   if (optErr) throw optErr;
 
+  // Add poll participants if specified
+  if (participantIds && participantIds.length > 0) {
+    const participantRows = participantIds.map((userId) => ({
+      poll_id: poll.id,
+      user_id: userId
+    }));
+    const { error: participantErr } = await supabase
+      .from('poll_participants')
+      .insert(participantRows);
+    if (participantErr) throw participantErr;
+  }
+
   await supabase
     .from('conversations')
     .update({ last_message_id: msg.id, updated_at: new Date().toISOString() })
@@ -2633,7 +2674,7 @@ export const getPollByMessage = async (
     .single();
   if (error || !poll) throw error || new Error('Poll not found');
 
-  const [{ data: options }, { data: myVotes }, { data: allVotes }] =
+  const [{ data: options }, { data: myVotes }, { data: allVotes }, { data: participants }] =
     await Promise.all([
       supabase
         .from('poll_options')
@@ -2647,7 +2688,11 @@ export const getPollByMessage = async (
             .eq('poll_id', poll.id)
             .eq('user_id', currentUserId)
         : Promise.resolve({ data: [] as any } as any),
-      supabase.from('poll_votes').select('option_id').eq('poll_id', poll.id)
+      supabase.from('poll_votes').select('option_id').eq('poll_id', poll.id),
+      supabase
+        .from('poll_participants')
+        .select('user_id')
+        .eq('poll_id', poll.id)
     ]);
 
   const countByOption = new Map<string, number>();
@@ -2656,13 +2701,22 @@ export const getPollByMessage = async (
     countByOption.set(k, (countByOption.get(k) || 0) + 1);
   });
 
+  const allowedParticipants = (participants || []).map((p: any) => p.user_id);
+  const canVote = !currentUserId 
+    ? false 
+    : allowedParticipants.length === 0 
+      ? true 
+      : allowedParticipants.includes(currentUserId);
+
   return {
     ...(poll as Poll),
     options: (options || []).map((o) => ({
       ...o,
       votes_count: countByOption.get(o.id) || 0
     })),
-    my_votes: (myVotes || []).map((v: any) => v.option_id)
+    my_votes: (myVotes || []).map((v: any) => v.option_id),
+    allowed_participants: allowedParticipants,
+    can_vote: canVote
   };
 };
 

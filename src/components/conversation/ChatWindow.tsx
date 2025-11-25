@@ -81,6 +81,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     messageId: string;
     preview: string;
   } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -93,6 +94,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const prevScrollTopRef = useRef<number>(0);
   const isFirstLoadRef = useRef(true);
   const isTypingRef = useRef(false);
+  const dragCounterRef = useRef(0);
 
   const { data: conversation } = useConversation(conversationId);
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
@@ -813,6 +815,86 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     [conversationId, userId, sendLocationMutation, isBlocked]
   );
 
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+
+      // Check if blocked or restricted
+      if (isBlocked) {
+        toast.error('Bạn không thể gửi file với người dùng này do đã bị chặn');
+        return;
+      }
+      if (isChatRestricted) {
+        toast.error('Chỉ admin mới có thể gửi file trong nhóm này');
+        return;
+      }
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
+
+      // Process each file
+      for (const file of files) {
+        let type: 'image' | 'video' | 'file' | 'audio' = 'file';
+        if (file.type.startsWith('image/')) type = 'image';
+        else if (file.type.startsWith('video/')) type = 'video';
+        else if (file.type.startsWith('audio/') || file.name.endsWith('.webm'))
+          type = 'audio';
+
+        // If it's an image, show preview
+        if (type === 'image' && files.length === 1) {
+          setImageToSend(file);
+          return;
+        }
+
+        // Otherwise send directly
+        try {
+          await sendFileMutation.mutateAsync({
+            conversationId,
+            senderId: userId,
+            file,
+            type
+          });
+          console.log(`✅ File ${file.name} sent successfully`);
+        } catch (error) {
+          console.error(`❌ Error sending file ${file.name}:`, error);
+          toast.error(`Không thể gửi file ${file.name}`);
+        }
+      }
+
+      if (files.length > 1) {
+        toast.success(`Đã gửi ${files.length} file`);
+      }
+    },
+    [conversationId, userId, sendFileMutation, isBlocked, isChatRestricted]
+  );
+
   // Get background styling from conversation
   const getBackgroundStyle = () => {
     if (!conversation) return {};
@@ -896,9 +978,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             className="
               flex-1 overflow-y-auto p-4 space-y-2
               discord-scroll
+              relative
             "
             style={getBackgroundStyle()}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
           >
+            {/* Drag and Drop Overlay */}
+            {isDragging && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/20 backdrop-blur-sm border-4 border-dashed border-blue-500 rounded-lg m-2">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-2xl text-center">
+                  <div className="text-6xl mb-4">📁</div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    Thả file vào đây
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Hỗ trợ hình ảnh, video, audio và tài liệu
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Load older */}
             {hasNextPage && (
               <div className="text-center pb-2">

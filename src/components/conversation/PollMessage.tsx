@@ -53,7 +53,7 @@ export function PollMessage({ messageId, conversationId }: { messageId: string; 
   const canMulti = poll.multiple;
 
   const handleToggleVote = async (optionId: string) => {
-    if (!userId) return;
+    if (!userId || !poll.can_vote) return;
     setSubmitting(optionId);
     try {
       if (myVotes.has(optionId)) {
@@ -116,9 +116,20 @@ export function PollMessage({ messageId, conversationId }: { messageId: string; 
     }
   };
 
+  const canVote = poll.can_vote !== false;
+  const hasRestrictions = (poll.allowed_participants?.length || 0) > 0;
+
   return (
     <div className="p-3 rounded-lg bg-white text-gray-900 dark:bg-[#2B2D31] dark:text-[#F2F3F5] border border-gray-200 dark:border-[#3F4246] w-[min(520px,80vw)]">
       <div className="font-semibold mb-2">📊 {poll.question}</div>
+      
+      {/* Show warning if user cannot vote */}
+      {!canVote && hasRestrictions && (
+        <div className="mb-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-700 dark:text-amber-300">
+          ⚠️ Bạn không được phép tham gia bình chọn này (chỉ xem)
+        </div>
+      )}
+
       <div className="space-y-2">
         {poll.options.map((opt) => {
           const count = opt.votes_count || 0;
@@ -127,9 +138,10 @@ export function PollMessage({ messageId, conversationId }: { messageId: string; 
           return (
             <button
               key={opt.id}
-              disabled={!!submitting}
+              disabled={!!submitting || !canVote}
               onClick={() => handleToggleVote(opt.id)}
               className={`w-full text-left px-3 py-2 rounded-md border transition
+                ${!canVote ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
                 ${selected ? 'bg-blue-50 border-blue-400 dark:bg-white/10 dark:border-blue-400' : 'bg-gray-50 border-gray-200 dark:bg-white/5 dark:border-[#3F4246]'}
               `}
             >
@@ -150,6 +162,7 @@ export function PollMessage({ messageId, conversationId }: { messageId: string; 
       <div className="mt-2 text-xs text-gray-500">
         {canMulti ? 'Cho phép chọn nhiều' : 'Chỉ được chọn một'}
         {totalVotes > 0 ? ` • Tổng ${totalVotes} phiếu` : ''}
+        {hasRestrictions && ` • Giới hạn ${poll.allowed_participants?.length} người`}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,8 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
-import { createPoll } from '@/services/chatService';
+import { PlusCircle, Users } from 'lucide-react';
+import { createPoll, getConversation, type ConversationWithDetails } from '@/services/chatService';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { chatKeys } from '@/hooks/useChat';
@@ -27,7 +27,17 @@ export function CreatePollModal({
   const [options, setOptions] = useState<string[]>(['', '']);
   const [multiple, setMultiple] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [conversation, setConversation] = useState<ConversationWithDetails | null>(null);
+  const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
+  const [restrictParticipants, setRestrictParticipants] = useState(false);
   const qc = useQueryClient();
+
+  // Fetch conversation details to get participants
+  useEffect(() => {
+    if (open && conversationId) {
+      getConversation(conversationId).then(setConversation).catch(console.error);
+    }
+  }, [open, conversationId]);
 
   const addOption = () => setOptions((prev) => [...prev, '']);
   const removeOption = (idx: number) =>
@@ -35,12 +45,25 @@ export function CreatePollModal({
   const updateOption = (idx: number, value: string) =>
     setOptions((prev) => prev.map((v, i) => (i === idx ? value : v)));
 
+  const toggleParticipant = (participantId: string) => {
+    setSelectedParticipants((prev) => {
+      const next = new Set(prev);
+      if (next.has(participantId)) {
+        next.delete(participantId);
+      } else {
+        next.add(participantId);
+      }
+      return next;
+    });
+  };
+
   const handleCreate = async () => {
     const cleanOptions = options.map((o) => o.trim()).filter((o) => o.length > 0);
     if (!question.trim() || cleanOptions.length < 2) {
       toast.error('Nhập câu hỏi và ít nhất 2 lựa chọn');
       return;
     }
+
     setSubmitting(true);
     try {
       // Optimistic add temporary poll message
@@ -67,12 +90,19 @@ export function CreatePollModal({
         };
       });
 
-      await createPoll(conversationId, userId, question.trim(), cleanOptions, multiple);
+      // Always include creator in participants list if restriction is enabled
+      const participantIds = restrictParticipants 
+        ? [userId, ...Array.from(selectedParticipants)]
+        : undefined;
+
+      await createPoll(conversationId, userId, question.trim(), cleanOptions, multiple, participantIds);
       toast.success('Đã tạo bình chọn');
       setOpen(false);
       setQuestion('');
       setOptions(['', '']);
       setMultiple(false);
+      setRestrictParticipants(false);
+      setSelectedParticipants(new Set());
 
       // Invalidate to sync
       qc.invalidateQueries({ queryKey: chatKeys.messages(conversationId) });
@@ -140,6 +170,89 @@ export function CreatePollModal({
             />
             Cho phép chọn nhiều
           </label>
+
+          {/* Restrict participants option - only show for group chats */}
+          {conversation?.type === 'group' && (
+            <div className="space-y-2 border-t pt-3">
+              <label className="inline-flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={restrictParticipants}
+                  onChange={(e) => {
+                    setRestrictParticipants(e.target.checked);
+                    if (!e.target.checked) {
+                      setSelectedParticipants(new Set());
+                    }
+                  }}
+                />
+                <Users className="size-4" />
+                Giới hạn người có thể bình chọn
+              </label>
+
+              {restrictParticipants && (
+                <div className="ml-6 space-y-2 max-h-48 overflow-y-auto p-2 border rounded-md bg-gray-50 dark:bg-gray-800/50">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Chọn thành viên có thể tham gia bình chọn ({selectedParticipants.size + 1} đã chọn)
+                  </p>
+                  
+                  {/* Always show creator as selected and disabled */}
+                  {conversation.participants
+                    .filter((p) => p.user_id === userId)
+                    .map((participant) => (
+                      <label
+                        key={participant.user_id}
+                        className="flex items-center gap-2 text-sm p-1.5 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          disabled={true}
+                          className="cursor-not-allowed"
+                        />
+                        <img
+                          src={participant.profile.avatar_url || '/default-avatar.png'}
+                          alt={participant.profile.display_name}
+                          className="size-6 rounded-full"
+                        />
+                        <span>{participant.profile.display_name} (Bạn)</span>
+                        {participant.role === 'admin' && (
+                          <span className="text-xs text-blue-500">Admin</span>
+                        )}
+                        <span className="text-xs text-gray-500 ml-auto">Luôn được bình chọn</span>
+                      </label>
+                    ))}
+
+                  {/* Other participants */}
+                  {conversation.participants
+                    .filter((p) => p.user_id !== userId)
+                    .map((participant) => (
+                      <label
+                        key={participant.user_id}
+                        className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 p-1.5 rounded"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedParticipants.has(participant.user_id)}
+                          onChange={() => toggleParticipant(participant.user_id)}
+                        />
+                        <img
+                          src={participant.profile.avatar_url || '/default-avatar.png'}
+                          alt={participant.profile.display_name}
+                          className="size-6 rounded-full"
+                        />
+                        <span>{participant.profile.display_name}</span>
+                        {participant.role === 'admin' && (
+                          <span className="text-xs text-blue-500">Admin</span>
+                        )}
+                      </label>
+                    ))}
+                  {conversation.participants.length === 1 && (
+                    <p className="text-xs text-gray-500 italic">Chỉ có bạn trong nhóm</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="pt-2 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setOpen(false)}>Hủy</Button>

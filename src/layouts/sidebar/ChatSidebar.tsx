@@ -105,7 +105,7 @@ export default function ChatSidebar() {
       </div>
 
       {/* List area */}
-      <div className="flex-1 bg-transparent dark:bg-[#313338] overflow-y-auto discord-scroll">
+      <div className="h-[calc(100vh-225px)] bg-transparent dark:bg-[#313338] overflow-y-auto discord-scroll">
         <ConversationsList
           userId={userId as string}
           selectedFilter={selectedFilter}
