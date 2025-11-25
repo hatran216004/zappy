@@ -54,6 +54,9 @@ export default function ConversationListPane() {
   const [showTransferAdminModal, setShowTransferAdminModal] = useState(false);
   const [showPinnedModal, setShowPinnedModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [groupInfoDefaultTab, setGroupInfoDefaultTab] = useState<
+    'info' | 'members' | 'add'
+  >('info');
   const [showMediaViewer, setShowMediaViewer] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -486,6 +489,10 @@ export default function ConversationListPane() {
               <SimpleSection
                 icon={<Users className="w-5 h-5 text-green-500" />}
                 label={`Thành viên (${participantsCount})`}
+                onClick={() => {
+                  setGroupInfoDefaultTab('members');
+                  setShowGroupInfoModal(true);
+                }}
               />
             )}
 
@@ -493,7 +500,10 @@ export default function ConversationListPane() {
             <SimpleSection
               icon={<Info className="w-5 h-5 text-gray-500" />}
               label="Thông tin"
-              onClick={() => setShowGroupInfoModal(true)}
+              onClick={() => {
+                setGroupInfoDefaultTab('info');
+                setShowGroupInfoModal(true);
+              }}
             />
 
             {/* Danger zone */}
@@ -565,9 +575,16 @@ export default function ConversationListPane() {
       {conversation && user?.id && (
         <GroupInfoModal
           open={showGroupInfoModal}
-          onOpenChange={setShowGroupInfoModal}
+          onOpenChange={(open) => {
+            setShowGroupInfoModal(open);
+            if (!open) {
+              // Reset to default tab when modal closes
+              setGroupInfoDefaultTab('info');
+            }
+          }}
           conversation={conversation}
           currentUserId={user.id}
+          defaultTab={groupInfoDefaultTab}
         />
       )}
 

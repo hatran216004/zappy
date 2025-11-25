@@ -45,13 +45,15 @@ interface GroupInfoModalProps {
   onOpenChange: (open: boolean) => void;
   conversation: ConversationWithDetails;
   currentUserId: string;
+  defaultTab?: 'info' | 'members' | 'add';
 }
 
 export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   open,
   onOpenChange,
   conversation,
-  currentUserId
+  currentUserId,
+  defaultTab = 'info'
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [groupName, setGroupName] = useState(conversation.title || '');
@@ -62,6 +64,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   );
   const [showTransferAdminModal, setShowTransferAdminModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'members' | 'add'>(defaultTab);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -69,6 +72,13 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   const { data: friends = [] } = useFriends(user?.id as string);
   const removeGroupMemberMutation = useRemoveGroupMember();
   const toggleChatEnabledMutation = useToggleChatEnabled();
+
+  // Update active tab when defaultTab prop changes (when modal opens)
+  React.useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab);
+    }
+  }, [open, defaultTab]);
 
   // Get current user's role
   const currentUserParticipant = conversation.participants.find(
@@ -286,7 +296,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
           <DialogTitle>Thông tin nhóm</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="info" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'info' | 'members' | 'add')} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="info">Thông tin</TabsTrigger>
             <TabsTrigger value="members">
