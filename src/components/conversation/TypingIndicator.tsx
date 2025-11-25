@@ -1,7 +1,7 @@
 // components/conversation/TypingIndicator.tsx
 import React from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { supabaseUrl } from '@/lib/supabase';
+import { getAvatarUrl } from '@/lib/supabase';
 
 interface TypingIndicatorProps {
   userName?: string;
@@ -15,18 +15,15 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   return (
     <div className="flex justify-start items-end gap-2 mb-2 animate-fade-in">
       {/* Avatar */}
-      {avatarUrl && (
-        <Avatar className="w-8 h-8">
-          <AvatarImage
-            src={`${supabaseUrl}/${avatarUrl}`}
-            alt={userName || 'User'}
-          />
-          <AvatarFallback className="bg-zinc-300 text-xs">
-            {userName?.[0]?.toUpperCase() || 'U'}
-          </AvatarFallback>
-        </Avatar>
-      )}
-      {!avatarUrl && <div className="w-8" />}
+      <Avatar className="w-8 h-8">
+        <AvatarImage
+          src={getAvatarUrl(avatarUrl) || undefined}
+          alt={userName || 'User'}
+        />
+        <AvatarFallback className="bg-zinc-300 text-xs">
+          {userName?.[0]?.toUpperCase() || 'U'}
+        </AvatarFallback>
+      </Avatar>
 
       {/* Typing bubble with animation */}
       <div className="bg-gray-200 dark:bg-gray-700 rounded-2xl px-5 py-3 shadow-sm">

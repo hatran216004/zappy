@@ -18,7 +18,8 @@ import {
   useSearchMessages,
   useEditMessage,
   useReactionsRealtime,
-  useReadReceiptsRealtime
+  useReadReceiptsRealtime,
+  chatKeys
 } from '../../hooks/useChat';
 import { useStartCall } from '../../hooks/useStartCall';
 import { useStartGroupCall } from '../../hooks/useStartGroupCall';
@@ -40,7 +41,13 @@ import {
   unpinMessage
 } from '@/services/chatService';
 import toast from 'react-hot-toast';
-import { useIsBlockedByUser, useIsBlockedByMe, useBlockStatusRealtime } from '@/hooks/useFriends';
+import {
+  useIsBlockedByUser,
+  useIsBlockedByMe,
+  useBlockStatusRealtime
+} from '@/hooks/useFriends';
+import { useQueryClient } from '@tanstack/react-query';
+import { createPoll } from '@/services/chatService';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ThreadList } from '@/components/thread/ThreadList';
 import { ThreadView } from '@/components/thread/ThreadView';
@@ -58,7 +65,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const params = useParams();
   const location = useLocation();
   const conversationId = params.conversationId as string;
-  
+
   // Get openSearch from location state
   const initialShowSearch = (location.state as any)?.openSearch || false;
 
@@ -99,6 +106,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const isTypingRef = useRef(false);
   const dragCounterRef = useRef(0);
 
+  const queryClient = useQueryClient();
   const { data: conversation } = useConversation(conversationId);
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     conversationId,
@@ -130,7 +138,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   const { data: isBlockedByUser } = useIsBlockedByUser(otherUserId || '');
   const { data: isBlockedByMe } = useIsBlockedByMe(otherUserId || '');
   // Block if either user is blocked by the other (only for direct chat)
-  const isBlocked = isDirectChat && (isBlockedByUser === true || isBlockedByMe === true);
+  const isBlocked =
+    isDirectChat && (isBlockedByUser === true || isBlockedByMe === true);
 
   // Check if chat is restricted (only admins can chat)
   const isGroupChat = conversation?.type === 'group';
@@ -314,8 +323,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         },
         (payload) => {
           const newMessage = payload.new as any;
-          const hasLocation = !!(newMessage.location_latitude && newMessage.location_longitude);
-          
+          const hasLocation = !!(
+            newMessage.location_latitude && newMessage.location_longitude
+          );
+
           console.log('📬 New message received:', {
             type: newMessage.type,
             sender: newMessage.sender_id,
@@ -379,6 +390,78 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     [sendTyping]
   );
 
+  // Parse /poll command: "/poll Pizza hay KFC?" -> { question: "Pizza hay KFC?", options: ["Pizza", "KFC"] }
+  const parsePollCommand = useCallback(
+    (text: string): { question: string; options: string[] } | null => {
+      const trimmed = text.trim();
+      if (!trimmed.toLowerCase().startsWith('/poll ')) {
+        return null;
+      }
+
+      const content = trimmed.substring(6).trim(); // Remove "/poll "
+      if (!content) {
+        return null;
+      }
+
+      // Try to split by common separators: hay, hoặc, or, |, vs, và, ,
+      const separators = [
+        /\s+hay\s+/i,
+        /\s+hoặc\s+/i,
+        /\s+or\s+/i,
+        /\s*\|\s*/,
+        /\s+vs\s+/i,
+        /\s+và\s+/i,
+        /\s*,\s*/
+      ];
+
+      let options: string[] = [];
+      let question = content;
+
+      for (const separator of separators) {
+        const parts = content
+          .split(separator)
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
+        if (parts.length >= 2) {
+          options = parts;
+          // Remove question mark from last option if present
+          if (options.length > 0) {
+            options[options.length - 1] = options[options.length - 1]
+              .replace(/[?？]+$/, '')
+              .trim();
+          }
+          // Question is the full content
+          question = content.replace(/[?？]+$/, '').trim();
+          break;
+        }
+      }
+
+      // If no separator found, try to extract options from question format like "Pizza hay KFC?"
+      if (options.length === 0) {
+        // Try to find "hay", "hoặc", "or", "vs" in the text
+        const match = content.match(
+          /^(.+?)\s+(hay|hoặc|or|vs)\s+(.+?)[?？]*$/i
+        );
+        if (match) {
+          options = [match[1].trim(), match[3].trim()];
+          question = content.replace(/[?？]+$/, '').trim();
+        }
+      }
+
+      // Clean up options
+      options = options
+        .map((opt) => opt.trim())
+        .filter((opt) => opt.length > 0);
+
+      if (options.length < 2) {
+        return null; // Need at least 2 options
+      }
+
+      return { question, options };
+    },
+    []
+  );
+
   const handleSendMessage = useCallback(async () => {
     if (!messageText.trim()) return;
 
@@ -396,6 +479,88 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       return;
     }
 
+    const trimmedText = messageText.trim();
+
+    // Check if it's a /poll command
+    if (trimmedText.toLowerCase().startsWith('/poll ')) {
+      const pollData = parsePollCommand(trimmedText);
+
+      if (!pollData || pollData.options.length < 2) {
+        toast.error('Poll cần ít nhất 2 lựa chọn. Ví dụ: /poll Pizza hay KFC?');
+        return; // Don't clear input so user can fix it
+      }
+
+      // Handle /poll command
+
+      setMessageText('');
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        sendTyping(false);
+      }
+
+      try {
+        // Optimistic add temporary poll message
+        queryClient.setQueryData(
+          chatKeys.messages(conversationId),
+          (old: any) => {
+            if (!old) return old;
+            const temp = {
+              id: `temp-poll-${Date.now()}`,
+              conversation_id: conversationId,
+              sender_id: userId,
+              type: 'poll',
+              content_text: pollData.question,
+              created_at: new Date().toISOString(),
+              sender: { id: userId, display_name: 'You', avatar_url: '' },
+              attachments: [],
+              reactions: [],
+              read_receipts: [],
+              reply_to: null
+            };
+            return {
+              ...old,
+              pages: old.pages.map((page: any[], index: number) =>
+                index === old.pages.length - 1 ? [...page, temp] : page
+              )
+            };
+          }
+        );
+
+        // Create poll with no participant restrictions (everyone can vote)
+        await createPoll(
+          conversationId,
+          userId,
+          pollData.question,
+          pollData.options,
+          false, // multiple = false (single choice)
+          undefined // participantIds = undefined (everyone can vote)
+        );
+
+        toast.success('Đã tạo bình chọn');
+        setReplyTo(null);
+        setMentionedUserIds([]);
+
+        // Invalidate to sync
+        queryClient.invalidateQueries({
+          queryKey: chatKeys.messages(conversationId)
+        });
+      } catch (error: any) {
+        console.error('❌ Error creating poll:', error);
+        toast.error(error?.message || 'Lỗi khi tạo bình chọn');
+        // Restore input on error
+        setMessageText(trimmedText);
+      }
+
+      inputRef.current?.focus();
+      return;
+    }
+
+    // Not a /poll command, proceed with normal message
     setMessageText('');
 
     if (typingTimeoutRef.current) {
@@ -413,7 +578,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       if (isEditing && editingMessageId) {
         await editMessageMutation.mutateAsync({
           messageId: editingMessageId,
-          content: messageText.trim()
+          content: trimmedText
         });
 
         setIsEditing(false);
@@ -437,7 +602,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         await sendTextMutation.mutateAsync({
           conversationId,
           senderId: userId,
-          content: messageText.trim(),
+          content: trimmedText,
           replyToId: replyTo || undefined,
           mentionedUserIds: resolvedMentionedIds
         });
@@ -463,7 +628,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
     isBlocked,
     isChatRestricted,
     mentionedUserIds,
-    conversation
+    conversation,
+    parsePollCommand,
+    queryClient
   ]);
 
   const handleEditMessage = useCallback(
@@ -1126,12 +1293,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
             })}
 
             {/* Typing indicator */}
-            {typingUsers.length > 0 && (
-              <TypingIndicator
-                userName={otherParticipant?.profile?.display_name}
-                avatarUrl={otherParticipant?.profile?.avatar_url}
-              />
-            )}
+            {typingUsers.length > 0 &&
+              typingUsers.map((typingUserId) => {
+                // Find participant info for typing user
+                const typingParticipant = conversation?.participants.find(
+                  (p) => p.user_id === typingUserId
+                );
+
+                // For direct chat, use otherParticipant if available
+                const displayParticipant = isDirectChat
+                  ? typingParticipant || otherParticipant
+                  : typingParticipant;
+
+                if (!displayParticipant) return null;
+
+                return (
+                  <TypingIndicator
+                    key={typingUserId}
+                    userName={displayParticipant.profile?.display_name}
+                    avatarUrl={displayParticipant.profile?.avatar_url}
+                  />
+                );
+              })}
 
             <div ref={messagesEndRef} />
           </div>

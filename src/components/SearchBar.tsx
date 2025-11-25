@@ -173,7 +173,7 @@ export default function SearchBar() {
         )}
         <input
           type="text"
-          placeholder="Tìm kiếm người dùng, cuộc trò chuyện hoặc email..."
+          placeholder="Tìm kiếm trên Zappy"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={() => searchResults.length > 0 && setShowResults(true)}

@@ -51,7 +51,7 @@ export default function ChatFooter({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const mentionRef = useRef<HTMLDivElement>(null);
 
-  const canSend = !!messageText&& !sendTextMutation.isPending;  
+  const canSend = !!messageText && !sendTextMutation.isPending;
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -98,11 +98,11 @@ export default function ChatFooter({
       // Find image in clipboard
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        
+
         // Check if it's an image
         if (item.type.indexOf('image') !== -1) {
           e.preventDefault();
-          
+
           const blob = item.getAsFile();
           if (!blob) continue;
 
@@ -124,7 +124,7 @@ export default function ChatFooter({
           } catch (error) {
             console.error('Error handling pasted image:', error);
           }
-          
+
           break; // Only process first image
         }
       }
@@ -172,7 +172,8 @@ export default function ChatFooter({
     // Tag all option for group chats
     const includeAll =
       (participants || []).length > 1 &&
-      ('all'.startsWith(mentionQuery.toLowerCase()) || mentionQuery.length === 0);
+      ('all'.startsWith(mentionQuery.toLowerCase()) ||
+        mentionQuery.length === 0);
     return includeAll ? [{ id: 'ALL', name: 'all' }, ...base] : base;
   })();
 
@@ -186,7 +187,9 @@ export default function ChatFooter({
     const after = messageText.slice(afterCaret);
     const inserted = `${before}@${p.name} ` + after;
     // Manually set value using the provided handler
-    const event = { target: { value: inserted } } as unknown as React.ChangeEvent<HTMLTextAreaElement>;
+    const event = {
+      target: { value: inserted }
+    } as unknown as React.ChangeEvent<HTMLTextAreaElement>;
     handleInputChange(event);
     setShowMentionList(false);
     setMentionQuery('');
@@ -196,7 +199,8 @@ export default function ChatFooter({
     requestAnimationFrame(() => {
       if (inputRef.current) {
         const newPos = (before + `@${p.name} `).length;
-        inputRef.current.selectionStart = inputRef.current.selectionEnd = newPos;
+        inputRef.current.selectionStart = inputRef.current.selectionEnd =
+          newPos;
         inputRef.current.focus();
       }
     });
@@ -304,7 +308,7 @@ export default function ChatFooter({
             <Button
               variant="ghost"
               size="sm"
-              type='button'
+              type="button"
               onClick={cancelRecording}
               className="text-gray-600 dark:text-gray-300"
             >
@@ -409,7 +413,11 @@ export default function ChatFooter({
           value={messageText}
           onChange={handleInputChange}
           onKeyPress={handleKeyPress}
-          placeholder={disabled ? "Bạn không thể gửi tin nhắn" : "Nhập @, tin nhắn tới ..."}
+          placeholder={
+            disabled
+              ? 'Bạn không thể gửi tin nhắn'
+              : 'Nhập @, tin nhắn hoặc /poll Pizza hay KFC? để tạo nhanh bình chọn ...'
+          }
           rows={1}
           disabled={disabled}
           className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -418,7 +426,10 @@ export default function ChatFooter({
 
         {/* Mention list */}
         {showMentionList && filteredParticipants.length > 0 && (
-          <div ref={mentionRef} className="absolute bottom-14 left-16 z-50 w-72 max-h-64 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+          <div
+            ref={mentionRef}
+            className="absolute bottom-14 left-16 z-50 w-72 max-h-64 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg"
+          >
             {filteredParticipants.map((p) => (
               <button
                 key={p.id}
@@ -451,7 +462,9 @@ export default function ChatFooter({
           disabled={disabled || !canSend}
         >
           <Send
-            className={`size-5 ${canSend && !disabled ? 'text-blue-500' : 'text-gray-400'}`}
+            className={`size-5 ${
+              canSend && !disabled ? 'text-blue-500' : 'text-gray-400'
+            }`}
           />
         </Button>
       </div>

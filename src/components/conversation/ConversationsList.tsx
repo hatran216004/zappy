@@ -1,38 +1,72 @@
 // components/ConversationsList.tsx
 // 🎨 Discord-like styling with DARK/LIGHT modes (UI-only, no logic changes)
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   useConversations,
   useConversationsRealtime,
   useGetOrCreateDirectConversation
 } from '@/hooks/useChat';
-import ConversationItem from './ConversationItem';
+import { SortableConversationItem } from './SortableConversationItem';
 import { useFriends, useFriendsRealtime } from '@/hooks/useFriends';
 import { useNavigate } from 'react-router';
 import { UserAvatar } from '../UserAvatar';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragMoveEvent,
+  Modifier
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { useConversationOrder } from '@/hooks/useConversationOrder';
 
 interface ConversationsListProps {
   userId: string;
   selectedConversationId?: string;
   selectedFilter?: string | null;
   tab?: string;
+  sidebarRef?: React.RefObject<HTMLElement>;
 }
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
   userId,
   selectedConversationId,
   selectedFilter = null,
-  tab = 'all'
+  tab = 'all',
+  sidebarRef
 }) => {
   const navigate = useNavigate();
   const { data: conversations, isLoading } = useConversations(userId);
   const { data: friends } = useFriends(userId);
   const getOrCreateConversation = useGetOrCreateDirectConversation();
   const [isCreating, setIsCreating] = useState(false);
+  const { sortConversations, reorderConversations } =
+    useConversationOrder(userId);
+  const listContainerRef = React.useRef<HTMLDivElement>(null);
 
   useFriendsRealtime(userId);
   useConversationsRealtime(userId);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8 // Require 8px movement before drag starts
+      }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  );
 
   const handleSelectFriend = async (friendId: string) => {
     if (isCreating) return;
@@ -87,6 +121,125 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
       return conv.type === 'group';
     });
   }
+
+  // Sort conversations by saved order
+  const sortedConversations = filteredConversations
+    ? sortConversations(filteredConversations)
+    : [];
+
+  // Modifier to restrict drag to ChatSidebar bounds
+  const restrictToSidebar: Modifier = useMemo(() => {
+    return ({ transform, draggingNodeRect }) => {
+      if (
+        !sidebarRef?.current ||
+        !draggingNodeRect ||
+        !listContainerRef.current
+      ) {
+        return transform;
+      }
+
+      // Get sidebar bounds and list container bounds
+      const sidebarBounds = sidebarRef.current.getBoundingClientRect();
+      const listBounds = listContainerRef.current.getBoundingClientRect();
+      const { y } = transform;
+
+      // Use the more restrictive bounds (list container within sidebar)
+      const containerTop = Math.max(sidebarBounds.top, listBounds.top);
+      const containerBottom = Math.min(sidebarBounds.bottom, listBounds.bottom);
+
+      // Calculate restricted transform values
+      // Completely prevent horizontal movement (x = 0) - only allow vertical dragging
+      const restrictedX = 0;
+
+      // Calculate min and max allowed Y transform values based on container bounds
+      const minY = containerTop - draggingNodeRect.top;
+      const maxY =
+        containerBottom - draggingNodeRect.height - draggingNodeRect.top;
+
+      // Clamp Y to stay within bounds - this prevents dragging outside container
+      const restrictedY = Math.max(minY, Math.min(maxY, y));
+
+      return {
+        ...transform,
+        x: restrictedX, // Always 0 - no horizontal movement allowed
+        y: restrictedY
+      };
+    };
+  }, [sidebarRef]);
+
+  // Handle drag move - cancel if pointer moves outside sidebar bounds
+  const handleDragMove = (event: DragMoveEvent) => {
+    if (!sidebarRef?.current) return;
+
+    const sidebarBounds = sidebarRef.current.getBoundingClientRect();
+    const { activatorEvent } = event;
+
+    // Get current pointer position
+    if (
+      activatorEvent &&
+      'clientX' in activatorEvent &&
+      'clientY' in activatorEvent
+    ) {
+      const pointerX = activatorEvent.clientX as number;
+      const pointerY = activatorEvent.clientY as number;
+
+      // If pointer moves outside sidebar bounds, prevent further dragging
+      if (
+        pointerX < sidebarBounds.left ||
+        pointerX > sidebarBounds.right ||
+        pointerY < sidebarBounds.top ||
+        pointerY > sidebarBounds.bottom
+      ) {
+        // Cancel the drag by stopping the event
+        if (activatorEvent.stopPropagation) {
+          activatorEvent.stopPropagation();
+        }
+      }
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id || !sortedConversations) {
+      return;
+    }
+
+    // Check if drop is within sidebar bounds
+    if (sidebarRef?.current && over) {
+      const sidebarBounds = sidebarRef.current.getBoundingClientRect();
+      const overElement = document.querySelector(
+        `[data-id="${over.id}"]`
+      ) as HTMLElement;
+
+      if (overElement) {
+        const overRect = overElement.getBoundingClientRect();
+        const overCenterX = overRect.left + overRect.width / 2;
+        const overCenterY = overRect.top + overRect.height / 2;
+
+        // If drop target is outside sidebar, cancel the drop
+        if (
+          overCenterX < sidebarBounds.left ||
+          overCenterX > sidebarBounds.right ||
+          overCenterY < sidebarBounds.top ||
+          overCenterY > sidebarBounds.bottom
+        ) {
+          return;
+        }
+      }
+    }
+
+    const conversationIds = sortedConversations.map((c) => c.id);
+    reorderConversations(
+      conversationIds,
+      active.id as string,
+      over.id as string
+    );
+
+    // Update conversations order (will be reflected on next render via sortConversations)
+    // The order is saved in localStorage by reorderConversations
+  };
 
   const friendsWithoutConversation =
     filteredFriends?.filter((friend) => {
@@ -149,41 +302,37 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
 
   return (
     <div
+      ref={listContainerRef}
       data-tour-id="conversations"
-      className="overflow-y-auto h-full bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5]"
+      className="py-2 pr-2 overflow-y-auto overflow-x-hidden h-full bg-white text-gray-900 dark:bg-[#1E1F22] dark:text-[#F2F3F5] relative"
+      style={{
+        contain: 'layout style paint',
+        clipPath: sidebarRef?.current ? 'inset(0)' : 'none'
+      }}
     >
-      {/* Danh sách conversations */}
-      {filteredConversations && filteredConversations.length > 0 && (
-        <>
-          {filteredConversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className="
-                group relative transition-colors
-                hover:bg-gray-100 dark:hover:bg-white/5
-                data-[active=true]:bg-gray-200 dark:data-[active=true]:bg-[#404249]
-              "
-              data-active={conversation.id === selectedConversationId}
-            >
-              {/* Active pill (trái) */}
-              <div
-                className={`
-                  absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full
-                  ${
-                    conversation.id === selectedConversationId
-                      ? 'h-8 bg-[#5865F2]'
-                      : 'h-0 bg-transparent'
-                  }
-                `}
-              />
-              <ConversationItem
+      {/* Danh sách conversations với drag and drop */}
+      {sortedConversations && sortedConversations.length > 0 && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          modifiers={sidebarRef ? [restrictToSidebar] : undefined}
+        >
+          <SortableContext
+            items={sortedConversations.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {sortedConversations.map((conversation) => (
+              <SortableConversationItem
+                key={conversation.id}
                 conversation={conversation}
                 userId={userId}
                 isSelected={conversation.id === selectedConversationId}
               />
-            </div>
-          ))}
-        </>
+            ))}
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Empty state cho conversations nếu chỉ có bạn bè */}

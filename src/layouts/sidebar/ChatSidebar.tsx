@@ -5,7 +5,7 @@ import { twMerge } from 'tailwind-merge';
 import { useAuth } from '@/stores/user';
 import SearchBar from '@/components/SearchBar';
 import { MoreVertical, SquarePen } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { CreateGroupModal } from '@/components/modal/CreateGroupModal';
 import AddFriendModal from '@/components/modal/AddFriendModal';
 
@@ -20,6 +20,7 @@ export default function ChatSidebar() {
   const userId = user?.id;
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   const { currentValue, handler } = useUrl({
     field: 'tab',
@@ -28,6 +29,7 @@ export default function ChatSidebar() {
 
   return (
     <aside
+      ref={sidebarRef}
       className="
         col-span-3 flex flex-col
         bg-white text-gray-900 border-r border-gray-200
@@ -107,11 +109,12 @@ export default function ChatSidebar() {
       </div>
 
       {/* List area */}
-      <div className="h-[calc(100vh-225px)] bg-transparent dark:bg-[#313338] overflow-y-auto discord-scroll">
+      <div className="h-[calc(100vh-225px)] bg-transparent dark:bg-[#313338] overflow-y-auto overflow-x-hidden discord-scroll relative" style={{ contain: 'layout style paint' }}>
         <ConversationsList
           userId={userId as string}
           selectedFilter={selectedFilter}
           tab={currentValue}
+          sidebarRef={sidebarRef}
         />
       </div>
 

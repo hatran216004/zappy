@@ -36,6 +36,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { twMerge } from 'tailwind-merge';
 import { avatarVariants } from '@/lib/variants';
 import { useUserStatus, useUserStatusRealtime } from '@/hooks/usePresence';
+import { getAvatarUrl } from '@/lib/supabase';
 
 type CenterNavItemProps = {
   active: boolean;
@@ -265,9 +266,9 @@ export default function Navbar() {
                 <Avatar
                   className={twMerge(avatarVariants({ size: 'sm' }), 'h-7 w-7')}
                 >
-                  <AvatarImage src={profile?.avatar_url} />
+                  <AvatarImage src={getAvatarUrl(profile?.avatar_url) || undefined} />
                   <AvatarFallback className="bg-white text-[#8A3BFF] font-semibold">
-                    {profile?.display_name?.[0] || 'U'}
+                    {profile?.display_name?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 {currentStatus && (
@@ -297,9 +298,9 @@ export default function Navbar() {
               <DropdownMenuLabel className="text-[#050505]">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={profile?.avatar_url} />
-                    <AvatarFallback className="bg-[#8A3BFF] text-white">
-                      {profile?.display_name?.[0] || 'U'}
+                    <AvatarImage src={getAvatarUrl(profile?.avatar_url) || undefined} />
+                    <AvatarFallback className="bg-[#8A3BFF] text-white font-semibold">
+                      {profile?.display_name?.[0]?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col space-y-1">
