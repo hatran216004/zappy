@@ -4,6 +4,7 @@ import { Smile, Paperclip, Mic, Send, X, MapPin } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import { getAvatarUrl } from '@/lib/supabase';
 
 type ChatFooterProps = {
   fileInputRef: React.RefObject<HTMLInputElement>;
@@ -44,12 +45,14 @@ export default function ChatFooter({
   const [showMentionList, setShowMentionList] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const mentionRef = useRef<HTMLDivElement>(null);
+  const mentionItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const canSend = !!messageText && !sendTextMutation.isPending;
 
@@ -157,14 +160,17 @@ export default function ChatFooter({
         setMentionStart(atIndex);
         setMentionQuery(afterAt.trim());
         setShowMentionList(true);
+        setActiveMentionIndex(0); // Reset active index when mention list shows
         return;
       }
     }
     setShowMentionList(false);
     setMentionStart(null);
     setMentionQuery('');
+    setActiveMentionIndex(0);
   }, [messageText, inputRef]);
 
+  // Calculate filtered participants
   const filteredParticipants = (() => {
     const base = (participants || []).filter((p) =>
       p.name.toLowerCase().includes(mentionQuery.toLowerCase())
@@ -176,6 +182,58 @@ export default function ChatFooter({
         mentionQuery.length === 0);
     return includeAll ? [{ id: 'ALL', name: 'all' }, ...base] : base;
   })();
+
+  // Reset active index when filtered participants change
+  useEffect(() => {
+    if (showMentionList && filteredParticipants.length > 0) {
+      setActiveMentionIndex((prev) => {
+        // Ensure active index is within bounds
+        if (prev >= filteredParticipants.length) {
+          return 0;
+        }
+        return prev;
+      });
+      // Reset refs array
+      mentionItemRefs.current = new Array(filteredParticipants.length).fill(null);
+    }
+  }, [filteredParticipants, showMentionList]);
+
+  // Scroll active item into view when index changes
+  useEffect(() => {
+    if (showMentionList && filteredParticipants.length > 0) {
+      // Wait for DOM to update
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const activeItem = mentionItemRefs.current[activeMentionIndex];
+          const container = mentionRef.current;
+          
+          if (!activeItem || !container) return;
+          
+          // Get bounding rectangles
+          const containerRect = container.getBoundingClientRect();
+          const itemRect = activeItem.getBoundingClientRect();
+          
+          // Calculate item's scroll position
+          const itemTopInScroll = container.scrollTop + (itemRect.top - containerRect.top);
+          const itemHeight = activeItem.offsetHeight;
+          const itemBottomInScroll = itemTopInScroll + itemHeight;
+          
+          // Current viewport
+          const viewportTop = container.scrollTop;
+          const viewportBottom = viewportTop + container.clientHeight;
+          
+          // Scroll if needed
+          if (itemTopInScroll < viewportTop) {
+            // Item is above - scroll to show it
+            container.scrollTop = itemTopInScroll - 4;
+          } else if (itemBottomInScroll > viewportBottom) {
+            // Item is below - scroll to show it
+            container.scrollTop = itemBottomInScroll - container.clientHeight + 4;
+          }
+        });
+      });
+    }
+  }, [activeMentionIndex, showMentionList, filteredParticipants.length]);
 
   const insertMention = (p: { id: string; name: string }) => {
     const el = inputRef.current;
@@ -194,6 +252,7 @@ export default function ChatFooter({
     setShowMentionList(false);
     setMentionQuery('');
     setMentionStart(null);
+    setActiveMentionIndex(0);
     onMentionSelected && onMentionSelected(p.id);
     // Restore focus and move caret to after inserted mention
     requestAnimationFrame(() => {
@@ -204,6 +263,89 @@ export default function ChatFooter({
         inputRef.current.focus();
       }
     });
+  };
+
+  // Scroll helper function - using scrollIntoView with container scroll
+  const scrollToActiveItem = (index: number) => {
+    // Wait for DOM to update
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const activeItem = mentionItemRefs.current[index];
+        const container = mentionRef.current;
+        
+        if (!activeItem || !container) return;
+        
+        // Get bounding rectangles
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = activeItem.getBoundingClientRect();
+        
+        // Check if item is visible
+        const isFullyVisible = 
+          itemRect.top >= containerRect.top && 
+          itemRect.bottom <= containerRect.bottom;
+        
+        if (!isFullyVisible) {
+          // Calculate scroll position
+          // The item's position relative to container's scroll position
+          const relativeTop = itemRect.top - containerRect.top;
+          const currentScroll = container.scrollTop;
+          const itemScrollPosition = currentScroll + relativeTop;
+          
+          const itemHeight = activeItem.offsetHeight;
+          const containerHeight = container.clientHeight;
+          
+          // Determine scroll target
+          let scrollTarget: number;
+          
+          if (itemRect.top < containerRect.top) {
+            // Item is above - scroll to show it at top
+            scrollTarget = itemScrollPosition - 4;
+          } else {
+            // Item is below - scroll to show it at bottom
+            scrollTarget = itemScrollPosition + itemHeight - containerHeight + 4;
+          }
+          
+          // Perform scroll
+          container.scrollTo({
+            top: Math.max(0, scrollTarget),
+            behavior: 'smooth'
+          });
+        }
+      });
+    });
+  };
+
+  // Handle keyboard navigation for mention list
+  const handleMentionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentionList && filteredParticipants.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const newIndex = activeMentionIndex === filteredParticipants.length - 1 ? 0 : activeMentionIndex + 1;
+        setActiveMentionIndex(newIndex);
+        // Scroll will be handled by useEffect
+        return;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const newIndex = activeMentionIndex === 0 ? filteredParticipants.length - 1 : activeMentionIndex - 1;
+        setActiveMentionIndex(newIndex);
+        // Scroll will be handled by useEffect
+        return;
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const selectedParticipant = filteredParticipants[activeMentionIndex];
+        if (selectedParticipant) {
+          insertMention(selectedParticipant);
+        }
+        return;
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentionList(false);
+        setMentionQuery('');
+        setMentionStart(null);
+        setActiveMentionIndex(0);
+        return;
+      }
+    }
   };
 
   // ✅ Voice Recording
@@ -412,6 +554,7 @@ export default function ChatFooter({
           ref={inputRef}
           value={messageText}
           onChange={handleInputChange}
+          onKeyDown={handleMentionKeyDown}
           onKeyPress={handleKeyPress}
           placeholder={
             disabled
@@ -428,27 +571,60 @@ export default function ChatFooter({
         {showMentionList && filteredParticipants.length > 0 && (
           <div
             ref={mentionRef}
-            className="absolute bottom-14 left-16 z-50 w-72 max-h-64 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg"
+            className="absolute bottom-14 left-16 z-50 w-72 max-h-64 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg"
           >
-            {filteredParticipants.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                onClick={() => insertMention(p)}
-              >
-                <img
-                  src={p.avatar_url || '/default_user.jpg'}
-                  className="w-6 h-6 rounded-full object-cover"
-                  alt={p.name}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/default_user.jpg';
+            {filteredParticipants.map((p, index) => {
+              const isActive = index === activeMentionIndex;
+              const avatarUrl = getAvatarUrl(p.avatar_url || null);
+              return (
+                <button
+                  key={p.id}
+                  ref={(el) => {
+                    mentionItemRefs.current[index] = el;
+                    // Auto scroll when item becomes active
+                    if (el && isActive) {
+                      requestAnimationFrame(() => {
+                        const container = mentionRef.current;
+                        if (container) {
+                          const containerRect = container.getBoundingClientRect();
+                          const itemRect = el.getBoundingClientRect();
+                          const itemTopInScroll = container.scrollTop + (itemRect.top - containerRect.top);
+                          const itemHeight = el.offsetHeight;
+                          const itemBottomInScroll = itemTopInScroll + itemHeight;
+                          const viewportTop = container.scrollTop;
+                          const viewportBottom = viewportTop + container.clientHeight;
+                          
+                          if (itemTopInScroll < viewportTop) {
+                            container.scrollTop = itemTopInScroll - 4;
+                          } else if (itemBottomInScroll > viewportBottom) {
+                            container.scrollTop = itemBottomInScroll - container.clientHeight + 4;
+                          }
+                        }
+                      });
+                    }
                   }}
-                />
-                <span className="truncate">@{p.name}</span>
-              </button>
-            ))}
+                  type="button"
+                  className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-blue-100 dark:bg-blue-900/30'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  onClick={() => insertMention(p)}
+                  onMouseEnter={() => setActiveMentionIndex(index)}
+                >
+                  <img
+                    src={avatarUrl || '/default_user.jpg'}
+                    className="w-6 h-6 rounded-full object-cover"
+                    alt={p.name}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/default_user.jpg';
+                    }}
+                  />
+                  <span className="truncate">@{p.name}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

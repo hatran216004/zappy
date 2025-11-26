@@ -57,6 +57,7 @@ export interface CreatePostData {
   image_url?: string; // Deprecated
   image_urls?: string[]; // Array of image URLs
   video_url?: string;
+  mentionedUserIds?: string[]; // Array of mentioned user IDs
 }
 
 // Tạo post mới
@@ -85,6 +86,33 @@ export const createPost = async (data: CreatePostData): Promise<Post> => {
     .single();
 
   if (error) throw error;
+
+  // Create mentions if any
+  if (data.mentionedUserIds && data.mentionedUserIds.length > 0) {
+    console.log('📝 Creating post mentions:', {
+      postId: post.id,
+      mentionedUserIds: data.mentionedUserIds
+    });
+
+    const mentions = data.mentionedUserIds.map(userId => ({
+      post_id: post.id,
+      mentioned_user_id: userId
+    }));
+
+    const { data: mentionsData, error: mentionsError } = await supabase
+      .from('post_mentions')
+      .insert(mentions)
+      .select();
+
+    if (mentionsError) {
+      console.error('❌ Error creating post mentions:', mentionsError);
+      // Don't throw error, post is already created
+    } else {
+      console.log('✅ Post mentions created successfully:', mentionsData);
+      console.log('📢 Notifications will be created by database trigger');
+    }
+  }
+
   return post as Post;
 };
 
@@ -391,6 +419,9 @@ export const uploadPostImages = async (files: File[]): Promise<string[]> => {
 export interface UpdatePostData {
   content?: string;
   image_url?: string | null;
+  image_urls?: string[];
+  video_url?: string;
+  mentionedUserIds?: string[]; // Array of mentioned user IDs
 }
 
 export const updatePost = async (
@@ -408,6 +439,8 @@ export const updatePost = async (
     .update({
       content: data.content,
       image_url: data.image_url ?? null,
+      image_urls: data.image_urls ?? null,
+      video_url: data.video_url ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", postId)
@@ -421,6 +454,42 @@ export const updatePost = async (
     .single();
 
   if (error) throw error;
+
+  // Update mentions if provided
+  if (data.mentionedUserIds !== undefined) {
+    // Delete existing mentions
+    await supabase
+      .from('post_mentions')
+      .delete()
+      .eq('post_id', postId);
+
+    // Create new mentions if any
+    if (data.mentionedUserIds.length > 0) {
+      console.log('📝 Updating post mentions:', {
+        postId,
+        mentionedUserIds: data.mentionedUserIds
+      });
+
+      const mentions = data.mentionedUserIds.map(userId => ({
+        post_id: postId,
+        mentioned_user_id: userId
+      }));
+
+      const { data: mentionsData, error: mentionsError } = await supabase
+        .from('post_mentions')
+        .insert(mentions)
+        .select();
+
+      if (mentionsError) {
+        console.error('❌ Error updating post mentions:', mentionsError);
+        // Don't throw error, post is already updated
+      } else {
+        console.log('✅ Post mentions updated successfully:', mentionsData);
+        console.log('📢 Update notifications will be created by database trigger');
+      }
+    }
+  }
+
   return post as Post;
 };
 

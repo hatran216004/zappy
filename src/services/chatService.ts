@@ -640,33 +640,59 @@ export const sendTextMessage = async (
     // Get conversation participants (excluding sender)
     const { data: participants } = await supabase
       .from('conversation_participants')
-      .select('user_id, mute_until')
+      .select('user_id, mute_until, notif_level')
       .eq('conversation_id', conversationId)
       .neq('user_id', senderId)
       .is('left_at', null);
 
     if (participants && participants.length > 0 && senderProfile) {
-      // Filter out muted participants
       const now = new Date();
-      const unmutedParticipants = participants.filter((participant) => {
-        if (!participant.mute_until) return true;
-        return new Date(participant.mute_until) <= now;
+      const mentionedUserIdsSet = new Set(mentionedUserIds || []);
+      
+      // Filter participants based on mute status and notification level
+      const eligibleParticipants = participants.filter((participant) => {
+        // Check if muted
+        if (participant.mute_until) {
+          const muteDate = new Date(participant.mute_until);
+          if (muteDate > now) {
+            return false; // Muted, skip notification
+          }
+        }
+        
+        // Check notification level
+        const notifLevel = participant.notif_level || 'all';
+        
+        if (notifLevel === 'none') {
+          return false; // Notifications disabled
+        }
+        
+        if (notifLevel === 'mentions') {
+          // Only notify if user is mentioned
+          return mentionedUserIdsSet.has(participant.user_id);
+        }
+        
+        // notifLevel === 'all' - notify for all messages
+        return true;
       });
 
-      if (unmutedParticipants.length > 0) {
-        const notifications = unmutedParticipants.map((participant) => ({
-          user_id: participant.user_id,
-          type: 'new_message',
-          data: {
-            sender_id: senderId,
-            sender_name: senderProfile.display_name,
-            sender_avatar: senderProfile.avatar_url,
-            conversation_id: conversationId,
-            message_id: data.id,
-            message: content,
-            preview: content.substring(0, 100)
-          }
-        }));
+      if (eligibleParticipants.length > 0) {
+        const notifications = eligibleParticipants.map((participant) => {
+          const isMentioned = mentionedUserIdsSet.has(participant.user_id);
+          return {
+            user_id: participant.user_id,
+            type: isMentioned ? 'message_mention' : 'new_message',
+            data: {
+              sender_id: senderId,
+              sender_name: senderProfile.display_name,
+              sender_avatar: senderProfile.avatar_url,
+              conversation_id: conversationId,
+              message_id: data.id,
+              message: content,
+              preview: content.substring(0, 100),
+              is_mention: isMentioned
+            }
+          };
+        });
 
         await supabase.from('notifications').insert(notifications);
       }

@@ -1,7 +1,6 @@
 // components/notification/NotificationPanel.tsx
 import {
   useNotifications,
-  useNotificationsRealtime,
   useMarkNotificationAsRead,
   useMarkAllNotificationsAsRead
 } from '@/hooks/useNotifications';
@@ -23,8 +22,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   const markAsReadMutation = useMarkNotificationAsRead();
   const markAllAsReadMutation = useMarkAllNotificationsAsRead();
 
-  // Subscribe to realtime notifications
-  useNotificationsRealtime(userId);
+  // Note: Realtime notifications are handled in Navbar component
 
   const handleMarkAllAsRead = () => {
     markAllAsReadMutation.mutate(userId);

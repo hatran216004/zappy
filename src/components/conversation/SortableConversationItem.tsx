@@ -35,10 +35,7 @@ export function SortableConversationItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={twMerge(
-        'group relative',
-        isDragging && 'z-50'
-      )}
+      className={twMerge('group relative', isDragging && 'z-50')}
     >
       {/* Active pill (trái) */}
       <div
@@ -57,7 +54,7 @@ export function SortableConversationItem({
         className="
           absolute left-2 top-1/2 -translate-y-1/2
           p-1.5 rounded cursor-grab active:cursor-grabbing
-          opacity-0 group-hover:opacity-100 transition-opacity
+          transition-opacity
           hover:bg-gray-200 dark:hover:bg-gray-700
           z-10 touch-none
         "
@@ -78,4 +75,3 @@ export function SortableConversationItem({
     </div>
   );
 }
-

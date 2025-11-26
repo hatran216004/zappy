@@ -110,7 +110,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     <div
       className={twMerge(
         'flex items-center gap-3 p-4 transition-colors relative group rounded-2xl',
-        // Hover & active nền theo Discord (light/dark)
         isActive
           ? 'bg-gray-200 dark:bg-[#404249]'
           : 'hover:bg-gray-100 dark:hover:bg-white/5'
@@ -123,7 +122,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         {isGroupChat ? (
           <div className="relative inline-block">
             <img
-              src={getGroupPhotoUrl(conversation.photo_url) || '/default-image.png'}
+              src={
+                getGroupPhotoUrl(conversation.photo_url) || '/default-image.png'
+              }
               alt={conversation.title || 'Group'}
               className="w-12 h-12 rounded-full object-cover"
               onError={(e) => {
@@ -142,7 +143,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-2">
             <p
               className={twMerge(
                 'truncate text-gray-900 dark:text-[#F2F3F5]',
@@ -152,7 +153,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {displayName}
             </p>
             {conversation.last_message && (
-              <span className="text-xs text-gray-500 dark:text-[#B5BAC1]">
+              <span className="text-xs text-gray-500 dark:text-[#B5BAC1] text-right">
                 {formatTime(conversation.last_message.created_at)}
               </span>
             )}

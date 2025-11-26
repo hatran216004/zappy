@@ -57,6 +57,8 @@ import {
   useDeletePost,
   uploadPostImage
 } from '@/hooks/usePosts';
+import { MentionList } from '@/components/posts/MentionList';
+import { PostContent } from '@/components/posts/PostContent';
 import { ReportPostModal } from '@/components/modal/ReportPostModal';
 import { uploadPostImages, uploadPostVideo } from '@/services/postService';
 import type { Post, PostReactionType } from '@/services/postService';
@@ -255,8 +257,13 @@ function CreatePostCard({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [mentionedUsers, setMentionedUsers] = useState<Array<{id: string, name: string}>>([]);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [cursorPosition, setCursorPosition] = useState(0);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
   const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
@@ -345,8 +352,69 @@ function CreatePostCard({
     setVideoPreview(null);
   };
 
+  // Handle mention detection
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    
+    setContent(value);
+    setCursorPosition(cursorPos);
+
+    // Check for @ mention
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+      console.log('🔍 Mention detected:', mentionMatch[1]);
+      setMentionQuery(mentionMatch[1]);
+      setShowMentionList(true);
+    } else {
+      setShowMentionList(false);
+      setMentionQuery('');
+    }
+  };
+
+  // Handle mention selection
+  const handleMentionSelect = (friend: {id: string, display_name: string, username: string}) => {
+    console.log('👤 Selecting mention:', friend);
+    
+    const textBeforeCursor = content.substring(0, cursorPosition);
+    const textAfterCursor = content.substring(cursorPosition);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+      const beforeMention = textBeforeCursor.substring(0, mentionMatch.index);
+      const newContent = `${beforeMention}@${friend.username} ${textAfterCursor}`;
+      
+      setContent(newContent);
+      setMentionedUsers(prev => {
+        const exists = prev.find(u => u.id === friend.id);
+        if (!exists) {
+          const newList = [...prev, { id: friend.id, name: friend.display_name }];
+          console.log('📝 Updated mentioned users:', newList);
+          return newList;
+        }
+        return prev;
+      });
+    }
+    
+    setShowMentionList(false);
+    setMentionQuery('');
+    
+    // Focus back to textarea
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
   const handleSubmit = async () => {
     if (!content.trim() && imageFiles.length === 0 && !videoFile) return;
+
+    console.log('📤 Submitting post with mentions:', {
+      content: content.trim(),
+      mentionedUsers,
+      mentionedUserIds: mentionedUsers.map(u => u.id)
+    });
 
     try {
       let imageUrls: string[] | undefined = undefined;
@@ -372,16 +440,22 @@ function CreatePostCard({
         }
       }
 
-      await createPostMutation.mutateAsync({
+      const postData = {
         content: content.trim(),
         image_urls: imageUrls,
-        video_url: videoUrl
-      });
+        video_url: videoUrl,
+        mentionedUserIds: mentionedUsers.map(u => u.id)
+      };
+      
+      console.log('🚀 Calling createPost with data:', postData);
+      
+      await createPostMutation.mutateAsync(postData);
       setContent('');
       setImagePreviews([]);
       setImageFiles([]);
       setVideoPreview(null);
       setVideoFile(null);
+      setMentionedUsers([]);
       onPostCreated?.();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -398,12 +472,49 @@ function CreatePostCard({
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <Textarea
-            placeholder="Bạn đang nghĩ gì?"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="min-h-[100px] resize-none bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-          />
+          <div className="relative">
+            <Textarea
+              ref={textareaRef}
+              placeholder="Bạn đang nghĩ gì? (Gõ @ để tag bạn bè)"
+              value={content}
+              onChange={handleContentChange}
+              className="min-h-[100px] resize-none bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+            />
+            
+            {/* Mention List */}
+            {console.log('🎯 Rendering MentionList with props:', {
+              show: showMentionList,
+              searchQuery: mentionQuery,
+              currentUserId: userId
+            })}
+            <MentionList
+              show={showMentionList}
+              onSelect={handleMentionSelect}
+              onClose={() => setShowMentionList(false)}
+              searchQuery={mentionQuery}
+              currentUserId={userId}
+            />
+          </div>
+
+          {/* Mentioned Users */}
+          {mentionedUsers.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {mentionedUsers.map((user) => (
+                <span
+                  key={user.id}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm rounded-full"
+                >
+                  @{user.name}
+                  <button
+                    onClick={() => setMentionedUsers(prev => prev.filter(u => u.id !== user.id))}
+                    className="text-blue-500 hover:text-blue-700"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Multiple Images Preview */}
           {imagePreviews.length > 0 && (
@@ -560,9 +671,10 @@ function CommentModal({
                   <h4 className="font-semibold text-sm">
                     {post.author?.display_name || 'Người dùng'}
                   </h4>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-                    {post.content || ''}
-                  </p>
+                  <PostContent 
+                    content={post.content || ''}
+                    className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words"
+                  />
                   {post.image_urls && post.image_urls.length > 0 && (
                     <div className="mt-2 grid grid-cols-2 gap-1">
                       {post.image_urls.slice(0, 4).map((url, index) => (

@@ -13,7 +13,8 @@ import {
   Unlock,
   BarChart3,
   MoreVertical,
-  Sparkles
+  Sparkles,
+  Music
 } from 'lucide-react';
 import { TooltipBtn } from '../TooltipBtn';
 import { useState, useEffect } from 'react';
@@ -77,6 +78,10 @@ interface ChatHeaderProps {
   onJumpTo?: (messageId: string) => void;
   onCreateThread?: () => void;
   initialShowSearch?: boolean;
+  onOpenPlaylist?: () => void;
+  hasActivePlaylist?: boolean;
+  isPlaylistPlaying?: boolean;
+  playlistTrackCount?: number;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -94,7 +99,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onUnpin,
   onJumpTo,
   onCreateThread,
-  initialShowSearch = false
+  initialShowSearch = false,
+  onOpenPlaylist,
+  hasActivePlaylist = false,
+  isPlaylistPlaying = false,
+  playlistTrackCount = 0
 }) => {
   const { user } = useUser();
   const location = useLocation();
@@ -139,7 +148,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const avatarUrl = isGroupChat
     ? getGroupPhotoUrl(conversation?.photo_url) || '/default-avatar.png'
-    : getAvatarUrl(otherParticipant?.profile.avatar_url) || '/default-avatar.png';
+    : getAvatarUrl(otherParticipant?.profile.avatar_url) ||
+      '/default-avatar.png';
 
   const statusText = isGroupChat
     ? `${conversation?.participants?.length || 0} thành viên`
@@ -276,6 +286,32 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                 <span>Tìm kiếm</span>
               </DropdownMenuItem>
 
+              {/* Playlist button */}
+              {conversation && onOpenPlaylist && (
+                <DropdownMenuItem onClick={onOpenPlaylist}>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <Music className="size-4" />
+                      {hasActivePlaylist && (
+                        <div className="absolute -top-1 -right-1">
+                          {isPlaylistPlaying ? (
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          ) : (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span>Playlist Cùng Nghe</span>
+                    {hasActivePlaylist && playlistTrackCount > 0 && (
+                      <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {playlistTrackCount}
+                      </span>
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              )}
+
               {/* Show invite button for group admins */}
               {isGroupChat && isAdmin && conversation && (
                 <>
@@ -386,20 +422,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             >
               <BarChart3 className="size-4 mr-1" />
               Summary
-            </Button>
-          )}
-
-          {/* Ask AI button */}
-          {conversation && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-full text-xs px-2"
-              onClick={() => setShowAskAIModal(true)}
-              title="Hỏi AI về cuộc trò chuyện"
-            >
-              <Sparkles className="size-4 mr-1" />
-              Ask AI
             </Button>
           )}
 
@@ -582,20 +604,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onOpenChange={setShowSummaryModal}
           conversationId={conversation.id}
           conversationName={conversation.title || 'Nhóm'}
-        />
-      )}
-
-      {/* Ask AI Chat Modal */}
-      {conversation && (
-        <AskAIChatModal
-          open={showAskAIModal}
-          onOpenChange={setShowAskAIModal}
-          conversationId={conversation.id}
-          conversationName={
-            isGroupChat
-              ? conversation.title || 'Nhóm'
-              : otherParticipant?.profile.display_name || 'Cuộc trò chuyện'
-          }
         />
       )}
 

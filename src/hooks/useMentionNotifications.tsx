@@ -20,17 +20,52 @@ export function useMentionNotifications(currentUserId?: string | null) {
           table: 'notifications',
           filter: `user_id=eq.${currentUserId}`
         },
-        (payload) => {
+        async (payload) => {
           const row = payload.new as NotificationRow;
-          if (row.type !== 'mention') return;
+          // Only handle 'message_mention' type (from chatService), ignore 'mention' (from trigger)
+          if (row.type !== 'message_mention') return;
 
-          // GIỮ LOGIC CŨ – chỉ ép kiểu để tránh lỗi TS
+          // Parse notification data
           const data = (
             typeof row.data === 'string' ? safeParseJson(row.data) : row.data
           ) as any;
 
+          // Get conversation_id from message_id if not in data
+          let conversationId = data?.conversation_id;
+          if (!conversationId && data?.message_id) {
+            const { data: message } = await supabase
+              .from('messages')
+              .select('conversation_id')
+              .eq('id', data.message_id)
+              .single();
+            conversationId = message?.conversation_id;
+          }
+
+          // Check if user has disabled notifications for this conversation
+          if (conversationId) {
+            const { data: participant } = await supabase
+              .from('conversation_participants')
+              .select('notif_level, mute_until')
+              .eq('conversation_id', conversationId)
+              .eq('user_id', currentUserId)
+              .single();
+
+            // If notif_level is 'none', don't show toast
+            if (participant?.notif_level === 'none') {
+              return;
+            }
+
+            // If conversation is muted, don't show toast
+            if (participant?.mute_until) {
+              const muteDate = new Date(participant.mute_until);
+              if (muteDate > new Date()) {
+                return;
+              }
+            }
+          }
+
           const displayName =
-            data?.author_display_name ?? data?.author_username ?? 'Ai đó';
+            data?.sender_name ?? data?.author_display_name ?? data?.author_username ?? 'Ai đó';
 
           const conversationName = data?.conversation_name ?? '';
 
@@ -39,12 +74,17 @@ export function useMentionNotifications(currentUserId?: string | null) {
               ? `${displayName} đã nhắc đến bạn trong ${conversationName}`
               : `${displayName} đã nhắc đến bạn`;
 
-          const avatarUrl =
-            data?.author_avatar_url ??
-            'https://ui-avatars.com/api/?background=random&name=' +
-              encodeURIComponent(displayName);
+          // Fix avatar URL - use proper URL construction
+          let avatarUrl = data?.sender_avatar;
+          if (avatarUrl && !avatarUrl.startsWith('http')) {
+            // If it's a path, construct full URL
+            avatarUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${avatarUrl}`;
+          }
+          if (!avatarUrl) {
+            avatarUrl = 'https://ui-avatars.com/api/?background=random&name=' + encodeURIComponent(displayName);
+          }
 
-          // ✅ CHỈ ĐỔI UI: card giống hình, không đụng logic
+          // Show toast notification
           toast.custom(
             (t) => (
               <div

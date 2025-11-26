@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useCallback
 } from 'react';
+import { Music } from 'lucide-react';
 import {
   useMessages,
   useMessagesRealtime,
@@ -48,6 +49,9 @@ import {
 } from '@/hooks/useFriends';
 import { useQueryClient } from '@tanstack/react-query';
 import { createPoll } from '@/services/chatService';
+import { SharedPlaylistPanel } from '../playlist/SharedPlaylistPanel';
+import { MiniPlayer } from '../playlist/MiniPlayer';
+import { useSharedPlaylist } from '@/hooks/useSharedPlaylist';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ThreadList } from '@/components/thread/ThreadList';
 import { ThreadView } from '@/components/thread/ThreadView';
@@ -92,6 +96,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [showMiniPlayer, setShowMiniPlayer] = useState(true);
+
+  // Shared Playlist Hook
+  const {
+    playlist: sharedPlaylist,
+    currentTrack: sharedCurrentTrack,
+    isPlaying: sharedIsPlaying,
+    play,
+    pause,
+    nextTrack,
+    previousTrack
+  } = useSharedPlaylist(conversationId);
+
+  // Simple approach: Let each component manage its own audio player
+
+  // Simple approach: Let each component manage its own audio player
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -177,6 +198,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   useReactionsRealtime(conversationId); // ⭐ Subscribe to reactions updates
   useReadReceiptsRealtime(conversationId); // ⭐ Subscribe to read receipts updates
   useBlockStatusRealtime(userId); // ⭐ Subscribe to block status changes realtime
+
+  // Playlist hook
+  const {
+    playlist,
+    isLoading: isPlaylistLoading,
+    isPlaying: isPlaylistPlaying,
+    currentTrack,
+    initializePlaylist
+  } = useSharedPlaylist(conversationId);
 
   // Reset typing state khi chuyển conversation
   useEffect(() => {
@@ -299,7 +329,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       if (isTypingRef.current) {
         isTypingRef.current = false;
         sendTyping(false);
-        console.log('🧹 OFF: Cleanup');
+        // Cleanup
       }
     },
     [conversationId, sendTyping]
@@ -309,7 +339,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
   useEffect(() => {
     if (!conversationId) return;
 
-    console.log('🗺️ Setting up location message listener for:', conversationId);
+    // Setting up location message listener
 
     const channel = supabase
       .channel(`location-messages-${conversationId}`)
@@ -344,11 +374,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         }
       )
       .subscribe((status) => {
-        console.log('🔌 Location listener status:', status);
+        // Location listener status
       });
 
     return () => {
-      console.log('🧹 Cleaning up location listener');
+      // Cleaning up location listener
       void supabase.removeChannel(channel);
     };
   }, [conversationId, userId]);
@@ -368,7 +398,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
         if (isTypingRef.current) {
           isTypingRef.current = false;
           sendTyping(false);
-          console.log('🛑 OFF');
+          // OFF
         }
         return;
       }
@@ -376,7 +406,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
       if (!isTypingRef.current) {
         isTypingRef.current = true;
         sendTyping(true);
-        console.log('▶️ ON');
+        // ON
       }
 
       typingTimeoutRef.current = setTimeout(() => {
@@ -1164,6 +1194,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           void jumpToMessage(messageId);
         }}
         onCreateThread={() => setShowCreateThreadModal(true)}
+        onOpenPlaylist={() => {
+          setShowPlaylist(true);
+          setShowMiniPlayer(false); // Hide mini player when opening full playlist
+        }}
+        hasActivePlaylist={!!sharedPlaylist}
+        isPlaylistPlaying={sharedIsPlaying}
+        playlistTrackCount={sharedPlaylist?.tracks.length || 0}
       />
 
       {/* Tabs for Chat and Threads */}
@@ -1502,6 +1539,44 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           userId={userId}
           currentConversationId={conversationId}
         />
+      )}
+
+      {/* Shared Playlist Panel */}
+      <SharedPlaylistPanel
+        conversationId={conversationId}
+        isVisible={showPlaylist}
+        onClose={() => {
+          console.log('🔄 SharedPlaylistPanel closing, showing MiniPlayer');
+          setShowPlaylist(false);
+          setShowMiniPlayer(true); // Show mini player when closing full playlist
+        }}
+      />
+
+      {/* Mini Player */}
+      {showMiniPlayer && (
+        <MiniPlayer
+          conversationId={conversationId}
+          onExpand={() => {
+            console.log('🔄 MiniPlayer expanding to full playlist');
+            setShowPlaylist(true);
+            setShowMiniPlayer(false);
+          }}
+          onClose={() => {
+            console.log('🔄 MiniPlayer closing');
+            setShowMiniPlayer(false);
+          }}
+        />
+      )}
+
+      {/* Mini Player Toggle Button - Show when mini player is hidden and there's a playlist */}
+      {!showMiniPlayer && sharedPlaylist && (
+        <button
+          onClick={() => setShowMiniPlayer(true)}
+          className="fixed bottom-4 left-4 z-40 w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+          title="Hiện Mini Player"
+        >
+          <Music className="w-6 h-6" />
+        </button>
       )}
 
       {/* Map Panel */}

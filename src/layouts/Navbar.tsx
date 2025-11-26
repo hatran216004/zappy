@@ -11,7 +11,9 @@ import {
   Phone
 } from 'lucide-react';
 import { NotificationButton } from '@/components/notification/NotificationButton';
-import { useNotificationsRealtime } from '@/hooks/useNotifications';
+import { useNotificationSubscription } from '@/hooks/useNotificationSubscription';
+import { setGlobalNotificationRestart } from '@/hooks/useMute';
+import { usePostMentionNotifications } from '@/hooks/usePostMentionNotifications';
 import { useEffect, useState, type ElementType } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
@@ -108,7 +110,15 @@ export default function Navbar() {
   useUserStatusRealtime(userId || '');
 
   // Subscribe to notifications realtime
-  useNotificationsRealtime(userId || '');
+  const { restartSubscription } = useNotificationSubscription(userId || '');
+  
+  // Set global restart function for use in mute hooks
+  useEffect(() => {
+    setGlobalNotificationRestart(restartSubscription);
+  }, [restartSubscription]);
+
+  // Subscribe to post mention notifications
+  usePostMentionNotifications(userId);
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [searchUsersModalOpen, setSearchUsersModalOpen] = useState(false);

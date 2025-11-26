@@ -42,7 +42,10 @@ export const muteConversation = async (
 
   const { error } = await supabase
     .from('conversation_participants')
-    .update({ mute_until: muteUntil })
+    .update({ 
+      mute_until: muteUntil,
+      notif_level: 'none' // Set notif_level to 'none' when muting
+    })
     .eq('conversation_id', conversationId)
     .eq('user_id', userId);
 
@@ -59,7 +62,10 @@ export const unmuteConversation = async (
 ): Promise<void> => {
   const { error } = await supabase
     .from('conversation_participants')
-    .update({ mute_until: null })
+    .update({ 
+      mute_until: null,
+      notif_level: 'all' // Set notif_level back to 'all' when unmuting
+    })
     .eq('conversation_id', conversationId)
     .eq('user_id', userId);
 

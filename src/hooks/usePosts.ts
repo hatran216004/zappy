@@ -46,12 +46,14 @@ export const useCreatePost = () => {
 
   return useMutation({
     mutationFn: async (data: CreatePostData) => {
+      console.log('🔄 usePosts hook received data:', data);
       // Support both old (image_url) and new (image_urls, video_url) format
       return createPost({
         content: data.content,
         image_url: data.image_url, // Backward compatibility
         image_urls: data.image_urls,
         video_url: data.video_url,
+        mentionedUserIds: data.mentionedUserIds, // Add this line
       });
     },
     onSuccess: (_, variables) => {
