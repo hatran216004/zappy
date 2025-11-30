@@ -163,12 +163,6 @@ serve(async (req) => {
                       minute: '2-digit'
                     }
                   )}
-                  <br>
-                  <a href="${appUrl}/logout-device?token=${
-                    session.logout_token
-                  }" class="button" style="background-color: #2563eb; color: white !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; display: inline-block; font-weight: 600; margin-top: 10px;">
-                    🔓 Đăng xuất thiết bị này
-                  </a>
                 </div>
               `
                 )

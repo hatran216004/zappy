@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/stores/user';
 import profileServices from '@/services/profileServices';
-import { createUserSession, getOtherActiveSessions } from '@/services/sessionServices';
+import {
+  createUserSession,
+  getOtherActiveSessions
+} from '@/services/sessionServices';
 import { getDeviceInfo } from '@/utils/deviceInfo';
 import toast from 'react-hot-toast';
 
@@ -62,27 +65,19 @@ const AuthCallbackPage = () => {
                 user.email?.split('@')[0] ||
                 'User';
 
-              // Generate username - ensure it's never null or empty
+              // Generate username - mặc định lấy từ email (phần trước @)
               // Helper function to ensure username is always valid
               const generateUsername = (): string => {
-                // Try profile.username from metadata (like register)
-                if (profileData?.username?.trim()) {
-                  return profileData.username.trim();
-                }
-                // Try preferred_username from Google
-                if (user.user_metadata?.preferred_username?.trim()) {
-                  return user.user_metadata.preferred_username.trim();
-                }
-                // Try username from Google
-                if (user.user_metadata?.username?.trim()) {
-                  return user.user_metadata.username.trim();
-                }
-                // Try email prefix
+                // Ưu tiên: Lấy từ email (phần trước @)
                 if (user.email) {
                   const emailPrefix = user.email.split('@')[0]?.trim();
                   if (emailPrefix && emailPrefix.length > 0) {
                     return emailPrefix;
                   }
+                }
+                // Fallback: Try profile.username from metadata (nếu có)
+                if (profileData?.username?.trim()) {
+                  return profileData.username.trim();
                 }
                 // Final fallback - always generate from user ID (guaranteed to exist)
                 return `user_${user.id.slice(0, 8)}`;
@@ -143,9 +138,13 @@ const AuthCallbackPage = () => {
                 username_length: profileInsertData.username.length
               });
 
+              // Sử dụng upsert để tránh lỗi nếu profile đã tồn tại (từ trigger)
               const { error: createError } = await supabase
                 .from('profiles')
-                .insert(profileInsertData);
+                .upsert(profileInsertData, {
+                  onConflict: 'id',
+                  ignoreDuplicates: false
+                });
 
               if (createError) {
                 console.error('Error creating profile:', createError);
@@ -177,40 +176,48 @@ const AuthCallbackPage = () => {
             try {
               const deviceInfo = getDeviceInfo();
               const sessionId = data.session.access_token;
-              
+
               // Lưu session mới
               await createUserSession(user.id, sessionId, deviceInfo);
 
               // Kiểm tra sessions cũ và gửi email cảnh báo (async, không block login)
-              const otherSessions = await getOtherActiveSessions(user.id, sessionId);
+              const otherSessions = await getOtherActiveSessions(
+                user.id,
+                sessionId
+              );
               if (otherSessions.length > 0) {
                 // Gọi Edge Function để gửi email
-                supabase.functions.invoke('notify-new-login', {
-                  body: {
-                    userId: user.id,
-                    sessionId: sessionId,
-                    frontendUrl: window.location.origin,
-                    deviceInfo: {
-                      deviceName: deviceInfo.deviceName,
-                      browserName: deviceInfo.browserName,
-                      browserVersion: deviceInfo.browserVersion,
-                      osName: deviceInfo.osName,
-                      osVersion: deviceInfo.osVersion,
-                      deviceType: deviceInfo.deviceType
-                    },
-                    otherSessions: otherSessions.map((s) => ({
-                      id: s.id,
-                      device_name: s.device_name,
-                      browser_name: s.browser_name,
-                      os_name: s.os_name,
-                      device_type: s.device_type,
-                      created_at: s.created_at,
-                      logout_token: s.logout_token
-                    }))
-                  }
-                }).catch((err) => {
-                  console.error('Error sending login notification email:', err);
-                });
+                supabase.functions
+                  .invoke('notify-new-login', {
+                    body: {
+                      userId: user.id,
+                      sessionId: sessionId,
+                      frontendUrl: window.location.origin,
+                      deviceInfo: {
+                        deviceName: deviceInfo.deviceName,
+                        browserName: deviceInfo.browserName,
+                        browserVersion: deviceInfo.browserVersion,
+                        osName: deviceInfo.osName,
+                        osVersion: deviceInfo.osVersion,
+                        deviceType: deviceInfo.deviceType
+                      },
+                      otherSessions: otherSessions.map((s) => ({
+                        id: s.id,
+                        device_name: s.device_name,
+                        browser_name: s.browser_name,
+                        os_name: s.os_name,
+                        device_type: s.device_type,
+                        created_at: s.created_at,
+                        logout_token: s.logout_token
+                      }))
+                    }
+                  })
+                  .catch((err) => {
+                    console.error(
+                      'Error sending login notification email:',
+                      err
+                    );
+                  });
               }
             } catch (sessionError) {
               console.error('Error creating user session:', sessionError);
