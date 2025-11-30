@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/stores/user';
 import profileServices from '@/services/profileServices';
+import { createUserSession, getOtherActiveSessions } from '@/services/sessionServices';
+import { getDeviceInfo } from '@/utils/deviceInfo';
 import toast from 'react-hot-toast';
 
 const AuthCallbackPage = () => {
@@ -168,6 +170,52 @@ const AuthCallbackPage = () => {
             );
             setTimeout(() => navigate('/login'), 2000);
             return;
+          }
+
+          // Lưu session vào database và kiểm tra sessions cũ (cho Google OAuth)
+          if (data.session) {
+            try {
+              const deviceInfo = getDeviceInfo();
+              const sessionId = data.session.access_token;
+              
+              // Lưu session mới
+              await createUserSession(user.id, sessionId, deviceInfo);
+
+              // Kiểm tra sessions cũ và gửi email cảnh báo (async, không block login)
+              const otherSessions = await getOtherActiveSessions(user.id, sessionId);
+              if (otherSessions.length > 0) {
+                // Gọi Edge Function để gửi email
+                supabase.functions.invoke('notify-new-login', {
+                  body: {
+                    userId: user.id,
+                    sessionId: sessionId,
+                    frontendUrl: window.location.origin,
+                    deviceInfo: {
+                      deviceName: deviceInfo.deviceName,
+                      browserName: deviceInfo.browserName,
+                      browserVersion: deviceInfo.browserVersion,
+                      osName: deviceInfo.osName,
+                      osVersion: deviceInfo.osVersion,
+                      deviceType: deviceInfo.deviceType
+                    },
+                    otherSessions: otherSessions.map((s) => ({
+                      id: s.id,
+                      device_name: s.device_name,
+                      browser_name: s.browser_name,
+                      os_name: s.os_name,
+                      device_type: s.device_type,
+                      created_at: s.created_at,
+                      logout_token: s.logout_token
+                    }))
+                  }
+                }).catch((err) => {
+                  console.error('Error sending login notification email:', err);
+                });
+              }
+            } catch (sessionError) {
+              console.error('Error creating user session:', sessionError);
+              // Không throw error vì login đã thành công, chỉ log
+            }
           }
 
           setUser(user);

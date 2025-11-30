@@ -21,6 +21,7 @@ import {
   useSearchUsers,
   useSendFriendRequest
 } from '@/hooks/useFriends';
+import { getAvatarUrl } from '@/lib/supabase';
 
 export const FriendSearch = () => {
   const { user } = useUser();
@@ -150,9 +151,10 @@ export const FriendSearch = () => {
                   key={user.id}
                   className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
                 >
-                  <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700">
+                  <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
                     <AvatarImage
-                      src={user.avatar_url || '/default-avatar.png'}
+                      className="object-cover rounded-full size-full"
+                      src={getAvatarUrl(user.avatar_url) || '/default-avatar.png'}
                       alt={user.display_name}
                     />
                     <AvatarFallback>

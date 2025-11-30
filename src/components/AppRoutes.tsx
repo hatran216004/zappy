@@ -10,6 +10,7 @@ import AuthenticationPage from '@/pages/AuthenticationPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AuthCallbackPage from '@/pages/AuthCallbackPage';
+import LogoutDevicePage from '@/pages/LogoutDevicePage';
 import { JoinGroupPage } from '@/pages/JoinGroupPage';
 import { useAuth } from '@/stores/user';
 import { BrowserRouter, Outlet, Route, Routes, Navigate } from 'react-router';
@@ -65,6 +66,9 @@ export default function AppRoutes() {
 
         {/* Public route for OAuth callback */}
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+
+        {/* Public route for logout device from email */}
+        <Route path="/logout-device" element={<LogoutDevicePage />} />
 
         {/* Public route for joining via invite */}
         <Route path="/invite/:inviteCode" element={<JoinGroupPage />} />

@@ -12,6 +12,8 @@ import authServices from '@/services/authServices';
 import profileServices from '@/services/profileServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/stores/user';
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 
 type FormData = Pick<RegisterSchema, 'email' | 'password'>;
 const loginSchema = registerSchema.pick(['email', 'password']);
@@ -21,6 +23,29 @@ const LoginPage = () => {
     mutationFn: authServices.loginWithPassword
   });
   const { setUser } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // Hiển thị thông báo khi logout device thành công
+  useEffect(() => {
+    const logoutSuccess = searchParams.get('logout_success');
+    const error = searchParams.get('error');
+
+    if (logoutSuccess === 'true') {
+      toast.success('Đã đăng xuất thiết bị thành công!');
+      // Xóa query params để không hiển thị lại
+      window.history.replaceState({}, '', '/login');
+    } else if (error) {
+      if (error === 'invalid_token') {
+        toast.error('Token không hợp lệ hoặc đã hết hạn');
+      } else if (error === 'logout_failed') {
+        toast.error('Không thể đăng xuất thiết bị. Token có thể đã hết hạn.');
+      } else if (error === 'server_error') {
+        toast.error('Có lỗi xảy ra. Vui lòng thử lại sau.');
+      }
+      // Xóa query params
+      window.history.replaceState({}, '', '/login');
+    }
+  }, [searchParams]);
 
   const {
     register,
