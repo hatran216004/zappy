@@ -120,7 +120,8 @@ export function SettingsModal({ open, onClose, userId }: SettingsModalProps) {
                 Chế độ riêng tư
               </Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Khi bật, bạn sẽ không nhận được lời mời kết bạn từ người khác
+                Khi bật, bạn sẽ vào chế độ riêng tư, không thể nhận được lời mời
+                kết bạn từ người khác và tag
               </p>
             </div>
             <Switch
