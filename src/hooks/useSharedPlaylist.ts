@@ -244,28 +244,48 @@ export const useSharedPlaylist = (conversationId: string): UseSharedPlaylistRetu
     
     try {
       await addLocalAudioTrack(playlist.id, audioFile);
+      // Refetch playlist immediately to update UI
+      const updatedPlaylist = await getPlaylistWithTracks(conversationId);
+      if (updatedPlaylist) {
+        setPlaylist(updatedPlaylist);
+        setLastSyncTime(Date.now());
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add local audio');
     }
-  }, [playlist]);
+  }, [playlist, conversationId]);
 
   const removeTrack = useCallback(async (trackId: string) => {
+    if (!playlist) return;
+    
     try {
       await removeTrackFromPlaylist(trackId);
+      // Refetch playlist immediately to update UI
+      const updatedPlaylist = await getPlaylistWithTracks(conversationId);
+      if (updatedPlaylist) {
+        setPlaylist(updatedPlaylist);
+        setLastSyncTime(Date.now());
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove track');
     }
-  }, []);
+  }, [playlist, conversationId]);
 
   const reorderTrack = useCallback(async (trackId: string, newPosition: number) => {
     if (!playlist) return;
     
     try {
       await reorderTracks(playlist.id, trackId, newPosition);
+      // Refetch playlist immediately to update UI
+      const updatedPlaylist = await getPlaylistWithTracks(conversationId);
+      if (updatedPlaylist) {
+        setPlaylist(updatedPlaylist);
+        setLastSyncTime(Date.now());
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reorder track');
     }
-  }, [playlist]);
+  }, [playlist, conversationId]);
 
   // Setup realtime subscriptions
   useEffect(() => {

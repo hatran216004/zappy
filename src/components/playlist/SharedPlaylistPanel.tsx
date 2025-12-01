@@ -109,14 +109,74 @@ export const SharedPlaylistPanel: React.FC<SharedPlaylistPanelProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[2fr_3fr] overflow-y-auto">
-          {/* Track List */}
-          <div className="flex-1 lg:flex-none overflow-y-auto lg:border-r border-gray-200 dark:border-gray-700 p-4">
+        {playlist && playlist.tracks.length > 0 ? (
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[2fr_3fr] overflow-hidden">
+            {/* Track List */}
+            <div className="flex-1 lg:flex-none overflow-y-auto lg:border-r border-gray-200 dark:border-gray-700">
+              <PlaylistTrackList
+                tracks={playlist.tracks}
+                onTrackSelect={(trackId) => play(trackId)}
+                onTrackRemove={removeTrack}
+                onTrackReorder={reorderTrack}
+              />
+            </div>
+
+            {/* Audio Player Area */}
+            {currentTrack ? (
+              <div className="flex-1 lg:flex-none p-4 lg:p-6 flex flex-col bg-gray-50 dark:bg-gray-900 min-h-0">
+                <div className="flex-1 flex flex-col max-w-full">
+                  <div className="w-full aspect-video rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-4 shadow-lg">
+                    <div className="text-center">
+                      <Music className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-500">Local Audio Track</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        {currentTrack.title}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="hidden lg:flex flex-1 lg:flex-none p-6 lg:p-8 flex-col items-center justify-center text-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-0">
+                <div className="max-w-sm">
+                  <div className="w-full aspect-video rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center mb-6 shadow-xl border-2 border-dashed border-blue-300 dark:border-gray-600">
+                    <div className="text-center">
+                      <Music className="w-16 h-16 text-blue-400 dark:text-blue-500 mx-auto mb-3" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                        Sẵn sàng phát
+                      </p>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Chọn bài hát để phát
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">
+                    Click vào bài hát bên trái để bắt đầu nghe nhạc cùng nhau
+                  </p>
+                  <button
+                    onClick={() => {
+                      console.log(
+                        '🎵 SIMPLE Play button clicked',
+                        playlist.tracks[0]
+                      );
+                      play(playlist.tracks[0].id);
+                    }}
+                    className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    <Play className="w-5 h-5" />
+                    <span>Phát bài đầu tiên</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                  <p className="text-gray-500">Đang tải playlist...</p>
+                  <p className="text-gray-500 dark:text-gray-400">Đang tải playlist...</p>
                 </div>
               </div>
             ) : error ? (
@@ -125,100 +185,37 @@ export const SharedPlaylistPanel: React.FC<SharedPlaylistPanelProps> = ({
                   <p>Lỗi: {error}</p>
                   <button
                     onClick={initializePlaylist}
-                    className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                    className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                   >
                     Thử lại
                   </button>
                 </div>
               </div>
-            ) : playlist && playlist.tracks.length > 0 ? (
-              <PlaylistTrackList
-                tracks={playlist.tracks}
-                onTrackSelect={(trackId) => play(trackId)}
-                onTrackRemove={removeTrack}
-                onTrackReorder={reorderTrack}
-              />
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center text-gray-500">
-                  <Music className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg mb-2">Playlist trống</p>
-                  <p className="text-sm mb-4">
-                    Thêm nhạc để bắt đầu nghe cùng nhau!
+              <div className="flex items-center justify-center h-full w-full px-4 py-12">
+                <div className="text-center max-w-lg">
+                  <div className="mb-8 flex justify-center">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-400/30 to-purple-400/30 rounded-full blur-3xl animate-pulse"></div>
+                      <div className="relative bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-full p-10 shadow-2xl">
+                        <Music className="w-20 h-20 text-blue-500 dark:text-blue-400 mx-auto" />
+                      </div>
+                    </div>
+                  </div>
+                  <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                    Playlist trống
+                  </h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-300 mb-10 leading-relaxed">
+                    Thêm nhạc để bắt đầu nghe cùng nhau với bạn bè!
                   </p>
                   <button
                     onClick={() => setShowAddTrackModal(true)}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    className="inline-flex items-center space-x-3 px-8 py-4 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl font-semibold text-lg transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105"
                   >
-                    Thêm bài hát đầu tiên
+                    <Plus className="w-6 h-6" />
+                    <span>Thêm bài hát đầu tiên</span>
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Audio Player Area - Chỉ hiển thị thông tin track */}
-          {currentTrack && (
-            <div className="flex-1 lg:flex-none p-4 lg:p-6 flex flex-col bg-gray-50 dark:bg-gray-900 min-h-0">
-              <div className="flex-1 flex flex-col max-w-full">
-                <div className="w-full aspect-video rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-4 shadow-lg">
-                  <div className="text-center">
-                    <Music className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <p className="text-gray-500">Local Audio Track</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {currentTrack.title}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Empty Player State */}
-        {!currentTrack && (
-          <div className="w-96 p-6 flex flex-col items-center justify-center text-center">
-            <div className="w-full aspect-video rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-6 shadow-lg">
-              <Music className="w-20 h-20 text-gray-400" />
-            </div>
-
-            {playlist && playlist.tracks.length > 0 ? (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Chọn bài hát để phát
-                </h3>
-                <p className="text-gray-500 mb-4">
-                  Click vào bài hát bên trái để bắt đầu nghe
-                </p>
-                <button
-                  onClick={() => {
-                    console.log(
-                      '🎵 SIMPLE Play button clicked',
-                      playlist.tracks[0]
-                    );
-                    play(playlist.tracks[0].id);
-                  }}
-                  className="flex items-center space-x-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  <Play className="w-5 h-5" />
-                  <span>Phát bài đầu tiên</span>
-                </button>
-              </div>
-            ) : (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Playlist trống
-                </h3>
-                <p className="text-gray-500 mb-4">
-                  Thêm bài hát để bắt đầu nghe cùng nhau
-                </p>
-                <button
-                  onClick={() => setShowAddTrackModal(true)}
-                  className="flex items-center space-x-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span>Thêm bài hát</span>
-                </button>
               </div>
             )}
           </div>

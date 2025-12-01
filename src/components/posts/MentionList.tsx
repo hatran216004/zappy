@@ -43,7 +43,7 @@ export const MentionList: React.FC<MentionListProps> = ({
         .from('friends')
         .select(`
           friend:profiles!friends_friend_id_fkey(
-            id, display_name, username, avatar_url
+            id, display_name, username, avatar_url, is_private
           )
         `)
         .eq('user_id', currentUserId);
@@ -52,8 +52,11 @@ export const MentionList: React.FC<MentionListProps> = ({
 
       if (error) throw error;
 
-      const friendsList = data?.map(item => item.friend).filter(Boolean) as Friend[] || [];
-      console.log('👥 Processed friends list:', friendsList);
+      // Filter out friends who have privacy mode enabled
+      const friendsList = data?.map(item => item.friend)
+        .filter(Boolean)
+        .filter((friend: any) => !friend.is_private) as Friend[] || [];
+      console.log('👥 Processed friends list (excluding private users):', friendsList);
       setFriends(friendsList);
     } catch (error) {
       console.error('❌ Error fetching friends:', error);
