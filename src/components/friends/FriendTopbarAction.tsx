@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { ArrowUpDownIcon, ChevronDown, Check, Filter, Settings } from 'lucide-react';
+import {
+  ArrowUpDownIcon,
+  ChevronDown,
+  Check,
+  Filter,
+  Settings
+} from 'lucide-react';
 import { useContactLabels } from '@/hooks/useFriends';
 import useUser from '@/hooks/useUser';
 import { ManageLabelsModal } from '../modal/ManageLabelsModal';
@@ -22,7 +28,7 @@ const LABEL_COLORS = [
   { value: 4, color: 'bg-green-500' },
   { value: 5, color: 'bg-blue-500' },
   { value: 6, color: 'bg-purple-500' },
-  { value: 7, color: 'bg-pink-500' },
+  { value: 7, color: 'bg-pink-500' }
 ];
 
 export function FriendTopbarAction({
@@ -39,7 +45,7 @@ export function FriendTopbarAction({
   const [manageLabelsOpen, setManageLabelsOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  
+
   const sortRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +61,10 @@ export function FriendTopbarAction({
       if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
         setSortOpen(false);
       }
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(event.target as Node)
+      ) {
         setFilterOpen(false);
       }
     };
@@ -88,9 +97,11 @@ export function FriendTopbarAction({
           </button>
 
           {sortOpen && (
-            <div className="absolute right-0 mt-1 min-w-[160px] bg-white dark:bg-gray-800 
+            <div
+              className="absolute right-0 mt-1 min-w-[160px] bg-white dark:bg-gray-800 
                             border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg 
-                            z-50 py-1 animate-in fade-in-0 zoom-in-95">
+                            z-50 py-1 animate-in fade-in-0 zoom-in-95"
+            >
               {['Tên (A-Z)', 'Tên (Z-A)'].map((option) => (
                 <button
                   key={option}
@@ -102,7 +113,9 @@ export function FriendTopbarAction({
                              flex items-center justify-between transition-colors"
                 >
                   {option}
-                  {sortBy === option && <Check className="size-4 text-blue-500" />}
+                  {sortBy === option && (
+                    <Check className="size-4 text-blue-500" />
+                  )}
                 </button>
               ))}
             </div>
@@ -118,14 +131,18 @@ export function FriendTopbarAction({
                        border border-gray-300 dark:border-gray-600 transition"
           >
             <Filter className="size-4 mr-1 opacity-70" />
-            <span className="truncate text-xs flex-1 text-left">{getFilterDisplayName()}</span>
+            <span className="truncate text-xs flex-1 text-left">
+              {getFilterDisplayName()}
+            </span>
             <ChevronDown className="size-4 ml-1 opacity-70" />
           </button>
 
           {filterOpen && (
-            <div className="absolute right-0 mt-1 min-w-[200px] bg-white dark:bg-gray-800 
+            <div
+              className="absolute right-0 mt-1 min-w-[200px] bg-white dark:bg-gray-800 
                             border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg 
-                            z-50 py-1 animate-in fade-in-0 zoom-in-95 max-h-[400px] overflow-y-auto">
+                            z-50 py-1 animate-in fade-in-0 zoom-in-95 max-h-[400px] overflow-y-auto"
+            >
               {/* Tất cả */}
               <button
                 onClick={() => {
@@ -185,7 +202,7 @@ export function FriendTopbarAction({
                            flex items-center transition-colors"
               >
                 <Settings className="size-4 mr-2" />
-                Quản lý nhãn
+                Quản lý thẻ phân loại
               </button>
             </div>
           )}
