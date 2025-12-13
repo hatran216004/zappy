@@ -443,6 +443,7 @@ export default function ConversationListPane() {
                 title={`Ảnh & Video (${mediaData?.length || 0})`}
                 items={mediaItems}
                 onMediaClick={handleMediaClick}
+                icon={<Image className="w-5 h-5 text-pink-500" />}
               />
             )}
 
@@ -457,6 +458,7 @@ export default function ConversationListPane() {
                 type="file"
                 title={`Tệp & Tài liệu (${filesData?.length || 0})`}
                 items={fileItems}
+                icon={<FolderOpen className="w-5 h-5 text-blue-500" />}
               />
             ) : (
               <SimpleSection
@@ -476,6 +478,7 @@ export default function ConversationListPane() {
                 type="link"
                 title={`Liên kết (${linkItems.length})`}
                 items={linkItems}
+                icon={<LinkIcon className="w-5 h-5 text-indigo-500" />}
               />
             ) : (
               <SimpleSection

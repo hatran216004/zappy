@@ -17,6 +17,7 @@ type SidebarAccordionSectionProps = {
   title: string;
   items?: MediaItem[] | FileItem[] | LinkItem[] | ListItem[];
   onMediaClick?: (index: number) => void;
+  icon?: React.ReactNode;
 };
 
 export function SidebarAccordionSection({
@@ -24,6 +25,7 @@ export function SidebarAccordionSection({
   title,
   items = [],
   onMediaClick,
+  icon,
 }: SidebarAccordionSectionProps) {
   return (
     <Accordion
@@ -32,8 +34,11 @@ export function SidebarAccordionSection({
       className="w-full border-b border-gray-200 dark:border-gray-700"
     >
       <AccordionItem value={title.toLowerCase()}>
-        <AccordionTrigger className="px-6 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:no-underline">
-          {title}
+        <AccordionTrigger className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:no-underline hover:bg-gray-50 dark:hover:bg-[#313338]">
+          <div className="flex items-center gap-3">
+            {icon}
+            <span>{title}</span>
+          </div>
         </AccordionTrigger>
 
         <AccordionContent className="p-5">

@@ -191,7 +191,7 @@ export const getConversations = async (
   const unreadCountsRes = await Promise.all(
     conversationIds.map(async (convId) => {
       const lastReadAt = lastReadMap.get(convId);
-      
+
       // Get all unread message IDs (messages after last_read_at, not sent by user)
       const { data: unreadMessages } = await supabase
         .from('messages')
@@ -200,25 +200,25 @@ export const getConversations = async (
         .gt('created_at', lastReadAt || '1970-01-01')
         .neq('sender_id', userId)
         .is('thread_id', null); // Only count main conversation messages, not thread messages
-      
+
       if (!unreadMessages || unreadMessages.length === 0) {
         return [convId, 0] as const;
       }
-      
+
       const unreadMessageIds = unreadMessages.map((m) => m.id);
-      
+
       // Get read receipts for these messages by this user
       const { data: readReceipts } = await supabase
         .from('read_receipts')
         .select('message_id')
         .in('message_id', unreadMessageIds)
         .eq('user_id', userId);
-      
+
       const readMessageIds = new Set(readReceipts?.map((r) => r.message_id) || []);
-      
+
       // Count messages that don't have read receipts
       const unreadCount = unreadMessageIds.filter((id) => !readMessageIds.has(id)).length;
-      
+
       return [convId, unreadCount] as const;
     })
   );
@@ -332,7 +332,7 @@ export const getMessages = async (
   const directPairPromise = currentUserId
     ? getDirectPairInfo(conversationId, currentUserId)
     : Promise.resolve({ otherUserId: '', isDirectChat: false });
-  
+
   console.log('📬 getMessages called:', {
     conversationId,
     limit,
@@ -387,7 +387,7 @@ export const getMessages = async (
 
   // Get direct pair info
   const { otherUserId, isDirectChat } = await directPairPromise;
-  
+
   if (isDirectChat && otherUserId) {
     console.log('📬 Direct chat detected:', {
       conversationId,
@@ -563,10 +563,10 @@ const detectMessageEffect = (content: string): { effect: string | null; cleanCon
     ':fire:': { effect: 'fire', emoji: '🔥' },
     ':clap:': { effect: 'clap', emoji: '👏' }
   };
-  
+
   let cleanContent = content;
   let detectedEffect: string | null = null;
-  
+
   for (const [shortcode, { effect, emoji }] of Object.entries(effects)) {
     if (content.includes(shortcode)) {
       // Replace shortcode with emoji
@@ -575,7 +575,7 @@ const detectMessageEffect = (content: string): { effect: string | null; cleanCon
       break; // Only one effect per message
     }
   }
-  
+
   return { effect: detectedEffect, cleanContent };
 };
 
@@ -648,7 +648,7 @@ export const sendTextMessage = async (
     if (participants && participants.length > 0 && senderProfile) {
       const now = new Date();
       const mentionedUserIdsSet = new Set(mentionedUserIds || []);
-      
+
       // Filter participants based on mute status and notification level
       const eligibleParticipants = participants.filter((participant) => {
         // Check if muted
@@ -658,19 +658,19 @@ export const sendTextMessage = async (
             return false; // Muted, skip notification
           }
         }
-        
+
         // Check notification level
         const notifLevel = participant.notif_level || 'all';
-        
+
         if (notifLevel === 'none') {
           return false; // Notifications disabled
         }
-        
+
         if (notifLevel === 'mentions') {
           // Only notify if user is mentioned
           return mentionedUserIdsSet.has(participant.user_id);
         }
-        
+
         // notifLevel === 'all' - notify for all messages
         return true;
       });
@@ -1464,19 +1464,19 @@ export const subscribeMessages = (
           threadId: payload.new.thread_id,
           senderId: payload.new.sender_id
         });
-        
+
         // Filter out thread messages manually
         if (payload.new.thread_id !== null) {
           console.log('⏭️ Skipping thread message:', payload.new.id);
           return;
         }
-        
+
         // Double check conversation_id
         if (payload.new.conversation_id !== conversationId) {
           console.warn('⚠️ Message conversation_id mismatch:', payload.new.conversation_id, 'expected:', conversationId);
           return;
         }
-        
+
         const messageId = payload.new.id;
 
         // Fetch đầy đủ thông tin message như getMessages
@@ -1553,7 +1553,7 @@ export const subscribeMessages = (
         if (payload.new.thread_id !== null || payload.new.conversation_id !== conversationId) {
           return;
         }
-        
+
         const messageId = payload.new.id;
 
         // Fetch đầy đủ thông tin
@@ -2755,10 +2755,10 @@ export const getPollByMessage = async (
         .order('idx', { ascending: true }),
       currentUserId
         ? supabase
-            .from('poll_votes')
-            .select('option_id')
-            .eq('poll_id', poll.id)
-            .eq('user_id', currentUserId)
+          .from('poll_votes')
+          .select('option_id')
+          .eq('poll_id', poll.id)
+          .eq('user_id', currentUserId)
         : Promise.resolve({ data: [] as any } as any),
       supabase.from('poll_votes').select('option_id').eq('poll_id', poll.id),
       supabase
@@ -2774,10 +2774,10 @@ export const getPollByMessage = async (
   });
 
   const allowedParticipants = (participants || []).map((p: any) => p.user_id);
-  const canVote = !currentUserId 
-    ? false 
-    : allowedParticipants.length === 0 
-      ? true 
+  const canVote = !currentUserId
+    ? false
+    : allowedParticipants.length === 0
+      ? true
       : allowedParticipants.includes(currentUserId);
 
   return {
@@ -3102,7 +3102,7 @@ export const searchUsers = async (
     avatar_url: string;
     status: string;
   }>();
-  
+
   (byProfile || []).forEach((p) => map.set(p.id, p));
   byEmail.forEach((p) => {
     if (!map.has(p.id)) map.set(p.id, p);
@@ -3134,7 +3134,7 @@ export const subscribeThreads = (
       },
       async (payload) => {
         const threadId = payload.new.id;
-        
+
         // Fetch full thread details
         const { data: thread } = await supabase
           .from('threads')
@@ -3182,7 +3182,7 @@ export const subscribeThreads = (
       },
       async (payload) => {
         const threadId = payload.new.id;
-        
+
         // Fetch full thread details
         const { data: thread } = await supabase
           .from('threads')
@@ -3533,7 +3533,7 @@ export const subscribeThreadParticipants = (
       },
       async (payload) => {
         const participant = payload.new;
-        
+
         // Fetch profile
         const { data: profile } = await supabase
           .from('profiles')
@@ -4336,7 +4336,7 @@ export const getChatSummary24h = async (
     const userId = msg.sender_id;
     const userName = msg.sender?.display_name || 'Unknown';
     const avatar = msg.sender?.avatar_url || '';
-    
+
     if (userMessageCount.has(userId)) {
       userMessageCount.get(userId)!.count++;
     } else {
@@ -4475,7 +4475,7 @@ export const getAllMessagesForAI = async (
       const fileName = att.storage_path?.split('/').pop() || 'unknown';
       // Remove timestamp prefix if exists (format: timestamp_random.ext)
       const cleanFileName = fileName.replace(/^\d+_[a-z0-9]+\./, '') || fileName;
-      
+
       return {
         file_name: cleanFileName,
         file_size: att.byte_size || 0,
@@ -4498,7 +4498,7 @@ export const askAIAboutChat = async (
     .map((msg) => {
       const timestamp = new Date(msg.created_at).toLocaleString('vi-VN');
       let content = `[${timestamp}] ${msg.sender.display_name}: `;
-      
+
       if (msg.type === 'text' && msg.content_text) {
         content += msg.content_text;
       } else if (msg.type === 'image') {
@@ -4517,7 +4517,7 @@ export const askAIAboutChat = async (
       } else {
         content += `[${msg.type}]`;
       }
-      
+
       return content;
     })
     .join('\n');
@@ -4526,7 +4526,7 @@ export const askAIAboutChat = async (
   // Option 1: Use Supabase Edge Function (preferred for production)
   // Skip this if OpenAI API key is available (to avoid unnecessary CORS errors)
   const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  
+
   if (!openaiApiKey) {
     // Only try Edge Function if no OpenAI key is configured
     try {
@@ -4541,13 +4541,13 @@ export const askAIAboutChat = async (
       if (!error && data?.answer) {
         return data.answer;
       }
-      
+
       if (error) {
         console.warn('Edge function error:', error);
         // If it's a CORS or function not found error, continue to fallback
         if (
-          error.message?.includes('CORS') || 
-          error.message?.includes('404') || 
+          error.message?.includes('CORS') ||
+          error.message?.includes('404') ||
           error.message?.includes('does not exist') ||
           error.message?.includes('Failed to send a request') ||
           error.name === 'FunctionsFetchError'
@@ -4575,19 +4575,25 @@ export const askAIAboutChat = async (
     }
   }
 
-  // Option 2: Direct OpenAI API call (fallback or primary if key is set)
-  // This requires VITE_OPENAI_API_KEY to be set in environment variables
-  
-  if (openaiApiKey) {
+  // Option 2: Direct API call (Groq or OpenAI)
+  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+
+  const apiKey = groqApiKey || openaiApiKey;
+  const apiUrl = groqApiKey
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+  const model = groqApiKey ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+
+  if (apiKey) {
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiApiKey}`
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', // or 'gpt-3.5-turbo' for cheaper option
+          model: model,
           messages: [
             {
               role: 'system',
@@ -4608,13 +4614,13 @@ Trả lời bằng tiếng Việt, ngắn gọn và chính xác.`
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        
+
         if (response.status === 429) {
           throw new Error('Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.');
         } else if (response.status === 401) {
           throw new Error('API key không hợp lệ. Vui lòng kiểm tra lại cấu hình.');
         } else if (response.status === 403) {
-          throw new Error('Không có quyền truy cập API. Vui lòng kiểm tra tài khoản OpenAI.');
+          throw new Error('Không có quyền truy cập API. Vui lòng kiểm tra tài khoản.');
         } else {
           throw new Error(`Lỗi API: ${errorData.error?.message || response.statusText}`);
         }
@@ -4622,14 +4628,14 @@ Trả lời bằng tiếng Việt, ngắn gọn và chính xác.`
 
       const data = await response.json();
       return data.choices[0]?.message?.content || 'Không thể tạo câu trả lời.';
-    } catch (openaiError: any) {
-      console.error('OpenAI API error:', openaiError);
-      
+    } catch (apiError: any) {
+      console.error('AI API error:', apiError);
+
       // If it's already a formatted error message, throw it
-      if (openaiError.message && !openaiError.message.includes('Failed to fetch')) {
-        throw openaiError;
+      if (apiError.message && !apiError.message.includes('Failed to fetch')) {
+        throw apiError;
       }
-      
+
       // Otherwise, provide a generic error
       throw new Error('Không thể kết nối với AI. Vui lòng kiểm tra kết nối mạng và cấu hình API key.');
     }
@@ -4637,6 +4643,258 @@ Trả lời bằng tiếng Việt, ngắn gọn và chính xác.`
 
   // If neither method works
   throw new Error(
-    'AI service chưa được cấu hình. Vui lòng thiết lập Supabase Edge Function hoặc thêm VITE_OPENAI_API_KEY vào file .env'
+    'AI service chưa được cấu hình. Vui lòng thêm VITE_GROQ_API_KEY hoặc VITE_OPENAI_API_KEY vào file .env'
   );
+};
+
+// AI Summary Response Type
+export interface AIConversationSummary {
+  summary: string;
+  highlights: string[];
+  topics: string[];
+  actionItems: string[];
+  sentiment: 'positive' | 'neutral' | 'negative';
+}
+
+// Get AI-powered conversation summary
+export const getAIConversationSummary = async (
+  conversationId: string,
+  timeRange: '24h' | '7d' | '30d' | 'all' = '24h'
+): Promise<AIConversationSummary> => {
+  // Calculate time filter
+  const now = new Date();
+  let since: Date | null = null;
+
+  switch (timeRange) {
+    case '24h':
+      since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      break;
+    case '7d':
+      since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case '30d':
+      since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+    case 'all':
+      since = null;
+      break;
+  }
+
+  // Get messages for context
+  let query = supabase
+    .from('messages')
+    .select(`
+      id,
+      content_text,
+      type,
+      created_at,
+      sender:profiles!messages_sender_id_fkey(id, display_name),
+      attachments(storage_path, byte_size, mime_type)
+    `)
+    .eq('conversation_id', conversationId)
+    .is('thread_id', null)
+    .is('recalled_at', null)
+    .order('created_at', { ascending: true });
+
+  if (since) {
+    query = query.gte('created_at', since.toISOString());
+  }
+
+  const { data: messages, error } = await query;
+
+  if (error) throw error;
+
+  if (!messages || messages.length === 0) {
+    return {
+      summary: 'Không có tin nhắn nào trong khoảng thời gian này.',
+      highlights: [],
+      topics: [],
+      actionItems: [],
+      sentiment: 'neutral'
+    };
+  }
+
+  // Format messages for AI context
+  const chatHistory = messages
+    .map((msg: any) => {
+      const timestamp = new Date(msg.created_at).toLocaleString('vi-VN');
+      let content = `[${timestamp}] ${msg.sender?.display_name || 'Unknown'}: `;
+
+      if (msg.type === 'text' && msg.content_text) {
+        content += msg.content_text;
+      } else if (msg.type === 'image') {
+        content += '[Ảnh]';
+      } else if (msg.type === 'video') {
+        content += '[Video]';
+      } else if (msg.type === 'file' && msg.attachments?.length > 0) {
+        const fileNames = msg.attachments.map((a: any) => a.storage_path?.split('/').pop()).join(', ');
+        content += `[File: ${fileNames}]`;
+      } else if (msg.type === 'audio') {
+        content += '[Audio]';
+      } else if (msg.type === 'location') {
+        content += '[Vị trí]';
+      } else if (msg.type === 'poll') {
+        content += '[Bình chọn]';
+      } else {
+        content += `[${msg.type}]`;
+      }
+
+      return content;
+    })
+    .join('\n');
+
+  // Call AI API (Groq or OpenAI)
+  const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+
+  const apiKey = groqApiKey || openaiApiKey;
+
+  if (!apiKey) {
+    throw new Error('VITE_GROQ_API_KEY hoặc VITE_OPENAI_API_KEY chưa được cấu hình trong file .env');
+  }
+
+  const apiUrl = groqApiKey
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+
+  // Use Llama 3 for Groq (fast & good), GPT-4o-mini for OpenAI
+  const model = groqApiKey ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+
+  const systemPrompt = `Bạn là một trợ lý AI chuyên tóm tắt cuộc trò chuyện. Nhiệm vụ của bạn là phân tích lịch sử chat và trả về một bản tóm tắt có cấu trúc.
+
+Hãy trả về một JSON object với cấu trúc sau:
+{
+  "summary": "Tóm tắt ngắn gọn nội dung chính của cuộc trò chuyện (2-3 câu)",
+  "highlights": ["Điểm nổi bật 1", "Điểm nổi bật 2", ...], // Tối đa 5 điểm
+  "topics": ["Chủ đề 1", "Chủ đề 2", ...], // Các chủ đề được thảo luận
+  "actionItems": ["Việc cần làm 1", "Việc cần làm 2", ...], // Các công việc, lịch hẹn được nhắc đến (nếu có)
+  "sentiment": "positive" | "neutral" | "negative" // Tông giọng chung của cuộc hội thoại
+}
+
+Lưu ý:
+- Trả lời bằng tiếng Việt
+- Nếu không có action items, trả về mảng rỗng
+- Highlight chỉ những thông tin quan trọng
+- Topics nên ngắn gọn, mỗi topic là 1-3 từ
+- Quan trọng: CHỈ TRẢ VỀ JSON, không thêm bất kỳ văn bản nào khác.`;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Lịch sử cuộc trò chuyện:\n\n${chatHistory}` }
+        ],
+        temperature: 0.5,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        throw new Error('Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.');
+      } else if (response.status === 401) {
+        throw new Error('API key không hợp lệ. Vui lòng kiểm tra lại cấu hình.');
+      } else {
+        throw new Error(`Lỗi API: ${errorData.error?.message || response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('Không nhận được phản hồi từ AI');
+    }
+
+    const result = JSON.parse(content);
+
+    return {
+      summary: result.summary || 'Không thể tóm tắt cuộc trò chuyện.',
+      highlights: result.highlights || [],
+      topics: result.topics || [],
+      actionItems: result.actionItems || [],
+      sentiment: result.sentiment || 'neutral'
+    };
+  } catch (err: any) {
+    console.error('AI Summary error:', err);
+
+    if (err.message?.includes('JSON')) {
+      throw new Error('Lỗi xử lý phản hồi từ AI. Vui lòng thử lại.');
+    }
+
+    throw err;
+  }
+};
+
+// General Chat with Zappy AI
+export const chatWithZappyAI = async (
+  message: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string> => {
+  const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+
+  const apiKey = groqApiKey || openaiApiKey;
+
+  if (!apiKey) {
+    throw new Error('Chưa cấu hình API Key. Vui lòng thêm VITE_GROQ_API_KEY hoặc VITE_OPENAI_API_KEY vào .env');
+  }
+
+  const apiUrl = groqApiKey
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+
+  const model = groqApiKey ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+
+  const systemPrompt = `Bạn là Zappy AI, một trợ lý ảo thông minh, thân thiện và hài hước của ứng dụng nhắn tin Zappy.
+Hãy trò chuyện với người dùng một cách tự nhiên, vui vẻ và hữu ích.
+Luôn trả lời bằng tiếng Việt.
+Bạn có thể trả lời các câu hỏi, đưa ra lời khuyên, hoặc chỉ đơn giản là trò chuyện phiếm.
+Đừng quá cứng nhắc như robot.`;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...history,
+          { role: 'user', content: message }
+        ],
+        temperature: 0.8, // Slightly higher creativity for casual chat
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        throw new Error('Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.');
+      } else {
+        throw new Error(`Lỗi API: ${errorData.error?.message || response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || 'Xin lỗi, tôi không nghĩ ra câu trả lời.';
+  } catch (error: any) {
+    console.error('Zappy AI Chat error:', error);
+    throw error;
+  }
 };

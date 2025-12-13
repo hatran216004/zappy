@@ -39,6 +39,7 @@ import { CreatePollModal } from '../modal/CreatePollModal';
 import { SelectCallParticipantsModal } from '../modal/SelectCallParticipantsModal';
 import { SummaryChatModal } from '../modal/SummaryChatModal';
 import { AskAIChatModal } from '../modal/AskAIChatModal';
+import { AISummaryModal } from '../modal/AISummaryModal';
 import useUser from '@/hooks/useUser';
 import {
   useBlockUser,
@@ -51,15 +52,15 @@ import toast from 'react-hot-toast';
 
 interface ChatHeaderProps {
   otherParticipant:
-    | {
-        user_id: string;
-        profile: {
-          display_name: string;
-          avatar_url?: string;
-          status?: string;
-        };
-      }
-    | undefined;
+  | {
+    user_id: string;
+    profile: {
+      display_name: string;
+      avatar_url?: string;
+      status?: string;
+    };
+  }
+  | undefined;
   typingUsers: string[];
   onSearch?: (query: string, direction: 'next' | 'prev') => void;
   searchResults?: { current: number; total: number };
@@ -115,6 +116,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showSelectCallModal, setShowSelectCallModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showAskAIModal, setShowAskAIModal] = useState(false);
+  const [showAISummaryModal, setShowAISummaryModal] = useState(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [callIsVideo, setCallIsVideo] = useState(false);
 
@@ -149,17 +151,17 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const avatarUrl = isGroupChat
     ? getGroupPhotoUrl(conversation?.photo_url) || '/default-avatar.png'
     : getAvatarUrl(otherParticipant?.profile.avatar_url) ||
-      '/default-avatar.png';
+    '/default-avatar.png';
 
   const statusText = isGroupChat
     ? `${conversation?.participants?.length || 0} thành viên`
     : isBlockedByUser
-    ? 'Đã bị chặn'
-    : typingUsers.length > 0
-    ? 'Đang nhập...'
-    : otherParticipant?.profile.status === 'online'
-    ? 'Đang hoạt động'
-    : 'Không hoạt động';
+      ? 'Đã bị chặn'
+      : typingUsers.length > 0
+        ? 'Đang nhập...'
+        : otherParticipant?.profile.status === 'online'
+          ? 'Đang hoạt động'
+          : 'Không hoạt động';
 
   const handleBlock = async () => {
     if (!otherUserId) return;
@@ -425,6 +427,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             </Button>
           )}
 
+          {/* AI Summary button */}
+          {conversation && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full text-xs px-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:text-purple-300 dark:hover:bg-purple-900/30"
+              onClick={() => setShowAISummaryModal(true)}
+              title="AI Tóm tắt nội dung"
+            >
+              <Sparkles className="size-4 mr-1" />
+              AI Tóm tắt
+            </Button>
+          )}
+
           {/* Create Thread button (only for groups) */}
           {onCreateThread && isGroupChat && (
             <Button
@@ -604,6 +620,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onOpenChange={setShowSummaryModal}
           conversationId={conversation.id}
           conversationName={conversation.title || 'Nhóm'}
+        />
+      )}
+
+      {/* AI Summary Modal */}
+      {conversation && (
+        <AISummaryModal
+          open={showAISummaryModal}
+          onOpenChange={setShowAISummaryModal}
+          conversationId={conversation.id}
+          conversationName={
+            isGroupChat
+              ? conversation.title || 'Nhóm'
+              : otherParticipant?.profile?.display_name || 'Cuộc trò chuyện'
+          }
         />
       )}
 

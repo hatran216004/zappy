@@ -324,6 +324,13 @@ export const useSendTextMessage = () => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversations(variables.senderId)
       });
+
+      // Invalidate valid links if content has URL
+      if (variables.content && /(https?:\/\/[^\s]+)/g.test(variables.content)) {
+        queryClient.invalidateQueries({
+          queryKey: ['conversation-links', variables.conversationId]
+        });
+      }
     }
   });
 };
@@ -351,6 +358,17 @@ export const useSendFileMessage = () => {
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversations(variables.senderId)
       });
+
+      // Invalidate media or files based on type
+      if (['image', 'video'].includes(variables.type)) {
+        queryClient.invalidateQueries({
+          queryKey: ['conversation-media', variables.conversationId]
+        });
+      } else if (variables.type === 'file' || variables.type === 'audio') {
+        queryClient.invalidateQueries({
+          queryKey: ['conversation-files', variables.conversationId]
+        });
+      }
     },
     onError: (err) => {
       const errorMessage =
@@ -668,6 +686,30 @@ export const useMessagesRealtime = (
         queryClient.invalidateQueries({
           queryKey: chatKeys.conversations(currentUserId)
         });
+
+        // Invalidate media/files/links based on message content
+        if (['image', 'video'].includes(newMessage.type)) {
+          queryClient.invalidateQueries({
+            queryKey: ['conversation-media', conversationId]
+          });
+        }
+
+        if (newMessage.type === 'file') {
+          queryClient.invalidateQueries({
+            queryKey: ['conversation-files', conversationId]
+          });
+        }
+
+        // Check for links in text messages
+        if (
+          newMessage.type === 'text' &&
+          newMessage.content_text &&
+          /(https?:\/\/[^\s]+)/g.test(newMessage.content_text)
+        ) {
+          queryClient.invalidateQueries({
+            queryKey: ['conversation-links', conversationId]
+          });
+        }
       },
 
       // On Update - update message trong cache
@@ -1033,9 +1075,9 @@ export const useReactionsRealtime = (conversationId: string) => {
                 page.map((msg: any) =>
                   msg.id === message_id
                     ? {
-                        ...msg,
-                        reactions: [...(msg.reactions || []), reaction]
-                      }
+                      ...msg,
+                      reactions: [...(msg.reactions || []), reaction]
+                    }
                     : msg
                 )
               )
@@ -1056,12 +1098,12 @@ export const useReactionsRealtime = (conversationId: string) => {
                 page.map((msg: any) =>
                   msg.id === message_id
                     ? {
-                        ...msg,
-                        reactions: (msg.reactions || []).filter(
-                          (r: any) =>
-                            !(r.user_id === user_id && r.emoji === emoji)
-                        )
-                      }
+                      ...msg,
+                      reactions: (msg.reactions || []).filter(
+                        (r: any) =>
+                          !(r.user_id === user_id && r.emoji === emoji)
+                      )
+                    }
                     : msg
                 )
               )
@@ -1401,10 +1443,10 @@ export const useUpdateConversationBackground = () => {
           return old.map((conv: any) =>
             conv.id === conversationId
               ? {
-                  ...conv,
-                  background_type: backgroundType,
-                  background_value: backgroundValue
-                }
+                ...conv,
+                background_type: backgroundType,
+                background_value: backgroundValue
+              }
               : conv
           );
         }
