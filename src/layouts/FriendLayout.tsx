@@ -5,7 +5,7 @@ export default function FriendLayout() {
   return (
     <>
       <FriendSidebar />
-      <main className="col-span-9 p-4 h-screen overflow-y-auto">
+      <main className="col-span-9 p-4 h-[calc(100vh-56px)] overflow-y-auto">
         <Outlet />
       </main>
     </>

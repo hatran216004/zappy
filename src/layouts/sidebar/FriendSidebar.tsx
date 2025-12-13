@@ -27,7 +27,7 @@ export default function FriendSidebar() {
   const friendRequestCount = friendRequests?.length || 0;
 
   return (
-    <div className="col-span-3 overflow-y-auto scrollbar-custom border-r">
+    <div className="col-span-3 overflow-y-auto scrollbar-custom border-r h-[calc(100vh-56px)]">
       <div className="flex flex-col border-t">
         {sidebarButtons.map((link, index) => (
           <SelectableButton
