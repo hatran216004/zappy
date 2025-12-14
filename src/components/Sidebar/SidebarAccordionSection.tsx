@@ -5,7 +5,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Link as LinkIcon } from "lucide-react";
-import { Button } from "../ui/button";
 
 type MediaItem = { src: string; kind?: 'image' | 'video'; id?: string };
 type FileItem = { name: string; size: string; time: string; icon?: string };
@@ -20,7 +19,7 @@ type SidebarAccordionSectionProps = {
   icon?: React.ReactNode;
 };
 
-export function SidebarAccordionSection({
+export default function SidebarAccordionSection({
   type,
   title,
   items = [],
