@@ -45,8 +45,6 @@ export const FriendSearch = () => {
   const sendRequestMutation = useSendFriendRequest();
   const cancelRequestMutation = useCancelFriendRequest();
 
-
-
   const handleSendRequest = async (userId: string) => {
     try {
       await sendRequestMutation.mutateAsync({ userId, message });
