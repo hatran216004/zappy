@@ -22,6 +22,7 @@ import {
   useSendFriendRequest
 } from '@/hooks/useFriends';
 import { getAvatarUrl } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 export const FriendSearch = () => {
   const { user } = useUser();
@@ -44,13 +45,24 @@ export const FriendSearch = () => {
   const sendRequestMutation = useSendFriendRequest();
   const cancelRequestMutation = useCancelFriendRequest();
 
+
+
   const handleSendRequest = async (userId: string) => {
     try {
       await sendRequestMutation.mutateAsync({ userId, message });
       setMessage('');
       setSelectedUser(null);
-    } catch (err) {
+      toast.success('Đã gửi lời mời kết bạn');
+    } catch (err: any) {
       console.error('Error sending friend request:', err);
+      if (
+        err.message ===
+        'Người dùng này đã bật chế độ riêng tư và không nhận lời mời kết bạn'
+      ) {
+        toast.error(err.message);
+      } else {
+        toast.error('Có lỗi xảy ra khi gửi lời mời');
+      }
     }
   };
 
