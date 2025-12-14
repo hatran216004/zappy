@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Search,
@@ -31,14 +32,13 @@ import type { ConversationWithDetails } from '@/services/chatService';
 import type { PinnedMessage } from '@/services/chatService';
 import { InviteLinkModal } from '../modal/InviteLinkModal';
 import { GroupInfoModal } from '../modal/GroupInfoModal';
-import { supabaseUrl, getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
+import { getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
 import { BackgroundPicker } from './BackgroundPicker';
 import { useUpdateConversationBackground } from '@/hooks/useChat';
 import { PinnedMessagesModal } from '../modal/PinnedMessagesModal';
 import { CreatePollModal } from '../modal/CreatePollModal';
 import { SelectCallParticipantsModal } from '../modal/SelectCallParticipantsModal';
 import { SummaryChatModal } from '../modal/SummaryChatModal';
-import { AskAIChatModal } from '../modal/AskAIChatModal';
 import { AISummaryModal } from '../modal/AISummaryModal';
 import useUser from '@/hooks/useUser';
 import {
@@ -115,7 +115,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showSelectCallModal, setShowSelectCallModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [showAskAIModal, setShowAskAIModal] = useState(false);
   const [showAISummaryModal, setShowAISummaryModal] = useState(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [callIsVideo, setCallIsVideo] = useState(false);
@@ -423,7 +422,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               title="Tóm tắt cuộc trò chuyện"
             >
               <BarChart3 className="size-4 mr-1" />
-              Summary
+              Thống kê
             </Button>
           )}
 
