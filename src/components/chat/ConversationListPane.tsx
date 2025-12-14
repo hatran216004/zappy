@@ -2,8 +2,8 @@ import {
   Users,
   AlertTriangle,
   LogOut,
-  Sun,
-  Moon,
+  // Sun,
+  // Moon,
   Star,
   Image,
   FolderOpen,
@@ -59,11 +59,11 @@ export default function ConversationListPane() {
   >('info');
   const [showMediaViewer, setShowMediaViewer] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof document !== 'undefined')
-      return document.documentElement.classList.contains('dark');
-    return true;
-  });
+  // const [isDark, setIsDark] = useState<boolean>(() => {
+  //   if (typeof document !== 'undefined')
+  //     return document.documentElement.classList.contains('dark');
+  //   return true;
+  // });
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       const v = localStorage.getItem('pane_collapsed');
@@ -74,11 +74,11 @@ export default function ConversationListPane() {
   });
 
   // Theme toggle (UI-only, no app logic changed)
-  const toggleTheme = () => {
-    if (typeof document === 'undefined') return;
-    document.documentElement.classList.toggle('dark');
-    setIsDark(document.documentElement.classList.contains('dark'));
-  };
+  // const toggleTheme = () => {
+  //   if (typeof document === 'undefined') return;
+  //   document.documentElement.classList.toggle('dark');
+  //   setIsDark(document.documentElement.classList.contains('dark'));
+  // };
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -310,7 +310,7 @@ export default function ConversationListPane() {
                     <path d="M14 18l-6-6 6-6" />
                   </svg>
                 </button>
-                <button
+                {/* <button
                   onClick={toggleTheme}
                   className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm border border-gray-200 hover:bg-gray-50 active:scale-[.98] transition dark:border-[#3F4246] dark:hover:bg-[#313338] dark:text-[#DCDDDE]"
                   aria-label="Toggle theme"
@@ -324,7 +324,7 @@ export default function ConversationListPane() {
                   <span className="hidden sm:inline">
                     {isDark ? 'Light' : 'Dark'}
                   </span>
-                </button>
+                </button> */}
               </div>
             </>
           )}
