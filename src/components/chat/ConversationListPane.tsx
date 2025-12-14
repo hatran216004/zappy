@@ -21,7 +21,7 @@ import {
 } from '@/hooks/useChat';
 import { getAttachmentUrl, leaveGroup } from '@/services/chatService';
 import { useEffect, useState, useMemo } from 'react';
-import SidebarAccordionSection from '../sidebar/SidebarAccordionSection';
+import SidebarAccordionSection from '@/components/sidebar/SidebarAccordionSection';
 import { twMerge } from 'tailwind-merge';
 import { getAvatarUrl, getGroupPhotoUrl } from '@/lib/supabase';
 import { ReportConversationModal } from '@/components/modal/ReportConversationModal';
