@@ -20,7 +20,7 @@ import {
 } from '@/services/chatService';
 import { useFriends } from '@/hooks/useFriends';
 import { useRemoveGroupMember, useToggleChatEnabled } from '@/hooks/useChat';
-import { supabase, getGroupPhotoUrl } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useConfirm } from './ModalConfirm';
 import { UserAvatar } from '../UserAvatar';
 import {
@@ -39,6 +39,7 @@ import toast from 'react-hot-toast';
 import { TransferAdminModal } from './TransferAdminModal';
 import { ReportConversationModal } from './ReportConversationModal';
 import { twMerge } from 'tailwind-merge';
+import { GroupAvatar } from '../GroupAvatar';
 
 interface GroupInfoModalProps {
   open: boolean;
@@ -310,10 +311,11 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
             {/* Group Photo */}
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
-                <img
-                  src={getGroupPhotoUrl(conversation.photo_url) || '/default-image.png'}
-                  alt={conversation.title || 'Group'}
-                  className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700"
+                <GroupAvatar
+                  photoUrl={conversation.photo_url}
+                  displayName={conversation.title || 'Group'}
+                  className="w-32 h-32 ring-4 ring-gray-200 dark:ring-gray-700"
+                  size="2xl"
                 />
                 {isAdmin && (
                   <button
@@ -550,11 +552,10 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                         {nonMembers.map((friend) => (
                           <div
                             key={friend.id}
-                            className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
-                              selectedMembers.has(friend.id)
-                                ? 'bg-primary/10 border-2 border-primary'
-                                : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent'
-                            }`}
+                            className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${selectedMembers.has(friend.id)
+                              ? 'bg-primary/10 border-2 border-primary'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent'
+                              }`}
                             onClick={() => {
                               const newSelected = new Set(selectedMembers);
                               if (newSelected.has(friend.id)) {
@@ -566,11 +567,10 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                             }}
                           >
                             <div
-                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                selectedMembers.has(friend.id)
-                                  ? 'bg-primary border-primary'
-                                  : 'border-gray-300'
-                              }`}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedMembers.has(friend.id)
+                                ? 'bg-primary border-primary'
+                                : 'border-gray-300'
+                                }`}
                             >
                               {selectedMembers.has(friend.id) && (
                                 <svg

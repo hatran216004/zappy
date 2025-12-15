@@ -315,7 +315,7 @@ export const useBlockUser = () => {
     onSuccess: (_, userId) => {
       queryClient.invalidateQueries({ queryKey: friendKeys.all });
       queryClient.invalidateQueries({ queryKey: ['blocks'] });
-      
+
       // Invalidate specific block status queries
       queryClient.invalidateQueries({ queryKey: ['blocks', 'by-me', userId] });
       queryClient.invalidateQueries({ queryKey: ['blocks', 'by-user', userId] });
@@ -334,12 +334,12 @@ export const useUnblockUser = () => {
       // Invalidate tất cả queries liên quan
       queryClient.invalidateQueries({ queryKey: friendKeys.all });
       queryClient.invalidateQueries({ queryKey: ['blocks'] });
-      
+
       // Invalidate specific block status queries
       queryClient.invalidateQueries({ queryKey: ['blocks', 'by-me', userId] });
       queryClient.invalidateQueries({ queryKey: ['blocks', 'by-user', userId] });
       queryClient.invalidateQueries({ queryKey: ['blocks', 'mutual', userId] });
-      
+
       // Force refetch friends list
       queryClient.refetchQueries({ queryKey: friendKeys.all });
     }
@@ -393,7 +393,7 @@ export const useBlockStatusRealtime = (currentUserId: string) => {
     if (!currentUserId) return;
 
     const channelName = `blocks:${currentUserId}`;
-    
+
     // Remove existing channel if any
     const existingChannel = supabase.getChannels().find(ch => ch.topic === channelName);
     if (existingChannel) {

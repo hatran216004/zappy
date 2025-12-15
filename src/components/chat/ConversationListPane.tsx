@@ -31,6 +31,7 @@ import { GroupInfoModal } from '@/components/modal/GroupInfoModal';
 import { MediaViewerModal } from '@/components/modal/MediaViewerModal';
 import { useConfirm } from '@/components/modal/ModalConfirm';
 import toast from 'react-hot-toast';
+import { GroupAvatar } from '@/components/GroupAvatar';
 
 export default function ConversationListPane() {
   const { user } = useAuth();
@@ -399,12 +400,21 @@ export default function ConversationListPane() {
         <div className="h-[calc(100vh-115px)] overflow-y-auto discord-scroll">
           {/* Avatar & Info */}
           <div className="flex flex-col items-center py-6 gap-2 border-b border-gray-200 dark:border-[#3F4246]">
-            <Avatar className="h-20 w-20 ring-4 ring-white dark:ring-[#2B2D31] shadow-lg">
-              <AvatarImage src={avatarUrl || '/default_user.jpg'} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-semibold">
-                {displayName?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            {conversation?.type === 'group' ? (
+              <GroupAvatar
+                photoUrl={conversation.photo_url}
+                displayName={displayName}
+                className="h-20 w-20 ring-4 ring-white dark:ring-[#2B2D31] shadow-lg"
+                size="xl"
+              />
+            ) : (
+              <Avatar className="h-20 w-20 ring-4 ring-white dark:ring-[#2B2D31] shadow-lg">
+                <AvatarImage src={avatarUrl || '/default_user.jpg'} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-semibold">
+                  {displayName?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            )}
 
             <div className="text-center px-4">
               <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
@@ -500,14 +510,17 @@ export default function ConversationListPane() {
             )}
 
             {/* Thông tin */}
-            <SimpleSection
-              icon={<Info className="w-5 h-5 text-gray-500" />}
-              label="Thông tin"
-              onClick={() => {
-                setGroupInfoDefaultTab('info');
-                setShowGroupInfoModal(true);
-              }}
-            />
+
+            {conversation?.type === 'group' &&
+              <SimpleSection
+                icon={<Info className="w-5 h-5 text-gray-500" />}
+                label="Thông tin"
+                onClick={() => {
+                  setGroupInfoDefaultTab('info');
+                  setShowGroupInfoModal(true);
+                }}
+              />
+            }
 
             {/* Danger zone */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#3F4246]">

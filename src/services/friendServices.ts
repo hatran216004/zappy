@@ -312,7 +312,18 @@ export const getSentFriendRequests = async (userId: string) => {
 };
 
 // Lấy danh sách bạn bè (bao gồm cả những người bị block)
-export const getFriends = async (): Promise<Friend[]> => {
+export interface FriendWithDetails extends Partial<Friend> {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string;
+  status: string;
+  last_seen_at?: string;
+  label_id?: string[];
+  isBlocked?: boolean;
+}
+
+export const getFriends = async (): Promise<FriendWithDetails[]> => {
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -320,8 +331,7 @@ export const getFriends = async (): Promise<Friend[]> => {
 
   if (!currentUserId) return [];
 
-  // Query trực tiếp từ table friends để lấy tất cả bạn bè (kể cả bị block)
-  // Thay vì dùng RPC get_friends vì RPC có thể filter ra blocked users
+  // Query trực tiếp từ table friends để lấy tất cả bạn bè
   const { data: friendsData, error: friendsError } = await supabase
     .from('friends')
     .select('friend_id')
@@ -332,22 +342,34 @@ export const getFriends = async (): Promise<Friend[]> => {
     throw friendsError;
   }
 
-  console.log(
-    '📋 Friends from database:',
-    friendsData?.length || 0,
-    friendsData
-  );
+  // Query bảng blocks để lấy danh sách đã chặn
+  // Để đảm bảo hiển thị cả những người đã bị chặn (ngay cả khi friendship bị xoá)
+  const { data: blockedData, error: blockedError } = await supabase
+    .from('blocks')
+    .select('blocked_id')
+    .eq('blocker_id', currentUserId);
 
-  if (!friendsData || friendsData.length === 0) return [];
+  if (blockedError) {
+    console.error('Error fetching blocked users:', blockedError);
+  }
 
-  const friendIds = friendsData.map((f) => f.friend_id);
-  console.log('👥 Friend IDs:', friendIds);
+  const blockedIds = new Set(blockedData?.map((b) => b.blocked_id) || []);
+  const friendIds = new Set([
+    ...(friendsData?.map((f) => f.friend_id) || []),
+    ...blockedIds
+  ]);
+
+  // Convert Set back to array specifically for the query
+  const allUserIds = Array.from(friendIds);
+  console.log('👥 Combined User IDs (Friends + Blocked):', allUserIds);
+
+  if (allUserIds.length === 0) return [];
 
   // Lấy thông tin profiles
   const { data: profilesData, error: profilesError } = await supabase
     .from('profiles')
     .select('id, display_name, username, avatar_url, status, last_seen_at')
-    .in('id', friendIds)
+    .in('id', allUserIds)
     .eq('is_disabled', false);
 
   if (profilesError) throw profilesError;
@@ -356,7 +378,7 @@ export const getFriends = async (): Promise<Friend[]> => {
   const { data: labelsData } = await supabase
     .from('contact_label_map')
     .select('friend_id, label_id')
-    .in('friend_id', friendIds);
+    .in('friend_id', allUserIds);
 
   // Group labels by friend_id
   const labelsMap = new Map<string, string[]>();
@@ -368,14 +390,15 @@ export const getFriends = async (): Promise<Friend[]> => {
   });
 
   // Map to Friend format
-  const friends: Friend[] = (profilesData || []).map((profile) => ({
+  const friends: FriendWithDetails[] = (profilesData || []).map((profile) => ({
     id: profile.id,
     display_name: profile.display_name,
     username: profile.username,
     avatar_url: profile.avatar_url || '',
     status: profile.status || 'offline',
     last_seen_at: profile.last_seen_at || '',
-    label_id: labelsMap.get(profile.id) || []
+    label_id: labelsMap.get(profile.id) || [],
+    isBlocked: blockedIds.has(profile.id)
   }));
 
   return friends;
@@ -791,35 +814,39 @@ export const unblockUser = async (userId: string): Promise<void> => {
 
   console.log('✅ Block deleted successfully');
 
-  // Kiểm tra xem friendship có còn tồn tại không
-  // Nếu không có, có thể đã bị xóa khi block (do RPC block_user)
-  // Cần tạo lại friendship
-  console.log('🔍 Checking if friendship exists...');
-  const { data: friendshipCheck } = await supabase
-    .from('friends')
-    .select('id')
-    .eq('user_id', currentUserId)
-    .eq('friend_id', userId)
-    .maybeSingle();
+  // Recreate bidirectional friendship using RPC function
+  // This ensures both users can see each other in their friend lists
+  console.log('🔄 Recreating bidirectional friendship...');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: rpcError } = await (supabase.rpc as any)('recreate_friendship_bidirectional', {
+    _other_user_id: userId
+  });
 
-  if (!friendshipCheck) {
-    console.log('⚠️ Friendship does not exist, recreating...');
+  if (rpcError) {
+    console.error('❌ Error recreating bidirectional friendship:', rpcError);
+    // Fallback: Try to create just our side of friendship
+    console.log('⚠️ Falling back to one-directional friendship...');
+    const { data: friendshipCheck } = await supabase
+      .from('friends')
+      .select('id')
+      .eq('user_id', currentUserId)
+      .eq('friend_id', userId)
+      .maybeSingle();
 
-    // Tạo lại friendship
-    const { error: friendError } = await supabase.from('friends').insert({
-      user_id: currentUserId,
-      friend_id: userId
-    });
+    if (!friendshipCheck) {
+      const { error: friendError } = await supabase.from('friends').insert({
+        user_id: currentUserId,
+        friend_id: userId
+      });
 
-    if (friendError) {
-      console.error('❌ Error recreating friendship:', friendError);
-      // Không throw error vì có thể friendship đã bị xóa trước đó
-      // User có thể cần kết bạn lại
-    } else {
-      console.log('✅ Friendship recreated successfully');
+      if (friendError) {
+        console.error('❌ Error recreating one-directional friendship:', friendError);
+      } else {
+        console.log('✅ One-directional friendship recreated');
+      }
     }
   } else {
-    console.log('✅ Friendship still exists');
+    console.log('✅ Bidirectional friendship recreated successfully');
   }
 };
 

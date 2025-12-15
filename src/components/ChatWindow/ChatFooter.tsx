@@ -206,22 +206,22 @@ export default function ChatFooter({
         requestAnimationFrame(() => {
           const activeItem = mentionItemRefs.current[activeMentionIndex];
           const container = mentionRef.current;
-          
+
           if (!activeItem || !container) return;
-          
+
           // Get bounding rectangles
           const containerRect = container.getBoundingClientRect();
           const itemRect = activeItem.getBoundingClientRect();
-          
+
           // Calculate item's scroll position
           const itemTopInScroll = container.scrollTop + (itemRect.top - containerRect.top);
           const itemHeight = activeItem.offsetHeight;
           const itemBottomInScroll = itemTopInScroll + itemHeight;
-          
+
           // Current viewport
           const viewportTop = container.scrollTop;
           const viewportBottom = viewportTop + container.clientHeight;
-          
+
           // Scroll if needed
           if (itemTopInScroll < viewportTop) {
             // Item is above - scroll to show it
@@ -272,31 +272,31 @@ export default function ChatFooter({
       requestAnimationFrame(() => {
         const activeItem = mentionItemRefs.current[index];
         const container = mentionRef.current;
-        
+
         if (!activeItem || !container) return;
-        
+
         // Get bounding rectangles
         const containerRect = container.getBoundingClientRect();
         const itemRect = activeItem.getBoundingClientRect();
-        
+
         // Check if item is visible
-        const isFullyVisible = 
-          itemRect.top >= containerRect.top && 
+        const isFullyVisible =
+          itemRect.top >= containerRect.top &&
           itemRect.bottom <= containerRect.bottom;
-        
+
         if (!isFullyVisible) {
           // Calculate scroll position
           // The item's position relative to container's scroll position
           const relativeTop = itemRect.top - containerRect.top;
           const currentScroll = container.scrollTop;
           const itemScrollPosition = currentScroll + relativeTop;
-          
+
           const itemHeight = activeItem.offsetHeight;
           const containerHeight = container.clientHeight;
-          
+
           // Determine scroll target
           let scrollTarget: number;
-          
+
           if (itemRect.top < containerRect.top) {
             // Item is above - scroll to show it at top
             scrollTarget = itemScrollPosition - 4;
@@ -304,7 +304,7 @@ export default function ChatFooter({
             // Item is below - scroll to show it at bottom
             scrollTarget = itemScrollPosition + itemHeight - containerHeight + 4;
           }
-          
+
           // Perform scroll
           container.scrollTo({
             top: Math.max(0, scrollTarget),
@@ -593,7 +593,7 @@ export default function ChatFooter({
                           const itemBottomInScroll = itemTopInScroll + itemHeight;
                           const viewportTop = container.scrollTop;
                           const viewportBottom = viewportTop + container.clientHeight;
-                          
+
                           if (itemTopInScroll < viewportTop) {
                             container.scrollTop = itemTopInScroll - 4;
                           } else if (itemBottomInScroll > viewportBottom) {
@@ -604,11 +604,10 @@ export default function ChatFooter({
                     }
                   }}
                   type="button"
-                  className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
-                    isActive
+                  className={`w-full text-left px-3 py-2 flex items-center gap-2 ${isActive
                       ? 'bg-blue-100 dark:bg-blue-900/30'
                       : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                   onClick={() => insertMention(p)}
                   onMouseEnter={() => setActiveMentionIndex(index)}
                 >
@@ -638,9 +637,8 @@ export default function ChatFooter({
           disabled={disabled || !canSend}
         >
           <Send
-            className={`size-5 ${
-              canSend && !disabled ? 'text-blue-500' : 'text-gray-400'
-            }`}
+            className={`size-5 ${canSend && !disabled ? 'text-blue-500' : 'text-gray-400'
+              }`}
           />
         </Button>
       </div>

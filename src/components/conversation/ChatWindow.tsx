@@ -60,6 +60,7 @@ import { MessageSquare, MapPin } from 'lucide-react';
 import type { ThreadWithDetails } from '@/services/chatService';
 import { MapPanel } from '@/components/map/MapPanel';
 import { supabase } from '@/lib/supabase';
+import { UserAvatar } from '../UserAvatar';
 
 interface ChatWindowProps {
   userId: string;
@@ -622,8 +623,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           const hasAll = mentionedUserIds.includes('ALL');
           let ids = hasAll
             ? (conversation?.participants || [])
-                .map((p) => p.user_id)
-                .filter((id) => id !== userId)
+              .map((p) => p.user_id)
+              .filter((id) => id !== userId)
             : mentionedUserIds;
           // unique
           ids = Array.from(new Set(ids));
@@ -782,12 +783,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
           created_at: new Date().toISOString(),
           message: target
             ? {
-                id: target.id,
-                content_text: target.content_text || '',
-                created_at: target.created_at,
-                type: target.type,
-                sender: target.sender as any
-              }
+              id: target.id,
+              content_text: target.content_text || '',
+              created_at: target.created_at,
+              type: target.type,
+              sender: target.sender as any
+            }
             : undefined
         };
         return [optimistic, ...prev].slice(0, 3);
@@ -1273,61 +1274,80 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ userId }) => {
               </div>
             )}
 
-            {messages.map((message, index) => {
-              const prevMessage = messages[index - 1];
-              const showAvatar =
-                !prevMessage || prevMessage.sender_id !== message.sender_id;
-              const showTimestamp =
-                !prevMessage ||
-                new Date(message.created_at).getTime() -
+            {messages.length === 0 && isDirectChat && otherParticipant ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-60">
+                <UserAvatar
+                  avatarUrl={otherParticipant.profile.avatar_url}
+                  displayName={otherParticipant.profile.display_name}
+                  size="xl"
+                  className="mb-4 w-24 h-24"
+                />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  Nhắn gì đó cho {otherParticipant.profile.display_name}...
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-2">
+                  Hãy gửi lời chào hoặc bắt đầu bằng một câu chuyện thú vị!
+                </p>
+              </div>
+            ) : (
+              messages.map((message, index) => {
+                const prevMessage = messages[index - 1];
+                const showAvatar =
+                  !prevMessage || prevMessage.sender_id !== message.sender_id;
+                const showTimestamp =
+                  !prevMessage ||
+                  new Date(message.created_at).getTime() -
                   new Date(prevMessage.created_at).getTime() >
                   5 * 60 * 1000;
 
-              const isHighlighted =
-                searchResults.length > 0 &&
-                searchResults[currentSearchIndex] === message.id;
+                const isHighlighted =
+                  searchResults.length > 0 &&
+                  searchResults[currentSearchIndex] === message.id;
 
-              return (
-                <div
-                  key={message.id}
-                  ref={(el) => {
-                    messageRefs.current[message.id] = el;
-                  }}
-                  className={twMerge(
-                    'transition-all rounded-lg',
-                    isHighlighted
-                      ? 'ring-2 ring-[#5865F2]/40 bg-gray-100 dark:bg-white/5'
-                      : ''
-                  )}
-                >
-                  <MessageBubble
-                    message={message}
-                    isOwn={message.sender_id === userId}
-                    showAvatar={showAvatar}
-                    showTimestamp={showTimestamp}
-                    onReply={() => setReplyTo(message.id)}
-                    onEdit={(content) => handleEditMessage(message.id, content)}
-                    currentUserId={userId}
-                    isPinned={pinned.some((p) => p.message_id === message.id)}
-                    onPin={() => handlePin(message.id)}
-                    onUnpin={() => handleUnpin(message.id)}
-                    onJumpToMessage={(id) => {
-                      void jumpToMessage(id);
+                return (
+                  <div
+                    key={message.id}
+                    ref={(el) => {
+                      messageRefs.current[message.id] = el;
                     }}
-                    onForward={() => setForwardingMessageId(message.id)}
-                    isAdmin={conversation?.participants?.some(
-                      (p) => p.user_id === userId && p.role === 'admin'
+                    className={twMerge(
+                      'transition-all rounded-lg',
+                      isHighlighted
+                        ? 'ring-2 ring-[#5865F2]/40 bg-gray-100 dark:bg-white/5'
+                        : ''
                     )}
-                    conversationType={conversation?.type}
-                    conversationId={conversationId}
-                    onCreateThread={(messageId, preview) => {
-                      setCreateThreadFromMessage({ messageId, preview });
-                      setShowCreateThreadModal(true);
-                    }}
-                  />
-                </div>
-              );
-            })}
+                  >
+                    <MessageBubble
+                      message={message}
+                      isOwn={message.sender_id === userId}
+                      showAvatar={showAvatar}
+                      showTimestamp={showTimestamp}
+                      onReply={() => setReplyTo(message.id)}
+                      onEdit={(content) =>
+                        handleEditMessage(message.id, content)
+                      }
+                      currentUserId={userId}
+                      isPinned={pinned.some((p) => p.message_id === message.id)}
+                      onPin={() => handlePin(message.id)}
+                      onUnpin={() => handleUnpin(message.id)}
+                      onJumpToMessage={(id) => {
+                        void jumpToMessage(id);
+                      }}
+                      onForward={() => setForwardingMessageId(message.id)}
+                      isAdmin={conversation?.participants?.some(
+                        (p) => p.user_id === userId && p.role === 'admin'
+                      )}
+                      conversationType={conversation?.type}
+                      conversationId={conversationId}
+                      onCreateThread={(messageId, preview) => {
+                        setCreateThreadFromMessage({ messageId, preview });
+                        setShowCreateThreadModal(true);
+                      }}
+                    />
+                  </div>
+                );
+              })
+            )}
 
             {/* Typing indicator */}
             {typingUsers.length > 0 &&

@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,9 +9,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent
 } from "@/components/ui/dropdown-menu";
-import { 
-  useContactLabels, 
-  useAssignLabelToFriend, 
+import {
+  useContactLabels,
+  useAssignLabelToFriend,
   useRemoveLabelFromFriend,
   useBlockUser,
   useUnblockUser,
@@ -32,6 +32,7 @@ interface FriendItemProps {
     avatar_url: string;
     status: string;
     label_id?: string[];
+    isBlocked?: boolean;
   };
   onRemove: () => void;
   onMessage?: (friendId: string) => void;
@@ -61,7 +62,8 @@ export default function FriendItem({
   const removeLabelMutation = useRemoveLabelFromFriend();
   const blockUserMutation = useBlockUser();
   const unblockUserMutation = useUnblockUser();
-  const { data: isBlocked } = useIsBlockedByMe(friend.id);
+  const { data: isBlockedQuery } = useIsBlockedByMe(friend.id);
+  const isBlocked = friend.isBlocked ?? isBlockedQuery;
   const confirm = useConfirm();
 
   const handleMessage = () => {
@@ -72,7 +74,7 @@ export default function FriendItem({
 
   const handleToggleLabel = async (labelId: string) => {
     const hasLabel = friend.label_id?.includes(labelId);
-    
+
     try {
       if (hasLabel) {
         await removeLabelMutation.mutateAsync({
@@ -146,16 +148,11 @@ export default function FriendItem({
       >
         {/* Avatar */}
         <div className="relative shrink-0">
-          <Avatar className="w-12 h-12 ring-1 ring-gray-200 dark:ring-gray-700 flex items-center justify-center rounded-full bg-muted">
-            <AvatarImage
-              className="object-cover rounded-full size-full"
-              src={friend.avatar_url || "/default-avatar.png"}
-              alt={friend.display_name}
-            />
-            <AvatarFallback>
-              {friend.display_name?.[0]?.toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            avatarUrl={friend.avatar_url}
+            displayName={friend.display_name}
+            className="w-12 h-12"
+          />
           {friend.status === "online" && (
             <span
               className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card
@@ -190,9 +187,8 @@ export default function FriendItem({
                   return (
                     <span
                       key={labelId}
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-white ${
-                        LABEL_COLORS[label.color]?.color || 'bg-gray-500'
-                      }`}
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-white ${LABEL_COLORS[label.color]?.color || 'bg-gray-500'
+                        }`}
                     >
                       {label.name}
                     </span>
@@ -234,7 +230,7 @@ export default function FriendItem({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={handleMessage}
               disabled={isBlocked}
               className={isBlocked ? "opacity-50 cursor-not-allowed" : ""}
@@ -262,9 +258,8 @@ export default function FriendItem({
                         onClick={() => handleToggleLabel(label.id)}
                       >
                         <span
-                          className={`w-3 h-3 rounded-full mr-2 ${
-                            LABEL_COLORS[label.color]?.color || 'bg-gray-500'
-                          }`}
+                          className={`w-3 h-3 rounded-full mr-2 ${LABEL_COLORS[label.color]?.color || 'bg-gray-500'
+                            }`}
                         />
                         <span className="flex-1">{label.name}</span>
                         {hasLabel && <Check className="size-4 text-blue-500" />}

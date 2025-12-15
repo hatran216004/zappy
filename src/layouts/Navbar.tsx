@@ -111,7 +111,7 @@ export default function Navbar() {
 
   // Subscribe to notifications realtime
   const { restartSubscription } = useNotificationSubscription(userId || '');
-  
+
   // Set global restart function for use in mute hooks
   useEffect(() => {
     setGlobalNotificationRestart(restartSubscription);
@@ -167,17 +167,12 @@ export default function Navbar() {
       >
         {/* LEFT: Logo + Search */}
         <div className="flex items-center gap-3 min-w-[260px]">
-          {/* Logo tròn (đổi thành nền trắng cho hợp gradient) */}
+          {/* Logo */}
           <button
             onClick={() => navigate('/chat')}
-            className="
-              flex h-10 w-10 items-center justify-center
-              rounded-full bg-white/90
-              text-[#8A3BFF] text-sm font-bold
-              shadow-sm
-            "
+            className="flex items-center justify-center"
           >
-            Z
+            <img src="/icon.png" alt="Zappy" className="h-10 w-10 object-contain" />
           </button>
 
           {/* Ô search giả (mở modal tìm user) – nền trắng mờ, text trắng */}
