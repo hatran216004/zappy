@@ -1,14 +1,14 @@
-import { FriendRequest, Profile } from '@/services/friendServices';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { FriendRequest, Profile } from "@/services/friendServices";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
   useAcceptFriendRequest,
-  useRejectFriendRequest
-} from '@/hooks/useFriends';
-import { Button } from '../ui/button';
-import toast from 'react-hot-toast';
+  useRejectFriendRequest,
+} from "@/hooks/useFriends";
+import { Button } from "../ui/button";
+import toast from "react-hot-toast";
 
 export default function FriendRequestItem({
-  request
+  request,
 }: {
   request: FriendRequest & { from_user: Profile };
 }) {
@@ -18,10 +18,11 @@ export default function FriendRequestItem({
   const handleAccept = async (fromUserId: string) => {
     try {
       await acceptMutation.mutateAsync(fromUserId);
-      toast.success('Đã chấp nhận lời mời kết bạn');
+      toast.success("Đã chấp nhận lời mời kết bạn");
     } catch (err: any) {
-      console.error('Error accepting friend request:', err);
-      const errorMessage = err?.message || 'Không thể chấp nhận lời mời. Vui lòng thử lại.';
+      console.error("Error accepting friend request:", err);
+      const errorMessage =
+        err?.message || "Không thể chấp nhận lời mời. Vui lòng thử lại.";
       toast.error(errorMessage);
     }
   };
@@ -30,23 +31,23 @@ export default function FriendRequestItem({
     try {
       await rejectMutation.mutateAsync(fromUserId);
     } catch (err) {
-      console.error('Error rejecting friend request:', err);
+      console.error("Error rejecting friend request:", err);
     }
   };
 
   return (
     <li
       key={request.id}
-      className="flex items-center gap-4 px-5 py-3 hover:bg-zinc-50/80 transition-colors"
+      className="flex items-center gap-4 px-5 py-3 hover:bg-zinc-50/80 transition-colors "
     >
       {/* Avatar tròn 44px giống Zalo */}
       <Avatar className="h-11 w-11 shrink-0">
         <AvatarImage
-          src={request.from_user.avatar_url || '/default-avatar.png'}
+          src={request.from_user.avatar_url || "/default-avatar.png"}
           alt={request.from_user.display_name}
         />
         <AvatarFallback>
-          {request.from_user.display_name?.[0]?.toUpperCase() || 'U'}
+          {request.from_user.display_name?.[0]?.toUpperCase() || "U"}
         </AvatarFallback>
       </Avatar>
 
@@ -68,12 +69,12 @@ export default function FriendRequestItem({
         )}
 
         <p className="mt-1 text-[12px] text-zinc-400">
-          {new Date(request.created_at).toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+          {new Date(request.created_at).toLocaleDateString("vi-VN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
           })}
         </p>
       </div>
@@ -85,7 +86,7 @@ export default function FriendRequestItem({
           disabled={acceptMutation.isPending || rejectMutation.isPending}
           className="h-8 px-3 text-[13px] font-semibold"
         >
-          {acceptMutation.isPending ? 'Đang xử lý...' : 'Chấp nhận'}
+          {acceptMutation.isPending ? "Đang xử lý..." : "Chấp nhận"}
         </Button>
         <Button
           onClick={() => handleReject(request.from_user_id)}

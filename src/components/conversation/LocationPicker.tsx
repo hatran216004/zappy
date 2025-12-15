@@ -1,25 +1,30 @@
-import { useState } from 'react';
-import { MapPin, Loader2, X, Map, ExternalLink } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState } from "react";
+import { MapPin, Loader2, X, Map, ExternalLink } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface LocationPickerProps {
-  onLocationSelect: (location: { 
-    latitude: number; 
-    longitude: number; 
+  onLocationSelect: (location: {
+    latitude: number;
+    longitude: number;
     address: string;
-    displayMode: 'interactive' | 'static';
+    displayMode: "interactive" | "static";
   }) => void;
   onClose: () => void;
 }
 
-export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProps) {
+export function LocationPicker({
+  onLocationSelect,
+  onClose,
+}: LocationPickerProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<'interactive' | 'static'>('interactive');
+  const [selectedMode, setSelectedMode] = useState<"interactive" | "static">(
+    "interactive"
+  );
 
-  const getCurrentLocation = (mode: 'interactive' | 'static') => {
+  const getCurrentLocation = (mode: "interactive" | "static") => {
     setSelectedMode(mode);
     if (!navigator.geolocation) {
-      toast.error('Trình duyệt không hỗ trợ định vị');
+      toast.error("Trình duyệt không hỗ trợ định vị");
       return;
     }
 
@@ -36,19 +41,20 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
           onLocationSelect({
             latitude,
             longitude,
-            address: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-            displayMode: mode
+            address:
+              address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            displayMode: mode,
           });
 
-          toast.success('Đã lấy vị trí hiện tại');
+          toast.success("Đã lấy vị trí hiện tại");
         } catch (error) {
-          console.error('Geocoding error:', error);
+          console.error("Geocoding error:", error);
           // Still send location even if geocoding fails
           onLocationSelect({
             latitude,
             longitude,
             address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-            displayMode: mode
+            displayMode: mode,
           });
         } finally {
           setIsLoading(false);
@@ -57,26 +63,26 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
       },
       (error) => {
         setIsLoading(false);
-        console.error('Geolocation error:', error);
-        
+        console.error("Geolocation error:", error);
+
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            toast.error('Bạn đã từ chối quyền truy cập vị trí');
+            toast.error("Bạn đã từ chối quyền truy cập vị trí");
             break;
           case error.POSITION_UNAVAILABLE:
-            toast.error('Không thể xác định vị trí');
+            toast.error("Không thể xác định vị trí");
             break;
           case error.TIMEOUT:
-            toast.error('Hết thời gian chờ định vị');
+            toast.error("Hết thời gian chờ định vị");
             break;
           default:
-            toast.error('Lỗi khi lấy vị trí');
+            toast.error("Lỗi khi lấy vị trí");
         }
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 0,
       }
     );
   };
@@ -106,7 +112,7 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
 
           {/* Option 1: Interactive Map */}
           <button
-            onClick={() => getCurrentLocation('interactive')}
+            onClick={() => getCurrentLocation("interactive")}
             disabled={isLoading}
             className="w-full p-4 rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
           >
@@ -116,17 +122,17 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
               </div>
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {isLoading && selectedMode === 'interactive' ? (
+                  {isLoading && selectedMode === "interactive" ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Đang lấy vị trí...
                     </span>
                   ) : (
-                    'Bản đồ tương tác (Khuyên dùng)'
+                    "Bản đồ tương tác (Khuyên dùng)"
                   )}
                 </h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Giống Zalo/Messenger - Người nhận xem trực tiếp trên bản đồ trong app
+                  Người nhận xem trực tiếp trên bản đồ trong app
                 </p>
               </div>
             </div>
@@ -134,7 +140,7 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
 
           {/* Option 2: Static Link */}
           <button
-            onClick={() => getCurrentLocation('static')}
+            onClick={() => getCurrentLocation("static")}
             disabled={isLoading}
             className="w-full p-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
           >
@@ -144,13 +150,13 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
               </div>
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {isLoading && selectedMode === 'static' ? (
+                  {isLoading && selectedMode === "static" ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Đang lấy vị trí...
                     </span>
                   ) : (
-                    'Link Google Maps'
+                    "Link Google Maps"
                   )}
                 </h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -172,29 +178,31 @@ export function LocationPicker({ onLocationSelect, onClose }: LocationPickerProp
 }
 
 // Reverse geocoding using Nominatim (free, no API key needed)
-async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+async function reverseGeocode(
+  latitude: number,
+  longitude: number
+): Promise<string | null> {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
       {
         headers: {
-          'User-Agent': 'Zappy Chat App'
-        }
+          "User-Agent": "Zappy Chat App",
+        },
       }
     );
 
     if (!response.ok) {
-      throw new Error('Geocoding failed');
+      throw new Error("Geocoding failed");
     }
 
     const data = await response.json();
-    
+
     // Format address from components
     const address = data.display_name || null;
     return address;
   } catch (error) {
-    console.error('Reverse geocoding error:', error);
+    console.error("Reverse geocoding error:", error);
     return null;
   }
 }
-
